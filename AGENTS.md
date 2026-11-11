@@ -27,7 +27,7 @@ Bearbeite meine bestehende Anwendung schrittweise. Erzeuge nicht bei jeder Aufga
 - Arbeite im Projektordner `Anwendung/`.
 - Erstelle vor größeren Änderungen einen nachvollziehbaren Sicherungspunkt.
 - Frage vor dem Löschen oder grundlegenden Umbau nach.
-- Dokumentiere abgeschlossene Änderungen in [[CHANGELOG]].
+- Dokumentiere abgeschlossene Änderungen in [[02_Projekte/HTML-App/CHANGELOG|CHANGELOG]].
 
 ## Kommunikation
 
