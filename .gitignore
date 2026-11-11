@@ -1,0 +1,19 @@
+# Temporäre Dateien
+.DS_Store
+Thumbs.db
+*.tmp
+*.log
+
+# Abhängigkeiten
+node_modules/
+
+# Private Zugangsdaten
+.env
+.env.*
+!.env.example
+
+# Backups nicht zusätzlich versionieren
+Backups/
+
+# Editor- und Betriebssystemreste
+.vscode/
