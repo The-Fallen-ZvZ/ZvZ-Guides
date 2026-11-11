@@ -9,6 +9,7 @@
   - Original-Sicherung: `Backups/The-Fallen_2026-11-11_original.html`, byte-identisch
 - `css/` und `js/` sind für eine spätere Aufteilung vorgesehen; `js/features/` für einzelne Funktionsmodule.
 - Erst aufteilen, wenn es ausdrücklich beauftragt wird.
+- **Code-Index:** [[Code-Landkarte]] – Zeilenbereiche, alle Funktionen, Datenkonstanten und typische Änderungsstellen
 
 ## Git-Sicherung (GitHub Desktop)
 

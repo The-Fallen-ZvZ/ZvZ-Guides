@@ -12,6 +12,11 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-11 – Code-Landkarte
+
+- `Dokumentation/Code-Landkarte.md` angelegt: Zeilenbereiche, Seiten-Renderer (`P`), Init-Funktionen (`I`), Einstellungen, Datenkonstanten, externe Quellen, Storage-Keys und „wo ändere ich was“
+- Anwendung selbst unverändert
+
 ### 2026-11-11 – Aufräumen: eine Quelle für die Website
 
 - Root-`index.html` aus dem Repo entfernt (alte Kopie, 185.814 Bytes) – die Website wird nur noch aus `Anwendung/index.html` gebaut
