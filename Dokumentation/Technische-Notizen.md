@@ -68,6 +68,31 @@ Die Website wird aus dem Unterordner `Anwendung/` veröffentlicht; Notizen und D
 
 **Wichtig:** Es gibt keine Echtzeit-Übertragung. Obsidian speichert lokal, GitHub Pages baut erst nach dem Push. Für „automatisch“ müsste ein Watcher regelmäßig committen und pushen.
 
+## Moderator-Zugang & Worker
+
+Zwei getrennte Ebenen – das ist wichtig, wenn ein Passwort geändert wird:
+
+| Ebene | Wo gespeichert | Wirkung |
+| --- | --- | --- |
+| Admin-Login (Seitenzugriff) | Client-JS, `adminLogin()` Zeile 766, Status in `sessionStorage.isAdmin` | entscheidet nur, ob der Moderatorenbereich angezeigt wird |
+| Mod-Key (`modKey`) | Eingabe im Browser, `sessionStorage.feedbackModKey`; serverseitig als Binding **`MOD_KEY`** im Cloudflare Worker | entscheidet, ob Feedback gelesen und Inhalte gespeichert werden dürfen |
+
+Übertragung an den Worker:
+
+| Aktion | Aufruf |
+| --- | --- |
+| Feedback lesen | `GET {FEEDBACK_ENDPOINT}/feedback?key=…` |
+| Inhalt speichern | `POST {CUSTOM_CONTENT_ENDPOINT}` mit `{ key, pageId, html }` |
+| Inhalt zurücksetzen | `DELETE {CUSTOM_CONTENT_ENDPOINT}` mit `{ key, pageId }` |
+| Feedback senden (öffentlich) | `POST {FEEDBACK_ENDPOINT}` mit `{ category, subcategory, message }` – ohne Key |
+
+**Wenn `MOD_KEY` im Worker geändert wird:**
+- Im Repository ist **nichts** zu ändern und nichts zu deployen – der Wert liegt nur in Cloudflare.
+- Wer noch den alten Key im Tab hat, bekommt `Auth failed` bzw. „Server-Fehler“. Einmal neu eingeben (Prompt „Bitte Moderatoren-Passwort …“) oder den Tab schließen; `sessionStorage` wird beim Schließen geleert.
+- Der Seitenzugriff (Admin-Login) bleibt davon unberührt.
+
+**Sicherheitshinweis:** Das Passwort in `adminLogin()` steht im Klartext im öffentlichen Repo und ist im Browser lesbar – es ist kein echter Schutz. Der `MOD_KEY` ist der einzige wirksame Riegel, weil er serverseitig geprüft wird.
+
 ## Umgebung
 
 - Git: `2.55.0.windows.5` installiert
