@@ -52,6 +52,20 @@ HTML-, CSS-, JavaScript- und Dokumentationsdateien werden normal versioniert.
 
 **Windows-Hinweis:** Dateiendungen im Explorer einblenden (`Ansicht → Einblenden → Dateinamenerweiterungen`), damit die Datei nicht als `.gitignore.txt` endet.
 
+## Veröffentlichung (GitHub Pages)
+
+Die Website wird aus dem Unterordner `Anwendung/` veröffentlicht; Notizen und Dokumentation bleiben außen vor.
+
+1. Repository auf GitHub veröffentlichen (öffentlich, damit Pages im kostenlosen Plan läuft):
+   - GitHub Desktop: `Repository → Publish repository`, Häkchen „Keep this code private“ **entfernen**
+   - oder per CLI: `git remote add origin https://github.com/<user>/<repo>.git` und `git push -u origin main`
+2. Im Repository: `Settings → Pages → Build and deployment → Source: GitHub Actions`
+3. Der Workflow `.github/workflows/pages.yml` startet bei jedem Push auf `main` und lädt nur `Anwendung/` hoch
+4. Adresse: `https://<user>.github.io/<repo>/`
+5. Nach jeder Änderung: committen → `Push origin` → nach ca. 30–60 s ist die Seite aktuell
+
+**Wichtig:** Es gibt keine Echtzeit-Übertragung. Obsidian speichert lokal, GitHub Pages baut erst nach dem Push. Für „automatisch“ müsste ein Watcher regelmäßig committen und pushen.
+
 ## Umgebung
 
 - Git: `2.55.0.windows.5` installiert

@@ -12,6 +12,12 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-11 – Deploy-Workflow für GitHub Pages
+
+- `.github/workflows/pages.yml` angelegt: veröffentlicht bei jedem Push auf `main` ausschließlich den Ordner `Anwendung/`
+- Notizen, Dokumentation und `Backups/` werden nicht ins Web-Deploy aufgenommen
+- Noch einzurichten: GitHub-Repository veröffentlichen und `Settings → Pages → Source: GitHub Actions` wählen
+
 ### 2026-11-11 – Link im Rollen-Intro
 
 - In `Anwendung/index.html`, Bereich **Rollen**, Satzende des Introtexts („Hier findest du …“) um Link ergänzt: „Zur AlbionZvZ-Composition“ auf `https://www.albionzvz.com/g/the-fallen/compositions/f730f3e1-87cb-4b2d-b1f8-b743cc887cf3` (`target="_blank"`, `rel="noopener"`, unterstrichen – gleiche Optik wie im Comps-Bereich)
