@@ -12,6 +12,12 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-11 – Link im Rollen-Intro
+
+- In `Anwendung/index.html`, Bereich **Rollen**, Satzende des Introtexts („Hier findest du …“) um Link ergänzt: „Zur AlbionZvZ-Composition“ auf `https://www.albionzvz.com/g/the-fallen/compositions/f730f3e1-87cb-4b2d-b1f8-b743cc887cf3` (`target="_blank"`, `rel="noopener"`, unterstrichen – gleiche Optik wie im Comps-Bereich)
+- Nur diese eine Zeile geändert, JS-Syntax danach geprüft
+- App-interne Versionsnummer unverändert (v1.71.02)
+
 ### 2026-11-11 – Erste Sicherung
 
 - Git-Repository in `02_Projekte/HTML-App` initialisiert, Branch `main`
