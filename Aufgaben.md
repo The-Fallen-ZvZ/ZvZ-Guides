@@ -8,11 +8,13 @@
 - [x] `.gitignore` im Ordner `HTML-App` angelegt (siehe [[Technische-Notizen]])
 - [x] Bestehende HTML-Datei als `Anwendung/index.html` abgelegt (v1.71.02, unverändert, Prüfsumme geprüft)
 - [x] Sicherung des Originals in `Backups/The-Fallen_2026-11-11_original.html`
+- [x] Git-Repository in `02_Projekte/HTML-App` angelegt (Branch `main`)
+- [x] Erste Sicherung committet: `4f25e32` – „Erste vollständige Projektsicherung“ (11 Dateien)
 
 ## Offen
 
-- [ ] Git-Repository für `02_Projekte/HTML-App` in GitHub Desktop anlegen (nicht den ganzen Vault)
-- [ ] Erste Sicherung mit dem Kommentar „Erste vollständige Projektsicherung“ erstellen
+- [ ] Versehentliches Unter-Repo `HTML-App/HTML-App` entfernen (nur `.gitattributes`, derzeit in `.git/info/exclude` ausgeschlossen) – braucht dein OK
+- [ ] Repository in GitHub Desktop öffnen (`File → Add Local Repository` → `02_Projekte/HTML-App`)
 - [ ] OpenCode mit dem Vault als Arbeitsverzeichnis öffnen und [[AGENTS]] beachten lassen
 - [ ] Erste Teständerung an einer einzelnen Funktion durchführen und prüfen
 - [ ] [[Bedienungsanleitung]] und [[Fehler]] mit Inhalten füllen

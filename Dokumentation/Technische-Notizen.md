@@ -56,4 +56,8 @@ HTML-, CSS-, JavaScript- und Dokumentationsdateien werden normal versioniert.
 
 - Git: `2.55.0.windows.5` installiert
 - GitHub Desktop: installiert
-- Repository: noch nicht initialisiert
+- Repository: initialisiert am 11.11.2026, Branch `main`
+  - Erster Commit `4f25e32` – „Erste vollständige Projektsicherung“ (11 Dateien, 1.623 Zeilen)
+  - `core.autocrlf=false` (keine Zeilenenden-Umwandlung, Dateien bleiben byte-identisch)
+  - `Backups/` wird über `.gitignore` nicht versioniert
+- Altlast: `HTML-App/HTML-App/` ist ein versehentlich angelegtes, leeres Repo (nur `.gitattributes`); es ist über `.git/info/exclude` ausgeschlossen und kann entfernt werden.

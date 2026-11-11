@@ -12,4 +12,8 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
-_Noch keine Änderungen im Vault._
+### 2026-11-11 – Erste Sicherung
+
+- Git-Repository in `02_Projekte/HTML-App` initialisiert, Branch `main`
+- Commit `4f25e32`: 11 Dateien, 1.623 Zeilen (Anwendung, Notizen, Dokumentation, `AGENTS.md`, `.gitignore`)
+- `Anwendung/index.html` unverändert übernommen, Prüfsumme vor und nach dem Commit identisch

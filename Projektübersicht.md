@@ -19,6 +19,6 @@ Bestehende HTML-Anwendung, die direkt im Obsidian-Vault gespeichert und dort bea
 
 - Struktur angelegt, Regeln definiert ([[02_Projekte/HTML-App/AGENTS|AGENTS]])
 - Anwendung liegt als `Anwendung/index.html` vor (v1.71.02, unverändert, Sicherung in `Backups/`)
-- Git-Sicherung vorbereitet (`.gitignore`), Repository noch nicht initialisiert
+- Git-Repository initialisiert (Branch `main`, erster Commit `4f25e32`), Status sauber
 
 Nächste Schritte: [[02_Projekte/HTML-App/Aufgaben|Aufgaben]] · Versionen: [[02_Projekte/HTML-App/CHANGELOG|CHANGELOG]] · Funktionen: [[02_Projekte/HTML-App/Dokumentation/Funktionen|Funktionen]]
