@@ -56,13 +56,16 @@ HTML-, CSS-, JavaScript- und Dokumentationsdateien werden normal versioniert.
 
 Die Website wird aus dem Unterordner `Anwendung/` veröffentlicht; Notizen und Dokumentation bleiben außen vor.
 
-1. Repository auf GitHub veröffentlichen (öffentlich, damit Pages im kostenlosen Plan läuft):
-   - GitHub Desktop: `Repository → Publish repository`, Häkchen „Keep this code private“ **entfernen**
-   - oder per CLI: `git remote add origin https://github.com/<user>/<repo>.git` und `git push -u origin main`
-2. Im Repository: `Settings → Pages → Build and deployment → Source: GitHub Actions`
-3. Der Workflow `.github/workflows/pages.yml` startet bei jedem Push auf `main` und lädt nur `Anwendung/` hoch
-4. Adresse: `https://<user>.github.io/<repo>/`
-5. Nach jeder Änderung: committen → `Push origin` → nach ca. 30–60 s ist die Seite aktuell
+- Repository: `https://github.com/The-Fallen-ZvZ/ZvZ-Guides` (öffentlich, Branch `main`)
+- Website: `https://the-fallen-zvz.github.io/ZvZ-Guides/`
+- Workflow: `.github/workflows/pages.yml` (lädt bei jedem Push nur `Anwendung/` hoch)
+
+1. Lokal ändern → Commit → `Push origin`
+2. GitHub Actions baut (~30–60 s), die Seite ist danach aktuell
+
+**Umstellung noch offen:** `Settings → Pages → Build and deployment → Source: GitHub Actions`. Solange dort „Deploy from a branch“ steht, wird die alte `index.html` im Wurzelverzeichnis ausgeliefert und der Workflow läuft ins Leere.
+
+**Altlast:** Im Repo liegt weiterhin eine `index.html` im Wurzelverzeichnis (ältere Kopie der Anwendung, 185.814 Bytes). Sie wird nach der Umstellung nicht mehr ausgeliefert und kann entfernt werden – die History bleibt erhalten.
 
 **Wichtig:** Es gibt keine Echtzeit-Übertragung. Obsidian speichert lokal, GitHub Pages baut erst nach dem Push. Für „automatisch“ müsste ein Watcher regelmäßig committen und pushen.
 
