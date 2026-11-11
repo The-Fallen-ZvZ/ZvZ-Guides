@@ -1,0 +1,1387 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><title>The-Fallen · ZvZ-Guide</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+(function(){
+    try{
+        var s=JSON.parse(localStorage.getItem('tf-settings')||'{}');
+        var t=s.theme||'dark';
+        if(t==='system') t = matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
+        var root = document.documentElement;
+        root.dataset.theme = t;
+        if(s.borderWidth) root.style.setProperty('--bw', s.borderWidth+'px');
+        if(s.radius!=null){
+            var r = s.radius;
+            root.style.setProperty('--r-sm', Math.round(Math.min(8, r*0.67))+'px');
+            root.style.setProperty('--r-md', r+'px');
+            root.style.setProperty('--r-lg', Math.round(Math.min(16, r*1.33))+'px');
+            root.style.setProperty('--r-pill', Math.max(12, Math.round(r*1.67))+'px');
+        }
+        if(s.borderColor) root.style.setProperty('--ln', s.borderColor);
+        if(s.accent) root.style.setProperty('--accent', s.accent);
+        if(s.fontSize==='small') root.dataset.font='small';
+        else if(s.fontSize==='large') root.dataset.font='large';
+        root.dataset.compact = s.compact ? '1' : '0';
+        root.dataset.motion = s.reduceMotion ? 'off' : 'on';
+    }catch(e){}
+})();
+</script>
+<style>
+:root{--bg:#000;--fg:#f5f5f5;--mut:#8c8c8c;--ln:#262626;--cd:#1a1a1a;--hv:#2a2a2a;color-scheme:dark;box-sizing:border-box;--bw:1px;--r-sm:8px;--r-md:12px;--r-lg:16px;--r-pill:20px;font-size:16px}
+:root[data-theme=light]{--bg:#fff;--fg:#0a0a0a;--mut:#666;--ln:#e3e3e3;--cd:#f6f6f6;--hv:#ececec;color-scheme:light}
+:root[data-font="small"]{font-size:14px}
+:root[data-font="large"]{font-size:18px}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px);scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:0.9375rem/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:10}
+a{color:inherit}button,input,textarea,select{font:inherit;color:inherit}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;gap:10px;align-items:center;padding:12px 20px;background:var(--bg);border-bottom:var(--bw) solid var(--ln)}
+header b{letter-spacing:-.02em;white-space:nowrap}header input{flex:1;max-width:420px;margin-left:auto;background:var(--cd);border:var(--bw) solid var(--ln);border-radius:var(--r-sm);padding:7px 12px;outline:0}
+header input:focus,button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid var(--accent,var(--fg));outline-offset:2px}
+.b{background:var(--cd);border:var(--bw) solid var(--ln);border-radius:var(--r-sm);padding:8px 16px;min-height:40px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}.b:hover,.b.on{background:var(--accent,var(--fg));color:var(--bg)}
+#settings-btn, #feedback-btn{padding:8px;min-width:40px}
+.app{display:flex;max-width:1180px;margin:auto}
+nav{width:230px;flex:none;position:sticky;top:77px;align-self:flex-start;height:calc(100vh - 97px);overflow:auto;padding:16px 8px;margin:20px 10px;border:var(--bw) solid var(--ln);border-radius:var(--r-md);background:var(--bg);z-index:10}
+nav a{display:block;padding:8px 12px;border-radius:var(--r-sm);text-decoration:none;color:var(--mut)}nav a:hover{background:var(--hv);color:var(--fg)}nav a.on{color:var(--fg);background:var(--hv);font-weight:600}
+main{flex:1;min-width:0;padding:36px 28px 90px;max-width:820px}
+h1{font-size:clamp(2.2rem,6vw,3.8rem);line-height:1.05;letter-spacing:-.04em;margin:0 0 12px}h2{font-size:1.9rem;letter-spacing:-.03em;margin:0 0 6px}h3{margin:28px 0 8px;font-size:1.05rem}
+.s{color:var(--mut);margin:0 0 24px}.mut{color:var(--mut)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-top:26px}
+.grid a{border:var(--bw) solid var(--ln);border-radius:var(--r-md);padding:14px;text-decoration:none;background:var(--cd);transition:background .15s,border-color .15s}.grid a:hover{background:var(--hv);border-color:var(--mut)}.grid b{display:block}.grid span{color:var(--mut);font-size:.85rem}
+.tw{overflow-x:auto;margin:10px 0}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:9px 12px;border-bottom:var(--bw) solid var(--ln);vertical-align:top}th{color:var(--mut);font-weight:500;font-size:.85rem}
+details{border:var(--bw) solid var(--ln);border-radius:var(--r-md);margin:8px 0;background:var(--cd);scroll-margin-top: 80px;}summary{cursor:pointer;padding:12px 16px;font-weight:600;list-style:none}summary::after{content:"+";float:right;color:var(--mut)}details[open] summary::after{content:"–"}.db{padding:0 16px 14px}
+ul, ol{padding-left:20px;margin:8px 0}.row{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px}
+.card{border:var(--bw) solid var(--ln);border-radius:var(--r-md);padding:16px;background:var(--cd);margin:12px 0;transition: background .15s;}.big{font-size:2.4rem;font-weight:700;letter-spacing:-.03em}
+a.card{display:block;text-decoration:none;} a.card:hover{background:var(--hv);border-color:var(--mut);}
+input[type=range]{width:100%;accent-color:var(--accent,var(--fg))}input.n,textarea,select{background:var(--bg);border:var(--bw) solid var(--ln);border-radius:var(--r-sm);padding:8px;width:100%;color:var(--fg)}input.n{width:90px}
+.chk{display:flex;gap:10px;padding:7px 0}.chk input{accent-color:var(--accent,var(--fg));width:18px;height:18px}
+.tag{color:var(--mut);font-size:.8rem;border:var(--bw) solid var(--ln);border-radius:var(--r-pill);padding:1px 9px}
+.warn-box{border-left:4px solid #ff6b6b;background:rgba(255,107,107,0.1);padding:16px;border-radius:var(--r-sm);margin-top:16px;font-size:0.95rem}
+.warn-box b{color:#ff6b6b;display:block;margin-bottom:4px;font-size:1.05rem}
+.bm-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;}
+.bm-grid button{text-align:left;padding:8px 10px;font-size:0.9em;}
+
+.cat-tanks { border-left: 4px solid #6cb2ff; padding-left: 10px; margin-left: -14px;}
+.cat-supports { border-left: 4px solid #ffa94d; padding-left: 10px; margin-left: -14px;}
+.cat-dps { border-left: 4px solid #ff6b6b; padding-left: 10px; margin-left: -14px;}
+.cat-healer { border-left: 4px solid #5fd38a; padding-left: 10px; margin-left: -14px;}
+.cat-bm { border-left: 4px solid #9ca3af; padding-left: 10px; margin-left: -14px;}
+
+.btn-tanks.on { background: rgba(108,178,255,0.2) !important; border-color: #6cb2ff; color: #6cb2ff; }
+.btn-supports.on { background: rgba(255,169,77,0.2) !important; border-color: #ffa94d; color: #ffa94d; }
+.btn-dps.on { background: rgba(255,107,107,0.2) !important; border-color: #ff6b6b; color: #ff6b6b; }
+.btn-healer.on { background: rgba(95,211,138,0.2) !important; border-color: #5fd38a; color: #5fd38a; }
+.btn-bm.on { background: rgba(156,163,175,0.2) !important; border-color: #9ca3af; color: #e5e7eb; }
+
+.search-section { margin-bottom: 24px; }
+.search-section .cat-name { margin: 0 0 8px 0; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--mut); border-bottom: var(--bw) solid var(--ln); padding-bottom: 4px; }
+.search-item { display: block; padding: 12px 16px; border: var(--bw) solid var(--ln); border-radius: var(--r-sm); background: var(--cd); text-decoration: none; margin-bottom: 8px; transition: background 0.15s; }
+.search-item:hover { background: var(--hv); border-color: var(--mut); }
+.search-item b { display: block; margin-bottom: 4px; color: var(--fg); font-size: 1rem; }
+.search-item span { color: var(--mut); font-size: 0.9em; display: block; line-height: 1.4; }
+
+.video-placeholder { aspect-ratio: 16/9; background: var(--cd); border: var(--bw) solid var(--ln); border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; color: var(--mut); margin-top: 12px; font-weight: 600; }
+
+#splash{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;transition:opacity 0.8s ease;}
+#splash-box{border:4px solid var(--accent,var(--fg));padding:60px 40px;text-align:center;width:100%;max-width:600px;margin:20px;animation:fadeIn 1s ease;}
+#splash h1{font-size:2.5rem;margin:0 0 20px;letter-spacing:2px;color:var(--accent,var(--fg));}
+#splash h2{font-size:1.5rem;font-weight:400;margin:0 0 60px;color:var(--mut);letter-spacing:4px;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ============================================================
+   SETTINGS PAGE
+   ============================================================ */
+.settings-grid{display:flex;flex-direction:column;gap:16px;margin-top:24px}
+.settings-section{border:var(--bw) solid var(--ln);border-radius:var(--r-md);padding:20px;background:var(--cd)}
+.settings-section h3{margin:0 0 8px;font-size:1.05rem}
+.setting-row{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 0;border-bottom:var(--bw) solid var(--ln);flex-wrap:wrap}
+.setting-row:last-child{border-bottom:none;padding-bottom:0}
+.setting-row:first-of-type{padding-top:8px}
+.setting-row>div:first-child{flex:1;min-width:180px}
+.setting-row b{display:block;font-weight:600}
+.setting-row .mut{margin:4px 0 0;font-size:.85rem;line-height:1.5}
+.setting-control{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+.segmented{display:inline-flex;background:var(--bg);border:var(--bw) solid var(--ln);border-radius:var(--r-sm);overflow:hidden}
+.segmented button{background:transparent;border:0;padding:8px 14px;color:var(--mut);cursor:pointer;font-size:.9rem;transition:background .15s,color .15s}
+.segmented button:hover{background:var(--hv);color:var(--fg)}
+.segmented button.on{background:var(--accent,var(--fg));color:var(--bg);font-weight:600}
+
+.switch{position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0;position:absolute}
+.switch span{position:absolute;inset:0;background:var(--hv);border:var(--bw) solid var(--ln);border-radius:24px;cursor:pointer;transition:background .2s,border-color .2s}
+.switch span::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;background:var(--fg);border-radius:50%;transition:transform .2s,background .2s}
+.switch input:checked+span{background:var(--accent,#c4a1ff);border-color:var(--accent,#c4a1ff)}
+.switch input:checked+span::after{transform:translateX(20px);background:#fff}
+
+.color-swatch-btn{display:inline-flex;align-items:center;gap:10px;padding:6px 12px;background:var(--bg);border:var(--bw) solid var(--ln);border-radius:var(--r-sm);cursor:pointer;font:inherit;color:var(--fg);transition:border-color .15s}
+.color-swatch-btn:hover{border-color:var(--mut)}
+.color-swatch{display:inline-block;width:22px;height:22px;border-radius:6px;border:1px solid rgba(128,128,128,.3);flex-shrink:0}
+.color-swatch-label{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;color:var(--mut)}
+.range-val{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;color:var(--mut);min-width:48px;text-align:right}
+#set-reset-btn{border-color:#ff6b6b!important;color:#ff6b6b!important}
+#set-reset-btn:hover{background:#ff6b6b!important;color:#fff!important;border-color:#ff6b6b!important}
+
+/* ============================================================
+   COLOR PICKER
+   ============================================================ */
+.color-picker-popover{position:fixed;z-index:100;background:var(--bg);border:var(--bw) solid var(--ln);border-radius:var(--r-md);padding:16px;box-shadow:0 16px 48px rgba(0,0,0,.5),0 0 0 1px rgba(128,128,128,.08);width:272px;font-family:system-ui,sans-serif}
+.cp-wheel{position:relative;width:240px;height:240px;margin:0 auto 14px;touch-action:none;user-select:none;-webkit-user-select:none}
+.cp-ring{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,hsl(0,100%,50%),hsl(60,100%,50%),hsl(120,100%,50%),hsl(180,100%,50%),hsl(240,100%,50%),hsl(300,100%,50%),hsl(360,100%,50%));-webkit-mask:radial-gradient(circle at center,transparent 0,transparent 89px,#000 90px,#000 118px,transparent 119px);mask:radial-gradient(circle at center,transparent 0,transparent 89px,#000 90px,#000 118px,transparent 119px);cursor:crosshair}
+.cp-hue-cursor{position:absolute;width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.5),0 2px 8px rgba(0,0,0,.4);transform:translate(-50%,-50%);pointer-events:none;z-index:3}
+.cp-sv{position:absolute;top:60px;left:60px;width:120px;height:120px;border-radius:4px;cursor:crosshair;z-index:2;background:linear-gradient(to bottom,transparent,#000),linear-gradient(to right,#fff,transparent),var(--cp-hue,#f00);box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+.cp-sv-cursor{position:absolute;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.5);transform:translate(-50%,-50%);pointer-events:none;z-index:3}
+.cp-hex-row{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+.cp-hex-label{font-size:.7rem;color:var(--mut);text-transform:uppercase;letter-spacing:1.5px;font-weight:600}
+.cp-hex-input{flex:1;background:var(--cd);border:var(--bw) solid var(--ln);border-radius:6px;padding:7px 10px;color:var(--fg);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.88rem;outline:none}
+.cp-hex-input:focus{border-color:var(--accent,var(--fg))}
+.cp-presets{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-bottom:12px}
+.cp-presets button{aspect-ratio:1;border-radius:6px;border:1px solid rgba(128,128,128,.4);cursor:pointer;padding:0;transition:transform .1s}
+.cp-presets button:hover{transform:scale(1.15)}
+.cp-actions{display:flex;gap:8px;justify-content:flex-end;border-top:var(--bw) solid var(--ln);padding-top:12px}
+.cp-actions button{background:var(--cd);border:var(--bw) solid var(--ln);border-radius:6px;padding:6px 14px;color:var(--fg);cursor:pointer;font-size:.85rem}
+.cp-actions button:hover{background:var(--hv)}
+.cp-actions button.primary{background:var(--accent,var(--fg));color:var(--bg);border-color:transparent;font-weight:600}
+
+/* ============================================================
+   FEEDBACK SYSTEM & MODALS
+   ============================================================ */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9998; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); padding: 16px; }
+.modal-overlay.open { display: flex; }
+.modal-content { background: var(--bg); border: var(--bw) solid var(--ln); border-radius: var(--r-md); padding: 24px; width: 100%; max-width: 500px; box-shadow: 0 16px 40px rgba(0,0,0,0.5); }
+.modal-content h3 { margin-top: 0; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+.modal-content .close-modal { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--mut); padding: 0 8px; line-height: 1; }
+.modal-content .close-modal:hover { color: var(--fg); }
+
+/* ADMIN FEEDBACK & EDITOR */
+.feedback-item { border: var(--bw) solid var(--ln); background: var(--bg); border-radius: var(--r-sm); padding: 16px; margin-bottom: 12px; }
+.feedback-header { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.85rem; color: var(--mut); border-bottom: var(--bw) solid var(--ln); padding-bottom: 8px; }
+.feedback-cat { font-weight: 600; color: var(--accent, var(--fg)); }
+.feedback-msg { font-size: 0.95rem; white-space: pre-wrap; }
+.editor-workspace { border: 1px solid var(--ln); border-radius: 8px; padding: 16px; background: var(--bg); min-height: 200px; outline: none; }
+
+/* COMPACT / MOTION */
+[data-compact="1"] main{padding:20px 16px 60px}
+[data-compact="1"] .card{padding:12px}
+[data-compact="1"] details{margin:4px 0}
+[data-compact="1"] .db{padding:0 12px 10px}
+[data-compact="1"] h1{margin-bottom:8px}
+[data-compact="1"] h2{margin-bottom:4px}
+[data-compact="1"] h3{margin:16px 0 4px}
+[data-compact="1"] .s{margin-bottom:16px}
+[data-compact="1"] .grid{gap:6px;margin-top:16px}
+[data-compact="1"] .grid a{padding:10px}
+[data-compact="1"] .setting-row{padding:10px 0}
+[data-compact="1"] .settings-section{padding:14px}
+[data-compact="1"] .settings-grid{gap:10px}
+
+[data-motion="off"] *, [data-motion="off"] *::before, [data-motion="off"] *::after { animation-duration:0s!important; animation-delay:0s!important; transition-duration:0s!important; transition-delay:0s!important; scroll-behavior:auto!important }
+
+@media(max-width:800px){nav{display:none;position:fixed;inset:57px 10px 10px 10px;width:auto;height:auto;background:var(--bg);z-index:4;margin:10px;padding:16px 8px}nav.o{display:block}main{padding:24px 16px 80px}header{padding:10px 14px}#mb{display:inline-block}}
+@media(min-width:801px){#mb{display:none}}
+@media(max-width:500px){header{padding:8px 10px;gap:6px}header b{display:none}.bm-grid{grid-template-columns:1fr}.color-picker-popover{width:calc(100% - 16px)!important;left:8px!important;right:8px!important;top:auto!important;bottom:16px!important}.setting-row{flex-direction:column;align-items:flex-start}.setting-control{width:100%}}
+</style></head><body>
+<div id="splash"><div id="splash-box"><h1>THE-FALLEN</h1><h2>ZVZ GUIDE</h2><button class="b" onclick="closeSplash()" style="font-size:1.2rem;padding:12px 30px;">Fortfahren</button></div></div>
+
+<!-- FEEDBACK MODAL -->
+<div id="feedback-modal" class="modal-overlay">
+    <div class="modal-content">
+        <h3>Feedback senden <button class="close-modal" onclick="closeFeedback()">×</button></h3>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+            <div>
+                <label style="font-size:0.8rem; color:var(--mut); margin-bottom:4px; display:block;">Bereich</label>
+                <select id="fb-cat" class="n" style="width:100%; padding:10px;">
+                    <option value="">Bitte wählen...</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:0.8rem; color:var(--mut); margin-bottom:4px; display:block;">Thema</label>
+                <select id="fb-subcat" class="n" style="width:100%; padding:10px;" disabled>
+                    <option value="">Bitte zuerst Bereich wählen</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:0.8rem; color:var(--mut); margin-bottom:4px; display:block;">Nachricht</label>
+                <textarea id="fb-msg" class="n" rows="4" placeholder="Dein Feedback..." style="width:100%; padding:10px; resize:vertical;" oninput="localStorage.setItem('fb-draft', this.value)"></textarea>
+            </div>
+            <button class="b" onclick="submitFeedback()" style="width:100%; margin-top:8px; border-color:var(--accent);">Absenden</button>
+            <p id="fb-status" class="mut" style="text-align:center; font-size:0.85rem; margin:0; min-height:1.2em;"></p>
+        </div>
+    </div>
+</div>
+
+<header>
+    <button class="b" id="mb" aria-label="Menü">Menü</button>
+    <b>The-Fallen</b>
+    <input id="q" type="search" placeholder="Im Guide suchen" aria-label="Suche">
+    <button class="b" id="feedback-btn" aria-label="Feedback" title="Feedback"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></button>
+    <button class="b" id="settings-btn" aria-label="Einstellungen" title="Einstellungen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+</header>
+<div class="app"><nav id="nv"></nav><main id="m"></main></div>
+<script>
+const BRAINSTORM_SHEET_URL = 'https://docs.google.com/spreadsheets/d/15bIvKIilpQZ8gCeoDKQvLAUTdTOk1y8v/edit?gid=1327692528#gid=1327692528';
+const FEEDBACK_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev';
+const CUSTOM_CONTENT_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/content';
+
+/* ============================================================
+   SETTINGS
+   ============================================================ */
+const SETTINGS_KEY = 'tf-settings';
+const DEFAULT_SETTINGS = {theme:'dark',borderColor:null,borderWidth:1,radius:12,accent:null,fontSize:'normal',compact:false,reduceMotion:false};
+let settings = {...DEFAULT_SETTINGS};
+
+function loadSettings(){
+    try{
+        const raw = localStorage.getItem(SETTINGS_KEY);
+        if(raw){ settings = {...DEFAULT_SETTINGS, ...JSON.parse(raw)}; }
+        else{
+            const oldTheme = localStorage.getItem('th');
+            if(oldTheme === 'light' || oldTheme === 'dark') settings.theme = oldTheme;
+            saveSettings();
+        }
+    }catch(e){}
+}
+function saveSettings(){ try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }catch(e){} }
+function getEffectiveTheme(){ return settings.theme === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : settings.theme; }
+function getDefaultBorderColor(){ return getEffectiveTheme() === 'light' ? '#e3e3e3' : '#262626'; }
+function getEffectiveBorderColor(){ return settings.borderColor || getDefaultBorderColor(); }
+function getEffectiveAccent(){ return settings.accent || '#c4a1ff'; }
+
+function applySettings(){
+    const root = document.documentElement;
+    root.dataset.theme = getEffectiveTheme();
+    if(settings.borderColor) root.style.setProperty('--ln', settings.borderColor); else root.style.removeProperty('--ln');
+    root.style.setProperty('--bw', settings.borderWidth + 'px');
+    const r = settings.radius;
+    root.style.setProperty('--r-sm', Math.round(Math.min(8, r * 0.67)) + 'px');
+    root.style.setProperty('--r-md', r + 'px');
+    root.style.setProperty('--r-lg', Math.round(Math.min(16, r * 1.33)) + 'px');
+    root.style.setProperty('--r-pill', Math.max(12, Math.round(r * 1.67)) + 'px');
+    if(settings.accent) root.style.setProperty('--accent', settings.accent); else root.style.removeProperty('--accent');
+    if(settings.fontSize === 'small') root.dataset.font = 'small';
+    else if(settings.fontSize === 'large') root.dataset.font = 'large';
+    else delete root.dataset.font;
+    root.dataset.compact = settings.compact ? '1' : '0';
+    root.dataset.motion = settings.reduceMotion ? 'off' : 'on';
+}
+
+loadSettings();
+applySettings();
+
+try{ matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if(settings.theme === 'system') applySettings(); }); }catch(e){}
+
+/* ============================================================
+   COLOR PICKER
+   ============================================================ */
+function hexToHsv(hex){
+    hex = hex.replace('#',''); if(hex.length===3) hex = hex.split('').map(c=>c+c).join('');
+    const r=parseInt(hex.substr(0,2),16)/255, g=parseInt(hex.substr(2,2),16)/255, b=parseInt(hex.substr(4,2),16)/255;
+    const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
+    const v=max, s=max===0?0:d/max;
+    let h=0;
+    if(d!==0){
+        if(max===r) h=60*(((g-b)/d)%6);
+        else if(max===g) h=60*((b-r)/d+2);
+        else h=60*((r-g)/d+4);
+    }
+    if(h<0) h+=360;
+    return {h,s,v};
+}
+function hsvToHex(h,s,v){
+    const c=v*s, x=c*(1-Math.abs(((h/60)%2)-1)), m=v-c;
+    let r,g,b;
+    if(h<60)[r,g,b]=[c,x,0];else if(h<120)[r,g,b]=[x,c,0];else if(h<180)[r,g,b]=[0,c,x];
+    else if(h<240)[r,g,b]=[0,x,c];else if(h<300)[r,g,b]=[x,0,c];else[r,g,b]=[c,0,x];
+    const t=n=>Math.round((n+m)*255).toString(16).padStart(2,'0');
+    return '#'+t(r)+t(g)+t(b);
+}
+
+function openColorPicker(anchor, currentColor, onChange, onAuto){
+    document.querySelectorAll('.color-picker-popover').forEach(el=>el.remove());
+    const init = hexToHsv(currentColor);
+    let state = {h:init.h, s:init.s, v:init.v};
+
+    const pop = document.createElement('div');
+    pop.className = 'color-picker-popover';
+    pop.innerHTML = `
+        <div class="cp-wheel">
+            <div class="cp-ring"></div>
+            <div class="cp-sv"></div>
+            <div class="cp-hue-cursor"></div>
+            <div class="cp-sv-cursor"></div>
+        </div>
+        <div class="cp-hex-row">
+            <span class="cp-hex-label">HEX</span>
+            <input type="text" class="cp-hex-input" value="${currentColor}" maxlength="7" spellcheck="false">
+        </div>
+        <div class="cp-presets">
+            ${['#262626','#3a3a3a','#555555','#888888','#cccccc','#e3e3e3','#f5f5f5','#ffffff'].map(c=>`<button data-color="${c}" style="background:${c}" aria-label="${c}"></button>`).join('')}
+        </div>
+        <div class="cp-actions">
+            <button class="auto-btn">Auto</button>
+            <button class="primary ok-btn">OK</button>
+        </div>
+    `;
+    document.body.appendChild(pop);
+
+    const ring = pop.querySelector('.cp-ring');
+    const sv = pop.querySelector('.cp-sv');
+    const hueCur = pop.querySelector('.cp-hue-cursor');
+    const svCur = pop.querySelector('.cp-sv-cursor');
+    const hexInput = pop.querySelector('.cp-hex-input');
+
+    function render(){
+        const angle = state.h * Math.PI / 180;
+        hueCur.style.left = (120 + 104 * Math.sin(angle)) + 'px';
+        hueCur.style.top  = (120 - 104 * Math.cos(angle)) + 'px';
+        hueCur.style.background = `hsl(${state.h},100%,50%)`;
+        sv.style.setProperty('--cp-hue', `hsl(${state.h},100%,50%)`);
+        svCur.style.left = (60 + state.s * 120) + 'px';
+        svCur.style.top  = (60 + (1-state.v) * 120) + 'px';
+        svCur.style.background = hsvToHex(state.h, state.s, state.v);
+        if(document.activeElement !== hexInput) hexInput.value = hsvToHex(state.h, state.s, state.v);
+    }
+    function commit(){ onChange(hsvToHex(state.h, state.s, state.v)); }
+
+    let ringDrag = false;
+    ring.addEventListener('pointerdown', e=>{
+        const rect = ring.getBoundingClientRect();
+        const dx = e.clientX - (rect.left + rect.width/2);
+        const dy = e.clientY - (rect.top + rect.height/2);
+        const dist = Math.hypot(dx,dy);
+        const scale = rect.width / 240;
+        if(dist < 90*scale || dist > 118*scale) return;
+        ringDrag = true; ring.setPointerCapture(e.pointerId); e.preventDefault(); updateHue(e);
+    });
+    ring.addEventListener('pointermove', e=>{ if(ringDrag) updateHue(e); });
+    ring.addEventListener('pointerup', e=>{ ringDrag=false; try{ring.releasePointerCapture(e.pointerId);}catch(_){} });
+    ring.addEventListener('pointercancel', ()=>{ ringDrag=false; });
+    function updateHue(e){
+        const rect = ring.getBoundingClientRect();
+        const dx = e.clientX - (rect.left + rect.width/2);
+        const dy = e.clientY - (rect.top + rect.height/2);
+        state.h = (Math.atan2(dy,dx) * 180/Math.PI + 90 + 360) % 360;
+        render(); commit();
+    }
+
+    let svDrag = false;
+    sv.addEventListener('pointerdown', e=>{ svDrag=true; sv.setPointerCapture(e.pointerId); e.preventDefault(); updateSV(e); });
+    sv.addEventListener('pointermove', e=>{ if(svDrag) updateSV(e); });
+    sv.addEventListener('pointerup', e=>{ svDrag=false; try{sv.releasePointerCapture(e.pointerId);}catch(_){} });
+    sv.addEventListener('pointercancel', ()=>{ svDrag=false; });
+    function updateSV(e){
+        const rect = sv.getBoundingClientRect();
+        state.s = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        state.v = Math.max(0, Math.min(1, 1 - (e.clientY - rect.top) / rect.height));
+        render(); commit();
+    }
+
+    hexInput.addEventListener('input', ()=>{
+        let val = hexInput.value.trim();
+        if(!val.startsWith('#')) val = '#'+val;
+        if(/^#[0-9a-fA-F]{6}$/.test(val) || /^#[0-9a-fA-F]{3}$/.test(val)){
+            state = hexToHsv(val); render(); commit();
+        }
+    });
+    pop.querySelectorAll('.cp-presets button').forEach(b=>b.addEventListener('click', ()=>{
+        state = hexToHsv(b.dataset.color); render(); commit();
+    }));
+    pop.querySelector('.auto-btn').addEventListener('click', ()=>{ onAuto(); cleanup(); });
+    pop.querySelector('.ok-btn').addEventListener('click', cleanup);
+
+    function position(){
+        pop.style.visibility='hidden';
+        const ar = anchor.getBoundingClientRect();
+        const pr = pop.getBoundingClientRect();
+        let left = ar.left;
+        let top = ar.bottom + 8;
+        if(top + pr.height > innerHeight - 8) top = Math.max(8, ar.top - pr.height - 8);
+        if(left + pr.width > innerWidth - 8) left = innerWidth - pr.width - 8;
+        if(left < 8) left = 8;
+        pop.style.left = left+'px';
+        pop.style.top = top+'px';
+        pop.style.visibility='visible';
+    }
+    if(innerWidth < 500){
+        pop.style.left='8px'; pop.style.right='8px'; pop.style.top='auto'; pop.style.bottom='16px'; pop.style.width='calc(100% - 16px)';
+    } else { position(); }
+
+    function outside(e){
+        if(!pop.contains(e.target) && e.target !== anchor && !anchor.contains(e.target)) cleanup();
+    }
+    setTimeout(()=>document.addEventListener('click', outside), 0);
+    function cleanup(){ pop.remove(); document.removeEventListener('click', outside); }
+
+    render();
+}
+
+/* ============================================================
+   SETTINGS PAGE
+   ============================================================ */
+function settingRowHTML(title, desc, control){
+    return `<div class="setting-row"><div><b>${title}</b><p class="mut">${desc}</p></div><div class="setting-control">${control}</div></div>`;
+}
+
+function renderSettings(){
+    const bc = getEffectiveBorderColor();
+    const ac = getEffectiveAccent();
+    return `<h2>Einstellungen</h2>
+<p class=s>Passe Erscheinungsbild und Darstellung des Guides an deine Vorlieben an. Alle Einstellungen werden lokal in deinem Browser gespeichert.</p>
+<div class="settings-grid">
+    <div class="settings-section">
+        <h3>Erscheinungsbild</h3>
+        ${settingRowHTML('Theme','Hell, Dunkel oder automatisch nach System.',
+            `<div class="segmented" data-setting="theme">
+                <button data-v="system" class="${settings.theme==='system'?'on':''}">System</button>
+                <button data-v="light" class="${settings.theme==='light'?'on':''}">Hell</button>
+                <button data-v="dark" class="${settings.theme==='dark'?'on':''}">Dunkel</button>
+            </div>`)}
+        ${settingRowHTML('Rahmenfarbe','Farbe der dezenten Rahmen um Karten, Details und Tabellen. „Auto" verwendet die themenspezifische Standardfarbe.',
+            `<button class="color-swatch-btn" data-setting="borderColor"><span class="color-swatch" style="background:${bc}"></span><span class="color-swatch-label">${settings.borderColor || 'Auto'}</span></button>`)}
+        ${settingRowHTML('Rahmenbreite','Dicke der Rahmen um Karten, Tabellen und Buttons.',
+            `<div class="segmented" data-setting="borderWidth">
+                <button data-v="1" class="${settings.borderWidth===1?'on':''}">1 px</button>
+                <button data-v="2" class="${settings.borderWidth===2?'on':''}">2 px</button>
+                <button data-v="3" class="${settings.borderWidth===3?'on':''}">3 px</button>
+            </div>`)}
+        ${settingRowHTML('Eckenradius','Wie stark Karten, Buttons und Details abgerundet sind.',
+            `<input type="range" data-setting="radius" min="0" max="24" step="1" value="${settings.radius}" style="width:160px;"><span class="range-val">${settings.radius} px</span>`)}
+        ${settingRowHTML('Akzentfarbe','Farbe für aktive Elemente, Buttons und Hervorhebungen.',
+            `<button class="color-swatch-btn" data-setting="accent"><span class="color-swatch" style="background:${ac}"></span><span class="color-swatch-label">${settings.accent || 'Standard'}</span></button>`)}
+    </div>
+    <div class="settings-section">
+        <h3>Darstellung</h3>
+        ${settingRowHTML('Schriftgröße','Größe der Schrift im gesamten Guide.',
+            `<div class="segmented" data-setting="fontSize">
+                <button data-v="small" class="${settings.fontSize==='small'?'on':''}">S</button>
+                <button data-v="normal" class="${settings.fontSize==='normal'?'on':''}">M</button>
+                <button data-v="large" class="${settings.fontSize==='large'?'on':''}">L</button>
+            </div>`)}
+        ${settingRowHTML('Kompaktmodus','Reduziert Abstände und Paddings für mehr Inhalt auf einen Blick.',
+            `<label class="switch"><input type="checkbox" data-setting="compact" ${settings.compact?'checked':''}><span></span></label>`)}
+        ${settingRowHTML('Animationen reduzieren','Deaktiviert Übergänge und Animationen (barrierefrei).',
+            `<label class="switch"><input type="checkbox" data-setting="reduceMotion" ${settings.reduceMotion?'checked':''}><span></span></label>`)}
+    </div>
+    <div class="settings-section">
+        <div class="setting-row" style="border-bottom:none;padding-bottom:0;">
+            <div><b>Alle Einstellungen zurücksetzen</b><p class="mut">Stellt alle Werte auf die Standardeinstellungen zurück.</p></div>
+            <div class="setting-control"><button class="b" id="set-reset-btn">Zurücksetzen</button></div>
+        </div>
+    </div>
+</div>`;
+}
+
+function initSettings(){
+    const themeSeg = document.querySelector('[data-setting="theme"]');
+    if(themeSeg) themeSeg.querySelectorAll('button').forEach(btn=>btn.addEventListener('click', ()=>{
+        settings.theme = btn.dataset.v; saveSettings(); applySettings();
+        themeSeg.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===btn));
+    }));
+    const bwSeg = document.querySelector('[data-setting="borderWidth"]');
+    if(bwSeg) bwSeg.querySelectorAll('button').forEach(btn=>btn.addEventListener('click', ()=>{
+        settings.borderWidth = parseInt(btn.dataset.v); saveSettings(); applySettings();
+        bwSeg.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===btn));
+    }));
+    const radiusInput = document.querySelector('[data-setting="radius"]');
+    if(radiusInput) radiusInput.addEventListener('input', e=>{
+        settings.radius = parseInt(e.target.value); saveSettings(); applySettings();
+        const lbl = e.target.parentElement.querySelector('.range-val');
+        if(lbl) lbl.textContent = settings.radius + ' px';
+    });
+    const fsSeg = document.querySelector('[data-setting="fontSize"]');
+    if(fsSeg) fsSeg.querySelectorAll('button').forEach(btn=>btn.addEventListener('click', ()=>{
+        settings.fontSize = btn.dataset.v; saveSettings(); applySettings();
+        fsSeg.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===btn));
+    }));
+    const compactInput = document.querySelector('[data-setting="compact"]');
+    if(compactInput) compactInput.addEventListener('change', e=>{ settings.compact = e.target.checked; saveSettings(); applySettings(); });
+    const motionInput = document.querySelector('[data-setting="reduceMotion"]');
+    if(motionInput) motionInput.addEventListener('change', e=>{ settings.reduceMotion = e.target.checked; saveSettings(); applySettings(); });
+
+    const borderBtn = document.querySelector('[data-setting="borderColor"]');
+    if(borderBtn) borderBtn.addEventListener('click', e=>{
+        e.stopPropagation();
+        openColorPicker(borderBtn, getEffectiveBorderColor(),
+            c=>{ settings.borderColor=c; saveSettings(); applySettings();
+                 const s=borderBtn.querySelector('.color-swatch'), l=borderBtn.querySelector('.color-swatch-label');
+                 if(s)s.style.background=c; if(l)l.textContent=c; },
+            ()=>{ settings.borderColor=null; saveSettings(); applySettings();
+                  const c=getEffectiveBorderColor();
+                  const s=borderBtn.querySelector('.color-swatch'), l=borderBtn.querySelector('.color-swatch-label');
+                  if(s)s.style.background=c; if(l)l.textContent='Auto'; });
+    });
+    const accentBtn = document.querySelector('[data-setting="accent"]');
+    if(accentBtn) accentBtn.addEventListener('click', e=>{
+        e.stopPropagation();
+        openColorPicker(accentBtn, getEffectiveAccent(),
+            c=>{ settings.accent=c; saveSettings(); applySettings();
+                 const s=accentBtn.querySelector('.color-swatch'), l=accentBtn.querySelector('.color-swatch-label');
+                 if(s)s.style.background=c; if(l)l.textContent=c; },
+            ()=>{ settings.accent=null; saveSettings(); applySettings();
+                  const c=getEffectiveAccent();
+                  const s=accentBtn.querySelector('.color-swatch'), l=accentBtn.querySelector('.color-swatch-label');
+                  if(s)s.style.background=c; if(l)l.textContent='Standard'; });
+    });
+    const resetBtn = document.getElementById('set-reset-btn');
+    if(resetBtn) resetBtn.addEventListener('click', ()=>{
+        if(!confirm('Alle Einstellungen auf Standard zurücksetzen?')) return;
+        settings = {...DEFAULT_SETTINGS}; saveSettings(); applySettings(); go();
+    });
+}
+
+/* ============================================================
+   FEEDBACK SYSTEM
+   ============================================================ */
+const FB_CATS = {
+    'Startseite': ['Allgemein', 'Design', 'Bug-Report'],
+    'ZvZ-Basics': ['Mindestvoraussetzungen', 'Positionierung', 'Bewegung & Formation', 'Party-Größen', 'Albion Settings'],
+    'Comps': ['Grundkonzept', 'Positionierung (Kreis)', 'Main Engage', 'Brawl Druck', 'Bait & Switch', 'Flood', 'Konter-Taktiken'],
+    'Rollen': ['Caller', 'Tanks', 'Supports', 'DPS', 'Healer', 'Battlemounts'],
+    'Waffen & BMs': ['Tanks', 'Supports', 'Support DPS', 'Clap DDs', 'Brawl DDs', 'Healer', 'Battlemounts'],
+    'Erweitert': ['Buffs & Debuffs', 'Disarray', 'Call-Glossar', 'Castles', 'Territories', 'Outposts', 'Open World', 'Regeln', 'Lootsplit', 'VODs'],
+    'Sonstiges': ['Feedback zur Seite', 'Feature-Wunsch', 'Lob']
+};
+
+function openFeedback(){
+    document.getElementById('feedback-modal').classList.add('open');
+    const catSelect = document.getElementById('fb-cat');
+    if(catSelect.options.length <= 1){
+        Object.keys(FB_CATS).forEach(cat => {
+            const opt = document.createElement('option');
+            opt.value = cat; opt.textContent = cat;
+            catSelect.appendChild(opt);
+        });
+    }
+    // Draft laden
+    const draft = localStorage.getItem('fb-draft');
+    if(draft) document.getElementById('fb-msg').value = draft;
+}
+
+function closeFeedback(){
+    document.getElementById('feedback-modal').classList.remove('open');
+    document.getElementById('fb-status').textContent = '';
+    // Text wird NICHT mehr gelöscht, sondern bleibt im localStorage für den Entwurf
+}
+
+async function submitFeedback(){
+    const cat = document.getElementById('fb-cat').value;
+    const subcat = document.getElementById('fb-subcat').value;
+    const msg = document.getElementById('fb-msg').value.trim();
+    const statusEl = document.getElementById('fb-status');
+
+    if(!cat || !subcat || msg.length < 10) {
+        statusEl.textContent = 'Bitte alle Felder ausfüllen (min. 10 Zeichen).';
+        statusEl.style.color = '#ff6b6b';
+        return;
+    }
+
+    if(!FEEDBACK_ENDPOINT){
+        statusEl.textContent = 'Testmodus: Nachricht lokal gespeichert (Discord nicht verbunden).';
+        statusEl.style.color = '#5fd38a';
+        setTimeout(closeFeedback, 3000);
+        return;
+    }
+
+    statusEl.textContent = 'Wird gesendet...';
+    statusEl.style.color = 'var(--mut)';
+
+    try {
+        const res = await fetch(FEEDBACK_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ category: cat, subcategory: subcat, message: msg })
+        });
+        if(!res.ok) throw new Error('Server-Fehler');
+        
+        // Erfolgreich gesendet: Entwurf löschen
+        localStorage.removeItem('fb-draft');
+        document.getElementById('fb-msg').value = '';
+        
+        statusEl.textContent = 'Erfolgreich gesendet! Vielen Dank.';
+        statusEl.style.color = '#5fd38a';
+        setTimeout(closeFeedback, 3000);
+    } catch (e) {
+        statusEl.textContent = 'Fehler beim Senden. Bitte später erneut versuchen.';
+        statusEl.style.color = '#ff6b6b';
+    }
+}
+
+function initAdminFeedback() {
+    let modKey = sessionStorage.getItem('feedbackModKey');
+    if(!modKey) {
+        modKey = prompt("Bitte Moderatoren-Passwort für Feedback eingeben:");
+        if(modKey) sessionStorage.setItem('feedbackModKey', modKey);
+        else return;
+    }
+    
+    const container = document.getElementById('admin-feedback-content');
+    if(!container) return;
+    container.innerHTML = '<p class="mut">Lade Feedback...</p>';
+
+    fetch(`${FEEDBACK_ENDPOINT}/feedback?key=${encodeURIComponent(modKey)}`)
+        .then(res => {
+            if(!res.ok) throw new Error('Auth failed');
+            return res.json();
+        })
+        .then(data => {
+            if(!data || data.length === 0) {
+                container.innerHTML = '<p class="mut">Noch kein Feedback vorhanden.</p>';
+                return;
+            }
+            
+            const grouped = {};
+            data.forEach(item => {
+                if(!grouped[item.category]) grouped[item.category] = {};
+                if(!grouped[item.category][item.subcategory]) grouped[item.category][item.subcategory] = [];
+                grouped[item.category][item.subcategory].push(item);
+            });
+
+            let html = '';
+            for(const [mainCat, subCats] of Object.entries(grouped)) {
+                let subHtml = '';
+                for(const [subCat, items] of Object.entries(subCats)) {
+                    subHtml += `<h4 style="margin-top:16px; margin-bottom:8px; font-size:1rem; color:var(--fg);">${subCat}</h4>`;
+                    items.forEach(item => {
+                        const date = new Date(item.timestamp || Date.now()).toLocaleString('de-DE');
+                        subHtml += `<div class="feedback-item">
+                            <div class="feedback-header">
+                                <span class="feedback-cat">${item.category} &rsaquo; ${item.subcategory}</span>
+                                <span>${date}</span>
+                            </div>
+                            <div class="feedback-msg">${item.message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+                        </div>`;
+                    });
+                }
+                html += `<details><summary>${mainCat}</summary><div class="db">${subHtml}</div></details>`;
+            }
+            container.innerHTML = html;
+        })
+        .catch(err => {
+            console.error(err);
+            container.innerHTML = '<p class="mut" style="color:#ff6b6b;">Fehler beim Laden. Falsches Passwort oder Server nicht erreichbar.</p>';
+        });
+}
+
+/* ============================================================
+   LIVE EDITOR (CUSTOM CONTENT)
+   ============================================================ */
+let customContent = {};
+
+async function loadCustomContent() {
+    try {
+        const res = await fetch(CUSTOM_CONTENT_ENDPOINT);
+        if(res.ok) customContent = await res.json();
+    } catch(e) { console.warn("Konnte Custom Content nicht laden", e); }
+}
+
+function initAdminEditor() {
+    const container = document.getElementById('admin-editor-content');
+    if(!container) return;
+
+    let modKey = sessionStorage.getItem('feedbackModKey');
+    if(!modKey) {
+        modKey = prompt("Bitte Moderatoren-Passwort eingeben:");
+        if(modKey) sessionStorage.setItem('feedbackModKey', modKey);
+        else { container.innerHTML = '<p class="mut">Passwort erforderlich.</p>'; return; }
+    }
+
+    container.innerHTML = `
+        <div class="card" style="margin-bottom:16px;">
+            <label style="display:block; margin-bottom:8px; font-weight:600;">Welche Seite möchtest du bearbeiten?</label>
+            <select id="editor-page-select" class="n" style="width:100%; padding:10px; margin-bottom:16px;">
+                <option value="">Bitte wählen...</option>
+                ${Object.keys(P).filter(k => k !== 'admin' && k !== 'settings' && k !== 'changelog' && k !== 'admin-feedback' && k !== 'admin-editor' && k !== 'admin-brainstorm').map(k => `<option value="${k}">${N.find(n=>n[0]===k)?.[1] || k}</option>`).join('')}
+            </select>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="b" onclick="loadEditorContent('${modKey}')">Laden</button>
+                <button class="b" onclick="saveEditorContent('${modKey}')" style="border-color:#5fd38a; color:#5fd38a;">Speichern</button>
+                <button class="b" onclick="resetEditorContent('${modKey}')" style="border-color:#ff6b6b; color:#ff6b6b;">Auf Standard zurücksetzen</button>
+            </div>
+        </div>
+        <p class="mut" style="font-size:0.9em; margin-bottom:8px;">Tipp: Ändere nur den Text, nicht die spitzen Klammern (z.B. &lt;details&gt; oder &lt;b&gt;), sonst bricht das Layout.</p>
+        <div id="editor-workspace" class="editor-workspace" contenteditable="true"></div>
+    `;
+
+    window.loadEditorContent = (key) => {
+        const pageId = document.getElementById('editor-page-select').value;
+        if(!pageId) return alert("Bitte eine Seite wählen.");
+        
+        const workspace = document.getElementById('editor-workspace');
+        workspace.innerHTML = customContent[pageId] || (P[pageId] ? P[pageId]() : '');
+    };
+
+    window.saveEditorContent = async (key) => {
+        const pageId = document.getElementById('editor-page-select').value;
+        if(!pageId) return alert("Bitte eine Seite wählen.");
+        
+        const html = document.getElementById('editor-workspace').innerHTML;
+        
+        try {
+            const res = await fetch(CUSTOM_CONTENT_ENDPOINT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: key, pageId: pageId, html: html })
+            });
+            if(res.ok) {
+                alert("Erfolgreich gespeichert! Die Änderungen sind ab sofort für alle sichtbar.");
+                customContent[pageId] = html;
+                if(location.hash === '#' + pageId) go();
+            } else {
+                alert("Fehler beim Speichern (Falscher Key?).");
+            }
+        } catch(e) { alert("Netzwerkfehler beim Speichern."); }
+    };
+
+    window.resetEditorContent = async (key) => {
+        const pageId = document.getElementById('editor-page-select').value;
+        if(!pageId) return alert("Bitte eine Seite wählen.");
+        if(!confirm("Möchtest du die Anpassungen für diese Seite wirklich löschen?")) return;
+        
+        try {
+            const res = await fetch(CUSTOM_CONTENT_ENDPOINT, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: key, pageId: pageId })
+            });
+            if(res.ok) {
+                alert("Auf Standard zurückgesetzt!");
+                delete customContent[pageId];
+                document.getElementById('editor-workspace').innerHTML = P[pageId] ? P[pageId]() : '';
+                if(location.hash === '#' + pageId) go();
+            } else {
+                alert("Fehler beim Zurücksetzen.");
+            }
+        } catch(e) { alert("Netzwerkfehler beim Zurücksetzen."); }
+    };
+}
+
+/* ============================================================
+   GUIDE
+   ============================================================ */
+function closeSplash(){ const s = document.getElementById('splash'); s.style.opacity = '0'; setTimeout(() => { s.style.display = 'none'; }, 800); }
+const $=s=>document.querySelector(s),A=s=>[...document.querySelectorAll(s)];
+const T=(h,r)=>`<div class=tw><table><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${r.map(x=>`<tr>${x.map(y=>`<td>${y}</td>`).join('')}</tr>`).join('')}</table></div>`;
+const L=a=>`<ul>${a.map(x=>`<li>${x}</li>`).join('')}</ul>`;
+const D=(t,b,o,s,i)=>`<details${o?' open':''} ${s?`style="${s}"`:''} ${i?`id="${i}"`:''}><summary>${t}</summary><div class=db>${b}</div></details>`;
+
+let isAdmin = sessionStorage.getItem('isAdmin') === 'true';
+function adminLogin(e){ if(e) e.preventDefault(); if (isAdmin) { location.hash = '#admin'; return; } const pwd = prompt("Bitte Moderatoren-Passwort eingeben:"); if (pwd === "1230") { isAdmin = true; sessionStorage.setItem('isAdmin', 'true'); location.hash = '#admin'; location.reload(); } else if (pwd !== null) { alert("Falsches Passwort!"); } }
+function adminLogout(e){ e.preventDefault(); isAdmin = false; sessionStorage.removeItem('isAdmin'); location.hash = '#start'; location.reload(); }
+
+const GL_CAT = {
+    'Caller & Movement': [
+        ['Looking (We are looking)', 'Wir suchen den Engage. Alle bereiten sich vor (Spreaden, Flanken bilden).'],
+        ['They are looking', 'Der Gegner sucht den Engage. Sofort spreaden und Defensives bereithalten.'],
+        ['Push', 'Vorstoßen. Befehl für die Melee DPS, um massiven Druck auszuüben. (Gilt nicht für Heiler/Ranged).'],
+        ['Full Run / Back Out', 'Sofortiger, kompletter Rückzug. Schaden ignorieren und rennen.'],
+        ['Kite', 'Beweglich kämpfen, Abstand halten, Cooldowns nutzen.'],
+        ['Soft Kiting', 'Gegen Brawl: Abstand halten, aber nicht wegrennen. Zeit gewinnen, um CDs zu resetten.'],
+        ['Hold', 'Front halten. Nicht weiter vorrücken und Gegner per CC stoppen.'],
+        ['Brawl [Richtung]', 'z.B. "Brawl West". Die Brawler sollen in die genannte Richtung Druck ausüben und ihre E dort abwerfen.'],
+        ['Stabilize', 'Stabilisieren. Nach einem harten Engage die Gruppe wieder hochheilen und sichern.']
+    ],
+    'Combat & Taktik': [
+        ['Defenses / Defensives', 'Aufruf, sofort die Schutzfähigkeiten (Demon Armor, Guard Rune, Judicator) zu zünden, um Schaden abzufangen.'],
+        ['Counter Engage', 'Kontern. Nachdem der Gegner engagt hat, sofort selbst offensiv werden, da seine Fähigkeiten auf Cooldown sind.'],
+        ['Fake Engage', 'Schein-Engage. Ein vorgetäuschter Engage, um die Defensives des Gegners zu verbrennen.'],
+        ['Execute', 'Niedrige HP-Ziele sofort fokussieren und töten (z.B. durch Bloodletter).'],
+        ['Purge', 'Gegnerische positive Buffs entfernen (z.B. Heavy Mace purged Soldier Armors).'],
+        ['Headbutt', 'Spezifischer Call für Locus/Oathkeepers, um einen Engage einzuleiten oder zu blocken.'],
+        ['Mark', 'Vom Caller gesetztes Ziel für Engage oder Fokus.']
+    ],
+    'Mechaniken': [
+        ['Clap', 'Koordinierter Burst: viele Fähigkeiten gleichzeitig auf Call.'],
+        ['Clump', 'Gegner stehen eng zusammen und sind für AoE angreifbar.'],
+        ['Engage', 'Gemeinsamer Beginn des Fights.'],
+        ['Disengage', 'Geordneter Rückzug aus dem Fight.'],
+        ['Fokus', 'Alle schießen auf dasselbe Ziel.'],
+        ['Peel', 'Gegner von der eigenen Backline wegziehen oder aufhalten.'],
+        ['Setup', 'Burst durch Kontrolle und Position vorbereiten.'],
+        ['Shred / Pierce', 'Rüstung und Magieresistenz des Ziels senken.'],
+        ['Cleanse', 'Entfernt negative Effekte wie CC.'],
+        ['DR', 'Diminishing Returns: wiederholtes CC wird kürzer.'],
+        ['Top-up / HoT', 'Heilung über Zeit, hält die Gruppe voll.'],
+        ['Dismount', 'Vom Mount absteigen, um zu kämpfen.'],
+        ['Overextension', 'Zu weit vorgelaufen und dafür bestraft.'],
+        ['Choke', 'Engpass wie Brücke, Tunnel oder Gate.'],
+        ['Gate', 'Tor in Castle oder Terri.'],
+        ['Prime Time', 'Zeitfenster für Terri-Angriffe.'],
+        ['Resetday', 'Monatlicher Territory-Reset (1x im Monat), Season-Reset (alle 3 Monate) und wöchentliche Wartung. Wichtig: Castlekisten sind an diesen Tagen golden.'],
+        ['Cap-Kreis', 'Nur eine Gilde darf beim Cappen im Kreis stehen.'],
+        ['BM', 'Battlemount.'],
+        ['CTA', 'Call to Arms: Aufruf zum Content.'],
+        ['Regear', 'Ausrüstungsersatz nach dem Content.']
+    ]
+};
+
+const HS=[0,0,35.3,35.3,43,49.4,54.7,59.2,63,66.2,69,71.3,73.4,75.2,76.8,78.2];
+const BM_DATA=[['Battle Rhino',2],['Ancient Ent',2],['Siege Ballista',2],['Goliath Horseeater',3],['Battle Eagle',4],['Behemoth',4],['Juggernaut',4],['Command Mammoth',5],['Roving Bastion',5],['Tower Chariot',5],['Phalanx Beetle',0],['Colossus Beetle',0],['Flame Basilisk',0],['Venom Basilisk',0]];
+const PT=[['Kleine Party','5–10 Spieler','Roaming, Scouting, kleine Scrims, Ganking; gut zum Abfangen von Regears.'],['Small scale Party','10–20 Spieler','Ab 20 = volle Party. Perfekt für Outposts und größere Fights. Optimierte Comp mit Caller, wo alle Core-Rollen besetzt sind.'],['Mid scale','ab ca. 25 bis 45–50 Spieler','Castle-Sieges, Terry Sieges. Optimierte Comp mit Caller, in der alle Core-Rollen besetzt sind.'],['Large Scale','ab 50–150 Spieler','<span class=tag>TODO</span>']];
+const MC_TEXT = `Unsere Comp ist eine Melee Clap. Wir spielen derzeit noch weniger mit dem Brawl/Flood Part, da unsere Comp durch die aktuelle Meta auf viele Longbows bzw. Demonfangs ausgelegt ist. Der Fokus liegt stark auf der Kreis-Mechanik (Positionierung) und dem kontrollierten Clap. Die Brawler zwingen den Gegner an den Außenseiten unter Druck, während unser Main-Engage (Party 1) im Zentrum die Lücken für die Kills ausnutzt.`;
+
+const SVG_TERR = {
+    farm1: `<svg viewBox="0 0 200 120" style="width:100%; display:block;"><polygon points="100,10 190,60 100,110 10,60" fill="#4a7c44" stroke="#2d5a27" stroke-width="2"/><polygon points="100,25 160,55 100,85 40,55" fill="#7db2d9"/><polygon points="100,45 130,60 100,75 70,60" fill="#7db2d9"/><polygon points="70,50 80,55 80,60 70,55" fill="#cbd5e1"/><polygon points="80,55 90,60 90,65 80,60" fill="#cbd5e1"/><polygon points="100,10 110,15 110,20 100,15" fill="#94a3b8"/><polygon points="180,55 190,60 190,65 180,60" fill="#94a3b8"/><polygon points="100,100 110,105 110,110 100,105" fill="#94a3b8"/><polygon points="20,55 30,60 30,65 20,60" fill="#94a3b8"/></svg>`,
+    farm2: `<svg viewBox="0 0 200 120" style="width:100%; display:block;"><polygon points="100,10 190,60 100,110 10,60" fill="#f4a4b5" stroke="#d9778b" stroke-width="2"/><polygon points="100,25 160,55 100,85 40,55" fill="#f4a4b5"/><polygon points="100,45 130,60 100,75 70,60" fill="#f4a4b5"/><polygon points="40,85 70,100 50,110 20,95" fill="#6b4c3a"/><polygon points="65,50 75,55 75,60 65,55" fill="#d4af37"/><polygon points="75,55 85,60 85,65 75,60" fill="#d4af37"/><polygon points="125,65 135,70 135,75 125,70" fill="#d4af37"/><polygon points="135,70 145,75 145,80 135,75" fill="#d4af37"/><polygon points="100,10 110,15 110,20 100,15" fill="#d4af37"/><polygon points="180,55 190,60 190,65 180,60" fill="#d4af37"/><polygon points="100,100 110,105 110,110 100,105" fill="#d4af37"/><polygon points="20,55 30,60 30,65 20,60" fill="#d4af37"/></svg>`,
+    res1: `<svg viewBox="0 0 200 120" style="width:100%; display:block;"><polygon points="100,10 190,60 100,110 10,60" fill="#8b5a2b" stroke="#5c3a1e" stroke-width="2"/><polygon points="100,30 150,55 100,80 50,55" fill="#9b7bb8"/><polygon points="100,45 130,60 100,75 70,60" fill="#9b7bb8"/><polygon points="75,55 85,60 85,65 75,60" fill="#d4af37"/><polygon points="125,55 135,60 135,65 125,60" fill="#d4af37"/><polygon points="100,10 110,15 110,20 100,15" fill="#d4af37"/><polygon points="180,55 190,60 190,65 180,60" fill="#d4af37"/><polygon points="100,100 110,105 110,110 100,105" fill="#d4af37"/><polygon points="20,55 30,60 30,65 20,60" fill="#d4af37"/></svg>`,
+    res2: `<svg viewBox="0 0 200 120" style="width:100%; display:block;"><polygon points="100,10 190,60 100,110 10,60" fill="#2d3a2e" stroke="#1a241b" stroke-width="2"/><polygon points="100,25 160,55 100,85 40,55" fill="#9b7bb8"/><polygon points="100,45 130,60 100,75 70,60" fill="#9b7bb8"/><polygon points="50,70 80,85 60,95 30,80" fill="#4a2b5c"/><polygon points="65,50 75,55 75,60 65,55" fill="#d4af37"/><polygon points="125,50 135,55 135,60 125,55" fill="#d4af37"/><polygon points="100,10 110,15 110,20 100,15" fill="#d4af37"/><polygon points="180,55 190,60 190,65 180,60" fill="#d4af37"/><polygon points="100,100 110,105 110,110 100,105" fill="#d4af37"/><polygon points="20,55 30,60 30,65 20,60" fill="#d4af37"/></svg>`
+};
+
+const N=[['start','Start',''],['basics','ZvZ-Basics','Ablauf, Grundregeln, Rollenkategorien'],['comps','Comps','Melee Clap'],['rollen','Rollen','Übersicht und Aufgaben'],['weapons-bms','Waffen & BMs','Details zu Waffen und Mounts'],['videos','Erklärvideos','Guides und Praktik'],['erweitert','Erweiterte Ansicht','Buffs, Regeln, Objectives, etc.']];
+const N_ALL=[['start','Start',''],['basics','ZvZ-Basics','Ablauf, Grundregeln, Rollenkategorien'],['comps','Comps','Melee Clap'],['rollen','Rollen','Übersicht und Aufgaben'],['weapons-bms','Waffen & BMs','Details zu Waffen und Mounts'],['videos','Erklärvideos','Guides und Praktik'],['erweitert','Erweiterte Ansicht','Buffs, Regeln, Objectives, etc.'],['settings','Einstellungen','Theme, Rahmen, Akzent, Schrift'],['buffs','Buffs und Debuffs','Mit Rechnern zum Ausprobieren'],['disarray','Disarray','Disarray, Homesick, Battlemounts'],['glossar','Call-Glossar','Begriffe aus dem Voice'],['castles','Castles','Gates, Kisten, Strategien'],['terris','Territories','Mauern, Mage, Angriffsplan'],['outposts','Outposts','Wellen, Cap-Kreis'],['open-world','Open World','Offene Fights, Catchen'],['regeln','Regeln','Verhalten und Standards'],['lootsplit','Lootsplit & Regear','Erstattung und Loot'],['vod','VODs','Videos und Aufzeichnungen']];
+
+const WEAPON_CATS = {
+    'Tanks': { color: 'tanks', items: ['1H Mace', 'Earthrune', '1H Hammer (Setup)', 'Stillgaze (Setup)', '1H Arcane (Tank)', 'Dreadstorm', 'Staff of Balance', '1H Mace Control', 'HeavyMace', 'Icicle', 'Great Arcane (Beam)'] },
+    'Supports': { color: 'supports', items: ['1H Arcane (Support)', '1H Mace Support', 'Locus Defensive', 'Locus Offensive', 'Rootbound', 'Oathkeepers'] },
+    'Support DPS': { color: 'supports', items: ['Carving', 'Damnation', 'Shadowcaller', 'Incubus', 'Realmbreaker'] },
+    'Clap DDs': { color: 'dps', items: ['Spiked', 'Longbow', 'Perma', 'Dawnsong', 'Demonfang'] },
+    'Brawl DDs': { color: 'dps', items: ['Galatine Pair (Offtimer)'] },
+    'Healer': { color: 'healer', items: ['Tank Hallowfall Royal', 'Tank Hallowfall', 'Exalted', 'Exalted (Plate)', '1H Nature', '1H Holy'] }
+};
+const BM_CATS = {
+    'Control BMs': { color: 'bm', desc: 'Spezialisiert auf Crowd Control, Positionierung und Störung des gegnerischen Zergs. Sie halten Gegner fest, unterbrechen Engages oder ziehen Spieler zusammen (z.B. Juggernaut, Roving Bastion).', items: ['Battle Eagle', 'Roving Bastion', 'Colossus Beetle', 'Juggernaut', 'Battle Rhino', 'Goliath Horseeater'] },
+    'Offensive BMs': { color: 'bm', desc: 'Fokussiert auf Schaden, Dismounten von Gegnern und Zerstörung von Tanks oder anderen Battlemounts. (z.B. Ballista gegen BMs, Behemoth als Anti-Tank, Basilisken für Piercing/Debuffs).', items: ['Behemoth', 'Siege Ballista', 'Flame Basilisk', 'Venom Basilisk'] },
+    'Support BMs': { color: 'bm', desc: 'Unterstützen den eigenen Zerg durch Buffs, Mana-Regeneration, Heilung oder Defensive Shields. (z.B. Tower Chariot für Mana, Command Mammoth für Damage-Boost).', items: ['Tower Chariot', 'Ancient Ent', 'Command Mammoth', 'Phalanx Beetle'] }
+};
+
+const WEAPON_CONTEXT = {
+    '1H Mace': 'Der Main Clumper des Zergs, auf diesen wird meist der Clap durchgeführt, außer es wird vorher anders, z.B. Engage auf Shield Marker gecallt.',
+    'Earthrune': 'Der second Clumper des Zergs, arbeitet entweder mit der 1H Mace zusammen um mehr Spieler in den Clump zu ziehen, oder macht einen eigenen Clump, wenn Engage auf Shield gecallt wird.',
+    '1H Hammer (Setup)': 'Dies ist der Main Setup des Zergs. Dein Job ist es, dort wo der Caller engagen möchte, möglichst viele gegnerische Spieler zu stunnen. Der E-Stun hält ca. 3 Sekunden, also nicht viel zu früh die E nutzen.',
+    'Stillgaze (Setup)': 'Ein advanced Setup-Tank, welcher sehr effektiv Clumps vorbereiten kann, aber in seiner E auch sehr verwundbar ist. Nutze deine E als Setup und versuche dies zu überleben, auch ein Offensive Gig-Pot ist manchmal angebracht.',
+    '1H Arcane (Tank)': 'Dein Job ist es, einen Bomb oder Engage zu verfolgen und diesem den Engage durch Purges/Silences zu denien. Deine Cleanse W ist trotzdem ein Defensives Tool für den Zerg, Cleanse Fokus liegt immer darauf, den gegnerischen Clump zu denien, also zum Beispiel der Stun des gegnerischen Setup-Tanks zu Cleansen.',
+    'Dreadstorm': 'Der Dreadstorm erfüllt 2 Rollen. Er drückt E auf 5 dann springt er mit dem Snair Charge (W) auf den Clump und drückt die Hellion Hood um den Clump zu silencen.',
+    'Staff of Balance': 'Unterschiedliche Jobs je nach Situation. Wenn wir gegen andere MeleeClap/Brawl Zergs fighten, halte Gegner zusammen durch Slows und force sie zum Clumpen. Gegen Clap-Kite mounte auf, flankiere die Gegner und hindere sie durch Slows am Kiten.',
+    '1H Mace Control': 'Unterschiedliche Jobs je nach Situation. Wenn wir gegen andere MeleeClap/Brawl Zergs fighten, halte Gegner zusammen durch Stuns/Roots und force sie zum Clumpen. Gegen Clap-Kite Mounte auf, flankiere die Gegner und hindere sie durch Stuns/Roots am Kiten.',
+    'HeavyMace': 'Gegen Brawl Zergs ist dein Hauptziel, gegnerisches Buffstacking zu verhindern. Siehst du also ein Galatine Pair, welches gerade Soldier Armor zündet, springe drauf und nutze deine E.',
+    'Icicle': 'Unterschiedliche Jobs je nach Situation. Wenn wir gegen andere MeleeClap/Brawl Zergs fighten, halte Gegner zusammen durch Slows und force sie zum Clumpen. Gegen Clap-Kite Mounte auf, flankiere die Gegner und hindere sie durch Slows am Kiten.',
+    'Great Arcane (Beam)': 'Ein situativer Tank, der nicht unbedingt anfängerfreundlich ist. Dein Job ist es, gegnerische Engages mit deiner E aufzuhalten. Ob das der gegnerische Caller ist oder du die gegnerischen DPS aufhältst hat den gleichen Effekt. Dein Job abgesehen von dem ist es, bei dem Countdown des Callers auf 4 unseren Spiked zu beamen.',
+    '1H Arcane (Support)': 'Dein Job ist es, mit deiner Cleanse W als defensives Tool für den Zerg den gegnerischen Clump zu denien, also zum Beispiel den Stun des gegnerischen Setup-Tanks zu Cleansen. Mit der E Brawler aufhalten wenn möglich, also ähnlich wie eine HeavyMace das Buffstacking dieser zu verhindern.',
+    '1H Mace Support': 'Dein wichtigstes Tool ist deine Demon-Armor. Wenn du zuerst deine Schuhe zündest und dann die Demon, kannst du auch Solo-Demon zünden. Defensive Tools werden nicht immer vom Caller gecalled und sind eigenständig zu nutzen. Es gibt zwei einfache Möglichkeiten, einen Gegnerischen Engage zu erkennen. Entweder ein Aircompress des gegnerischen Callers, oder, was noch auffälliger ist, die Shadowcaller-E des Gegners. Diese wird nur sehr selten zum faken verwendet. Die 1H Mace Support in PT1 ist außerdem die offensive Guard Rune, diese wird auf den Caller gelegt, damit dieser nicht beim Clumpen aufgehalten wird.',
+    'Locus Defensive': 'Deine Cleanse W wird genutzt um den Setup des Gegners zu verhindern. Deine E wird entweder auf Chokes gelegt, damit der Zerg besser durch kommt, oder als defensives Tool auf einen gegnerischen Engage genutzt. Hierbei muss die E frühzeitig begonnen werden, da Sie am Anfang zu klein ist um viel zu erreichen. Einen gegnerischen Engage erkennst du entweder am Aircompress oder am Shadowcaller-E des Gegners.',
+    'Locus Offensive': 'Mimic G-Rune und setze sie auf unsere DPS beim Engage und danach direkt Locus E auf den Clump setzen.',
+    'Rootbound': 'Die Polymorph-W auf den gegnerischen Clumper zu hitten, kann den gegnerischen Engage komplett denien. Deine E ist ein starkes defensives Tool mit dem gleichen Effekt wie eine Guard-Rune nur größer. Damit kann man auch sehr gut auf einem Caller bleiben und sofort E nutzen, sobald Aircompress/Shadowcaller zu sehen ist. Beachte, dass du nicht gestunnt wirst, sonst bist du in der Tree-Form extrem anfällig.',
+    'Oathkeepers': 'Dein wichtigstes Tool ist deine Demon-Armor. Wenn du zuerst deine Schuhe zündest und dann die Demon, kannst du auch Solo-Demon zünden. Defensive Tools werden nicht immer vom Caller gecalled und sind eigenständig zu nutzen. Es gibt zwei einfache Möglichkeiten, einen Gegnerischen Engage zu erkennen. Entweder ein Aircompress des gegnerischen Callers, oder, was noch auffälliger ist, die Shadowcaller-E des Gegners. Diese wird nur sehr selten zum faken verwendet. Die 1H Mace Support in PT1 ist außerdem die offensive Guard Rune, diese wird auf den Caller gelegt, damit dieser nicht beim Clumpen aufgehalten wird.',
+    'Carving': 'Stacks hochhalten und ready sein, auf den Clump E zu nutzen. Vor der E die Boots of Valor nutzen, damit man nicht gestoppt wird. Zusätzlich darauf achten den Knight Helmet gut zu zünden vor dem Engage, damit wir nicht aufgehalten werden können.',
+    'Damnation': 'E und dann W auf den Clump, beachte, dass deine E eine lange Casttime hat, dadurch richtiges Positioning wichtig ist, damit man nicht gestoppt wird. Wenn das Morgana Cape auf Cooldown ist, muss die E etwas früher gecasted werden.',
+    'Shadowcaller': 'E kommt auf 5! Dein Positioning ist wichtig, damit du immer nah genug am Caller stehst um auf ihn die E zu drücken, aber dich durch dieses Positioning nicht zu viel in Gefahr begibst.',
+    'Incubus': 'Die Incubus ist eine der wichtigsten Rollen und wird in zwei Subrollen aufgeteilt: DPS und Support. Der DPS-Part ist dabei der wichtigere und sollte immer priorisiert werden.<br><br>DPS: Die E muss treffen, nachdem die Gegner geclumpt wurden, aber noch vor dem Main-DMG. Der ideale Zeitpunkt ist meistens bei Count 2. Durch die Blink-Schuhe kann man entweder am Rand oder im inneren Kreis stehen, sollte sich aber niemals auf dem Caller positionieren. Meistens ist die Mitte besser, da man dem Caller mit den Schuhen nicht immer schnell genug hinterherkommt, wenn dieser auf der gegenüberliegenden Seite engaged.<br><br>Support: Der Support-Part besteht hauptsächlich darin, die Grune entweder auf Chokes zu setzen, durch die die Verbündeten laufen müssen, oder direkt auf den Engage, damit sich die geclumpten Spieler nach dem Cleanse wieder bewegen können.<br><br>Das zweite wichtige Support-Tool ist die Demon Armor. Diese senkt die eigenen Resistenzen auf Cloth-Leder-Niveau, gibt dafür aber bis zu 9 Verbündeten zusätzliche Resistenzen. Wenn man alleine demoned, muss man eine Gig-Pot nutzen, da man sonst stirbt. Wenn mehrere Spieler auf einen Engage demonen, kann die Incubus aufgrund der vielen Defensivwerte, beispielsweise durch passive Stats von Mace und Aegis, auch auf den Gig-Pot verzichten.<br><br>Gegen Brawl wird die Demon Armor hauptsächlich gegen Galas oder Astral-Stäbe eingesetzt. Man erkennt deren Engage meistens daran, dass sie Soldier Armor spielen und dadurch vor ihrem Engage rot aufleuchten. Teilweise spielen sie allerdings auch Taunt auf ihren Rüstungen. In diesem Fall muss besonders auf die Animation geachtet werden.<br><br>Kleiner Tipp: Beim Resetten immer die Guard Rune unter sich setzen, da man dadurch schwieriger unterbrochen wird und nach dem Resetten immer wieder der eine Up hat und nicht vergessen das die Incubus Cast Time hat.',
+    'Realmbreaker': 'Der Realmbreaker wird an der Seite des Zergs gespielt. Durch die W kann man enorme Distanzen zurücklegen. Die Schuhe werden auf 4 gezündet damit man durch CC durchkommt, ohne aufgehalten zu werden. Die E wird so getimed das sie auf 2 hittet. WICHTIG: Nie E drücken wenn der Clump noch nicht gemacht wurde da der Knock-Up den Clump zerstört da die Gegner dann nicht gepulled werden. Den DMG zu hitten ist gut aber nicht die Priorität, diese liegt auf dem HP-Cut.',
+    'Spiked': 'Dein Job ist es, den Clump mit deiner E zu hitten. Davor solltest du deine W nutzen um die defensiven Stats der Passive zu bekommen. Deine Jacket of Tenacity drückst du auf ein Magic-Damage-Ally, z.B. deinen GA-Beamer, oder aber auch Perma/Dawnsong. Nach dem Clap full defensive spielen und sich "verstecken". Ohne einen Spiked ist es extrem schwierig, Clumps effektiv zu killen, also bleib unbedingt am Leben. Wenn der Caller nach Cooldowns fragt, antwortest du, dein E Cooldown ist einer der längsten.',
+    'Longbow': 'Erst W dann E auf den Clump. Vor der E die Boots of Valor zünden und falls man auf Jacket of Tenacity spielt, die Rüstung auf einen Magic-Damage-Ally zünden, z.B. Perma/Dawnsong. Die Guardian Armor ist ein defensives Tool und soll nicht mit dem Clap genutzt werden. Nie Guardian Armor nutzen während des Engages.',
+    'Perma': 'Erst E dann W auf den Clump, gegen Brawl auch auf die Blink-W swappen für mehr defensive Tools. Casttime Passive und diese mit Qs so stacken, dass diese für die E aktiv ist.',
+    'Dawnsong': 'E auf den Clump, dafür die Passive bereithalten. Die W kann gut auf low Targets oder Healer genutzt werden.',
+    'Demonfang': 'Stacks bereithalten für den Clap, auf den Clap W und dann 2 Es. Die dritte E ist in der Regel nicht zu nutzen, außer du bist confident, dass du kein Problem mit dem Self-Bleeding hast. Nie Guardian Armour nutzen während des Engages.',
+    'Galatine Pair (Offtimer)': 'Diese werden nur mit Erfahrung und vorheriger Absprache mit Relgok oder Takumoto gespielt. Dein Job ist es, Druck auf den Gegner auszuüben und gegnerische Defensives zu forcen. Erst Soldier Armor+Passive stacken und dann einen unabhängigen Clump hitten.',
+    'Tank Hallowfall Royal': 'Halte dich und den Zerg am Leben. Deine Royal Armor auf Cooldown in Gegnern nutzen. Nutze das E hauptsächlich als defensives Movement-Tool, nur im Notfall als Heilung.',
+    'Tank Hallowfall': 'Halte dich und den Zerg am Leben. Nutze das E hauptsächlich als defensives Movement-Tool, nur im Notfall als Heilung.',
+    'Exalted': 'Halte dich und den Zerg am Leben. Deine E wird hauptsächlich offensiv genutzt. Dies ermöglicht das Entfernen von unter anderem Silence-Feldern, Slow-Ringen oder Behemoth Puddles.',
+    'Exalted (Plate)': 'Halte dich und den Zerg am Leben. Deine E wird hauptsächlich offensiv genutzt. Dies ermöglicht das Entfernen von unter anderem Silence-Feldern, Slow-Ringen oder Behemoth Puddles. Deine Royal Armor auf Cooldown in Gegnern nutzen.',
+    '1H Nature': 'Halte dich und den Zerg am Leben. Deine W into E heilt extrem viele Leute gleichzeitig um eine große Menge, applied aber auch schnell Healing Sickness, also nicht nutzen, wenn eh alle Full-HP sind.',
+    '1H Holy': 'Halte dich und den Zerg am Leben. Nutze das E quasi auf Cooldown, dies erhöht den Heal-Output extrem. Diese Rolle ist deutlich verwundbarer als ein Hallowfall.'
+};
+
+const BM_CONTEXT = {
+    'Battle Eagle': `<h4>Q: Favorable Wind (Buff)</h4><p>Erschafft einen Rückenwind mit 10m Radius am Zielort. Erhöht die Cooldown-Rate von bis zu 20 Verbündeten um 6% für 10s (stapelt bis zu 2 mal).</p><h4>W: Storm Wall (Crowd Control)</h4><p>Erschafft eine 16m breite Sturmwand 5m vor dir. Wirft alle Gegner, die sie berühren, 11.2m zurück (Knockback) und purged alle Buffs (außer Heilung über Zeit) für bis zu 3s (Channel).</p><h4>E: Lightning Storm (Damage / Crowd Control)</h4><p>Beschwört einen Blitzsturm mit 7m Radius am Zielort, der sich 5m wegbewegt und 5s lang hält. Verursacht 236 magischen Schaden an allen Gegnern und unterbricht deren Zauber.</p><h4>F: Battle Mount Gallop (Buff)</h4><p>Erhöht deine Bewegungsgeschwindigkeit um 90%. Du bist während des Galopps gesilenced. Der Effekt hält 4s nach dem Stoppen an. Wird unterbrochen, wenn du Schaden nimmst.</p><p class="mut" style="margin-top:12px; font-size:0.9em;"><b>Taktik:</b> Backline BM. Teile dein Team auf und gib Q zu verschiedenen Zeiten, da es nicht stapelt. Die W ist ein massiver Knockback und Purge, ideal gegen Engages. Die E cancelt Casts (z.B. Command Mammoth) und verursacht guten Schaden.</p>`,
+    'Tower Chariot': `<h4>Q: Energy Cloud (Buff)</h4><p>Schleudert eine Energiekugel (10m Radius), die 8 Energie pro Sekunde für 10s an bis zu 20 Verbündete wiederherstellt (stapelt bis zu 2 mal).</p><h4>W: Toxic Crystal Waste (Debuff)</h4><p>Rollt ein Fass mit giftigem Kristallabfall hinter dir her. Bei Aufprall explodiert es (12m Radius) und verringert den verursachten Schaden aller getroffenen Gegner um 40% für 6s.</p><h4>E: Tower Shield (Buff)</h4><p>Erschafft einen Energieschild (12m Radius) um dich herum. Erhöht die Verteidigung gegen Spieler von bis zu 25 Verbündeten (inkl. Mounts) um 23.077% für bis zu 12s (Channel, nicht unterbrechbar).</p><h4>F: Battle Mount Gallop (Buff)</h4><p>Erhöht deine Bewegungsgeschwindigkeit um 90%. Du bist während des Galopps gesilenced. Der Effekt hält 4s nach dem Stoppen an. Wird unterbrochen, wenn du Schaden nimmst.</p><p class="mut" style="margin-top:12px; font-size:0.9em;"><b>Taktik:</b> Die Manaquelle des Zergs. Wenn du Q spammst, hat niemand Manaprobleme. Die Kombination aus W (Damage-Reduktion) und E (Defensive) absorbiert massiven Schaden. Achte darauf, mit dem Rücken zum Team zu stehen, damit das Fass in die Reihen des Gegners rollt. Vorsicht vor Behemoth (Barrel dodgen).</p>`,
+    'Venom Basilisk': `<h4>Q: Poison Cloud (Debuff)</h4><p>Feuert einen Giftblitz am Zielort ab (10m Radius). Verringert den verursachten Schaden aller getroffenen Gegner um 20% für 10s.</p><h4>E: Intoxicating Breath (Damage / Debuff)</h4><p>Stößt einen giftigen Atem in einem Kegel vor dir aus. Verursacht 241 magischen Schaden und verringert die Verteidigung gegen alles von getroffenen Gegnern um 33% für 7s.</p><h4>F: Battle Mount Gallop (Buff)</h4><p>Erhöht deine Bewegungsgeschwindigkeit um 75%. Du bist während des Galopps gesilenced. Der Effekt hält 4s nach dem Stoppen an. Wird unterbrochen, wenn du Schaden nimmst.</p><p class="mut" style="margin-top:12px; font-size:0.9em;"><b>Taktik:</b> Extrem starker Pierce (E), der das gegnerische Ziel verwundbar macht. Der Q reduziert den gegnerischen Schaden. Sehr stark in Terry-Fights, aber teuer und risikoanfällig. Achte auf Cleanse des Gegners.</p>`,
+    'Colossus Beetle': `<h4>Q: Defensive Blow (Damage / Debuff / Buff)</h4><p>Greift den Gegner an (204 physischer Schaden). Verringert die CC-Resistenz um 20% für 8s (stapelt bis zu 3 mal). Erhöht gleichzeitig die Verteidigung gegen alles von bis zu 20 Verbündeten (12m Radius) um 13.043%.</p><h4>W: Onslaught (Damage / Crowd Control / Buff / Mobility)</h4><p>Fliegt zum Zielort (immun gegen Debuffs und CC). Hinterlässt eine 8m breite Spur für 3s (erhöht die Bewegungsgeschwindigkeit von Verbündeten um 50%). Verursacht 263 physischen Schaden (6m Radius) und wirft Gegner für 0.6s in die Luft (Knock-up).</p><h4>E: Beetle Buzz (Crowd Control)</h4><p>Wirbelt Staub auf (9m Radius). Verlangsamt alle Gegner um 10% und silenced sie für bis zu 5s (Channel).</p><h4>F: Flight (Buff)</h4><p>Beginnt zu fliegen (Bewegungsgeschwindigkeit +110%). Verringert deine Verteidigung gegen alles um 110% und deine CC-Resistenz um 200%. Wenn du aufhörst zu fliegen, wirst du für 4s gesilenced.</p><p class="mut" style="margin-top:12px; font-size:0.9em;"><b>Taktik:</b> Sehr mobil. W kann offensiv (Knock-up) oder defensiv (Kiten) genutzt werden. Die E kann Engages stoppen oder den Clump des Callers silencen. F gibt dir keine Tag-Bubble (Vorsicht vor Aggro).</p>`,
+    'Command Mammoth': `<h4>Fähigkeiten (High Command / Buffs)</h4><p>Das teuerste und stärkste BM. <b>High Command (90s CD):</b> Massiver Damage-Boost. <b>Defensive Shield:</b> Schützt Verbündete. <b>AOE Knockback:</b> Einer der stärksten Interrupts im Spiel. <b>Wichtig:</b> Der Cooldown zum Aufsteigen ist 90s (statt 30s). Jede HP-Leiste entspricht 18s Cooldown.</p><p class="mut" style="margin-top:12px; font-size:0.9em;"><b>Taktik:</b> Wird oft in Bomb Squads oder im Main Zerg gespielt. Nutze High Command auf Call. Sei dir bewusst, dass der Gegner dich mit dem Battle Eagle (E) oder durch Dismount (Ballista) hart fokussieren wird.</p>`,
+    'Siege Ballista': `<h4>Fähigkeiten (Anti-BM)</h4><p>Single-Target Anti-Tank und Anti-Battlemount. Zwei Ballistas können einen Command Mammoth in unter einer Minute dismounten. Der Channel kann durch Silences (z.B. Arcane Q) unterbrochen werden.</p><p class="mut" style="margin-top:12px; font-size:0.9em;"><b>Taktik:</b> Deine einzige Aufgabe ist es, gegnerische BMs zu dismounten und aus dem Fight zu halten. Habt ihr das gegnerische Chariot dismounted, jagt es den Rest des Fights.</p>`,
+    'Behemoth': `<h4>Q: Dismount</h4><p>Nutze dies ausschließlich auf gegnerische Battlemounts, um sie zu dismounten und zum Reset zu zwingen.</p><h4>W: Disrupt</h4><p>Stört gegnerische Engages.</p><h4>E: Silence</h4><p>Silence auf Chokes oder um Bomb Squads zu stoppen.</p><p class="mut" style="margin-top:12px; font-size:0.9em;"><b>Taktik:</b> Der Anti-Tank / Anti-BM. Halte gegnerische BMs so lange wie möglich aus dem Fight. Dein E ist extrem stark gegen Engages. Mit Exalted Stuff counterbar.</p>`,
+    'Roving Bastion': `<h4>Q: 3 Lasers</h4><p>Feuert 3 Laser ab. Der dritte Laser stunnt Gegner. Behalte Stacks auf den gegnerischen DPS im Auge.</p><h4>W: Defensive</h4><p>Ähnlich wie eine riesige Judicator Armor. Gibt Resistenzen an Verbündete.</p><h4>E: Disrupt</h4><p>Stört Engages und kann BMs am Aufsteigen hindern.</p><p class="mut" style="margin-top:12px; font-size:0.9em;"><b>Taktik:</b> Sehr stark gegen gegnerische Battlemounts. Du kannst verhindern, dass sie resetten. Dein Q Stun kann Engages canceln.</p>`,
+    'Juggernaut': `<h4>Fähigkeiten (Pull & Purge)</h4><p>Zieht Gegner (15m Radius) zusammen und purged sie kontinuierlich. Benötigt mindestens 6 Charges. Eine Mischung aus Icicle, Camlann und Life Curse.</p><p class="mut" style="margin-top:12px; font-size:0.9em;"><b>Taktik:</b> Wird in der Melee Bomb Squad genutzt, um Clumps zu erzeugen oder den Main-Zerg zu unterstützen. Der Pull kann gecleansed werden, aber es ist schwer, so viele Spieler gleichzeitig zu cleanen.</p>`,
+    'Flame Basilisk': `<h4>Fähigkeiten (Healing Reduction & Pierce)</h4><p>Verursacht Healing Sickness (Heilungsreduktion) auf einem langen Cooldown und hat einen Pierce-Effekt auf einem kurzen Cooldown.</p><p class="mut" style="margin-top:12px; font-size:0.9em;"><b>Taktik:</b> Sehr teuer. Wird genutzt, um die Heilung des Gegners zu unterdrücken (Healing Sickness) und die Rüstung zu durchdringen.</p>`,
+    'Ancient Ent': `<h4>Fähigkeiten (Healing Boost)</h4><p>Gibt einen massiven Heilungsboost (ähnlich Rootbound Q, aber 40% Heilungsboost) und hat einen starken Disrupt. Fähigkeiten sind stationär.</p><p class="mut" style="margin-top:12px; font-size:0.9em;"><b>Taktik:</b> Backline BM. Sehr gut in Castles oder Territories, da es dort oft enge Kämpfe gibt. Wird oft ignoriert, ist aber ein starker Heal-Support.</p>`,
+    'Phalanx Beetle': `<h4>Q / W / E</h4><p><b>Q:</b> Schwach. <b>W:</b> Ähnlich einer Demon Armor, aber nur für dich selbst (kein AoE). <b>E:</b> Ähnlich einem schwachen Icicle.</p><p class="mut" style="margin-top:12px; font-size:0.9em;"><b>Taktik:</b> Wird kaum gespielt, da es im Vergleich zu anderen BMs (wie Demon Armor) wenig Utility bietet.</p>`,
+    'Goliath Horseeater': `<h4>Fähigkeiten</h4><p>Hat nur zwei Skills, die ähnlich wie Daybreaker funktionieren. Wurde nie wirklich reworked.</p><p class="mut" style="margin-top:12px; font-size:0.9em;"><b>Taktik:</b> Wird im ZvZ kaum genutzt, da es bessere Optionen gibt.</p>`,
+    'Battle Rhino': `<h4>Fähigkeiten</h4><p>Das erste BM im Spiel. Hat nur zwei Skills (einer ähnlich Daybreaker). Wurde seit langem nicht mehr angepasst.</p><p class="mut" style="margin-top:12px; font-size:0.9em;"><b>Taktik:</b> Wird heutzutage so gut wie gar nicht mehr im ZvZ gespielt.</p>`
+};
+
+const P={
+start:()=>`<h1>The-Fallen<br>ZvZ-Guide</h1><p class=s>Alles zu Rollen, Comps und Mechaniken in Albion Online, für unsere Gilde. <a href="https://www.albionzvz.com/g/the-fallen" target=_blank rel=noopener>Gilde auf AlbionZvZ</a></p><div class=grid>${N.slice(1).map(n=>`<a href="#${n[0]}"><b>${n[1]}</b><span>${n[2]}</span></a>`).join('')}</div>`,
+admin:()=>`<h1>Moderatoren Bereich</h1><p class=s>Hier kannst du neue Kategorien anlegen und bestehende verwalten.</p><div class=grid><div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:140px;border-style:dashed;cursor:pointer;color:var(--mut);" onclick="alert('Funktion zum Erstellen von Themen folgt in Kürze!')"><span style="font-size:2.5rem;margin-bottom:8px;">+</span><b>Neues Thema einrichten</b></div><div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:140px;border-style:dashed;cursor:pointer;color:var(--mut);" onclick="alert('Funktion zum Erstellen von Themen folgt in Kürze!')"><span style="font-size:2.5rem;margin-bottom:8px;">+</span><b>Neues Thema einrichten</b></div></div>`,
+'admin-feedback': () => `<h1>Feedback Übersicht</h1><p class=s>Alle eingegangenen Nachrichten aus dem Guide, gruppiert nach Bereich.</p><div id="admin-feedback-content"><p class="mut">Lade Feedback...</p></div>`,
+'admin-editor': () => `<h1>Live-Editor</h1><p class=s>Bearbeite die Texte der Website sicher und einfach.</p><div id="admin-editor-content"><p class="mut">Lade Editor...</p></div>`,
+'admin-brainstorm':()=>{
+    const head = '<h1>Brainstorm (Waffen & BMs)</h1><p class=s>Hier kannst du Ideen und Konzepte für Waffen und Battlemounts sammeln.</p>';
+    if(!BRAINSTORM_SHEET_URL || BRAINSTORM_SHEET_URL.includes('HIER_DEINE_ID')){ return head + `<div class="card" style="text-align:center; padding:40px 20px;"><h3 style="margin-top:0;">Noch kein Sheet verknüpft</h3><p class="mut" style="margin-bottom:0;">Der Link zum Google Sheet muss im Code hinterlegt werden.</p></div>`; }
+    const previewUrl = BRAINSTORM_SHEET_URL.replace(/\/edit.*$/, '/preview');
+    return head + `<div class="row"><a href="${BRAINSTORM_SHEET_URL}" target="_blank" rel="noopener" class="b" style="text-decoration:none; display:inline-block;">In neuem Tab öffnen (Bearbeiten)</a></div><div class="card" style="padding:0; overflow:hidden; margin-top:0;"><iframe src="${previewUrl}" title="Brainstorm Waffen & BMs" loading="lazy" allowfullscreen style="width:100%; height:70vh; min-height:500px; border:0; display:block;"></iframe></div><p class="mut" style="font-size:0.85rem;">Die Vorschau ist schreibgeschützt. Zum gemeinsamen Bearbeiten den Button oben nutzen.</p>`;
+},
+settings: renderSettings,
+basics:()=>`<h2>ZvZ-Basics</h2><p class=s>Grundlagen und Fundamente für ZvZ-Erfolg.</p>
+<h3>Was ist ZvZ?</h3>
+<div class=card><p style="margin:0"><b>ZvZ = Zerg versus Zerg</b>: große, chaotische Schlachten in der Open World.</p><p style="margin:8px 0 0">Es geht um <b>Objectives</b>: Outposts, Castles, Territories, Cores, Vortexes. Es gibt viele Gründe, warum Leute massen und kämpfen – oft einfach aus Spaß. ZvZ ist <b>Kernbestandteil der Gildenaktivitäten</b> in Albion und kann sehr lohnend sein, wenn man es richtig macht.</p></div>
+<h3>Mindestvoraussetzungen</h3>
+<p class=s>Drei Dinge, die man zwingend braucht:</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:12px">
+<div class=card style="margin:0"><b>Gutes Gear und Economy</b><p class=mut style="margin:6px 0 0">ZvZ ist teuer. Die genauen Gear-Anforderungen (inkl. IP und Builds) findest du in unserer <a href="https://www.albionzvz.com/g/the-fallen/compositions/f730f3e1-87cb-4b2d-b1f8-b743cc887cf3" target="_blank" rel="noopener" style="text-decoration:underline">Albion ZvZ Composition</a>. Beachte zudem das Regear-System!</p></div>
+<div class=card style="margin:0"><b>Kommunikation (Pflicht)</b><p class=mut style="margin:6px 0 0">Mikrofon + Voice-Software wie Discord oder TeamSpeak. Ohne Kommunikation mit dem Team geht es nicht.</p></div>
+<div class=card style="margin:0"><b>Regelmäßig aktiv sein</b><p class=mut style="margin:6px 0 0">Wichtigster Punkt – noch wichtiger als Kommunikation. Bestes Gear hilft nichts ohne ein eingespieltes Team. Regelmäßiges trainieren bringt alle auf denselben Stand und baut Synergie auf.</p></div>
+</div>
+<h3>Allgemeine Tipps</h3>
+${D('Positionierung (wichtigster Tipp)',`<ul><li>Immer die eigene Position relativ zu <b>Team und Gegner</b> im Blick behalten.</li><li><b>Nicht clustern</b>, Impact von Gegner-AoE minimieren.</li><li>Grund: Albion skaliert AoE-Schaden danach, <b>wie viele Spieler getroffen werden</b> → siehe <a href="#buffs" class="jump-to-buff" data-buff="buffs-aoe">AoE Escalation</a>.</li><li>Deshalb hört man im Voice ständig „Positioning!", „Spread out!" – man soll <b>gespreadet</b> stehen, damit eingehender Schaden nicht alles auf einmal zerlegt.</li><li>Zweiter wichtiger Punkt: Während der eingehende Schaden auf einen Punkt fliegt, sind die <b>Defensiven Fähigkeiten der Supports und D-Tanks</b> dafür verantwortlich, den Disengage vorzubereiten oder den eingehenden Engage der Gegner aufzuhalten. <b>Ohne gut genutzte Defensive Fähigkeiten bringt viel DMG nichts.</b></li></ul>`,0)}
+${D('Allgemeiner Fokus im ZvZ',`<ul><li>High-Priority-Ziele fokussieren: <b>Healer und DPS</b>.</li><li>Grund: Fights enden oft, wenn eine Schlüsselrolle fällt.</li><li>Heiler tot → keine Sustain mehr → Gegner spreadet und rennt.</li><li>DPS tot → kein Schaden mehr → Gegner-Zerg kann nichts mehr töten → Gegner spreadet und geht.</li><li>Deshalb: Rolle und Positionierung ernst nehmen – wer gecatcht wird, kann den Fight fürs ganze Team verlieren.</li></ul>`)}
+${D('Klare Kommunikation',`<ul><li>Der <b>Shotcaller</b> gibt die Richtung vor.</li><li>Comms müssen <b>klar und knapp</b> sein, und man muss tun, was der Caller sagt – sonst bricht die <b>Synergie des Zergs</b> und es wird unklar (<a href="#glossar">→ Call-Glossar</a>).</li></ul><p style="margin-top:12px;">Wir müssen folgendes von jedem Spieler erwarten, damit eine klare Kommunikation gewährleistet ist:</p>`)}
+${D('Scouting-Informationen', `<p>Falls man Gegner im ZvZ-Event als Scout spottet, sind folgende Informationen essenziell (nicht weniger und nicht mehr):</p><ul><li><b>Name der Gilde/Allianz</b></li><li><b>Disarray</b> des gescouteten Spielers</li><li><b>IP</b> vom Spieler (bzw. wenn man mehrere Leute anklicken kann, den ungefähren Durchschnitt der IP des Zergs)</li><li><b>Playstyle</b> (wenn man sich auskennt: Clap Kite, Melee Clap, Full Brawl)</li></ul>`)}
+${D('Albion Settings für ZvZ (Essenziell)', `<p>Diese Einstellungen sind im ZvZ überlebenswichtig und sollten vor jedem Content geprüft werden:</p><ul><li><b>Zaubereffekte (Spell Effects):</b> <b>NIEDRIG</b> oder <b>AUS</b>. Maximale FPS und bessere Sicht auf Boden-AoEs.</li><li><b>Kamera-Zoom:</b> <b>Maximal herauszoomen</b> (Mausrad nach unten). Mehr Übersicht über den Zerg und Flanken.</li><li><b>Smart Cast:</b> <b>Situativ / Meistens AUS</b>. Bei Boden-AoEs (Tanks, Longbow) mit sichtbarem Kreis zielen, um nicht ins Leere zu werfen.</li><li><b>Doppelklick zum Bewegen:</b> <b>AUSSCHALTEN</b>. Verhindert versehentliches Weglaufen.</li><li><b>Namen & Lebensbalken:</b> <b>HP-Balken AN, Namen AUS</b> (falls möglich). Weniger visuelles Chaos.</li><li><b>Party Member Marker Size:</b> <b>Big</b>. Besser sichtbar.</li><li><b>Party Member Marker:</b> <b>ON</b>.</li><li><b>Quick Hotkey:</b> <b>WICHTIG!</b> Stellt euch im Menü (ESC = Albion Settings = Bindings = Fast ganz unten = "Select Marked Target 5") diese Einstellung auf einen beliebigen Hotkey, um mit dem Hotkey Kronenmark Ziele auszuwählen (z.B. auf T für Main Tank).</li></ul>`)}
+${D('Adaptabilität',`<ul><li>Strategie an den Verlauf des Fights anpassen, flexibel bleiben.</li><li>Beispiel: Als Main-DPS auch mal andere Rollen spielen, um ein Grundverständnis für jede Rolle zu bekommen. Wer alle Rollen versteht, wird ein <b>besserer Spieler</b> und ein <b>großer Gewinn für jede ZvZ-Gruppe</b>.</li></ul>`)}
+<h3>Bewegung & Formation</h3>
+${D('Flanks & Bewegung', `<p>Die Kunst eines jeden Zerg-Fights ist es, nicht als ein einziger großer Haufen (Blob) zu laufen. Teilt euch in <b>Flanks (zwei Hälften)</b> auf, bevor ihr auf den Gegner trefft. Wenn der Engage beginnt, bildet ihr aus diesen Flanks den <b>Kreis</b> (Zentrum und Außenseiten), um AoE-Schaden zu minimieren.</p><ul><li><b>Chasing (Verfolgen):</b> Ihr habt Momentum und lauft dem Gegner hinterher.</li><li><b>Kiting (Weglaufen):</b> Der Gegner hat Momentum. Ihr lauft weg, aber schießt weiter (Poke).</li><li><b>Soft Kiting (Gegen Brawl):</b> Haltet Abstand, aber rennt nicht panisch weg. Zeit gewinnen, um Cooldowns zu resetten, während ihr weiterhin Schaden macht.</li><li><b>Holding (Halten):</b> Ihr stoppt die Bewegung. Tanks blockieren den Gegner, DPS versuchen, ihn aus der Distanz zu töten.</li></ul>`, 0, 'border-left: 4px solid #5fd38a')}
+<h3>Party-Größen</h3>
+<p class=s>Die Größe der Party beeinflusst Taktik und Strategie.</p>
+<div class=row id=ps>${PT.map((p,i)=>`<button class="b${i?'':' on'}" data-i=${i}>${p[0]}</button>`).join('')}</div>
+<div class=card id=pd></div>
+<p class=mut>Alle Größen funktionieren im Kern gleich – und in jeder Größe sind die Rollen entscheidend.</p>`,
+
+comps:()=>`<h2>Comps</h2><p class=s>Unsere aktuelle Comp: Melee Clap. <a href="https://www.albionzvz.com/g/the-fallen/compositions/f730f3e1-87cb-4b2d-b1f8-b743cc887cf3" target="_blank" rel="noopener" style="text-decoration:underline">Zur AlbionZvZ-Composition</a>.</p><p class=s style="margin-top:-10px;margin-bottom:24px;">Hier findest du eine Erklärung zu unserem Spielstil. Bei Fragen oder Anmerkungen wende dich gerne an den Discord!</p>
+<div id="cb">
+    <h3 style="margin-top:20px;">Grundkonzept</h3>
+    <div class=card style="margin-bottom:20px;"><p style="margin:0;">Unsere Comp ist eine <b>Melee Clap</b>. Wir spielen derzeit noch weniger mit dem Brawl/Flood Part, da unsere Comp durch die aktuelle Meta auf viele Longbows bzw. Demonfangs ausgelegt ist. Der Fokus liegt stark auf der Kreis-Mechanik (Positionierung) und dem kontrollierten Clap. Die Brawler zwingen den Gegner an den Außenseiten unter Druck, während unser Main-Engage (Party 1) im Zentrum die Lücken für die Kills ausnutzt.</p></div>
+    <h3>Die Phasen des Fights</h3>
+    ${D('Regeln & IP-Anforderungen', `<p>Der Caller gibt einen 5 Sekunden Countdown und oft eine Richtung (z.B. "Wall East") an. Defensives sollten eigenständig und situationsbedingt genutzt werden (siehe <a href="#weapons-bms">Waffen & BMs</a>). IP-Anforderungen: Tanks/Supports brauchen hohe IP auf der Brust (Plate), um den Engage zu überleben. Für DPS gilt unsere Gildenregel: Du brauchst <b>100 Specs auf deiner Waffe</b>.</p>`, 0, '', 'mc-regeln')}
+    ${D('Positionierung (Der Kreis)', `<p style="margin-top:0">Stell dir den Fight als einen Kreis vor. Es gibt ein gefährliches Zentrum und sichere Außenseiten. Der Caller markiert oft das Zentrum mit einem Crown-Mark.</p><div style="display:flex; justify-content:center; margin:20px 0;"><svg viewBox="0 -20 200 240" style="width:100%; max-width:320px; display:block;"><circle cx="100" cy="100" r="80" fill="none" stroke="var(--ln)" stroke-width="2" stroke-dasharray="5,5" /><circle cx="100" cy="100" r="14" fill="#c4a1ff" opacity="0.4" /><circle cx="100" cy="100" r="10" fill="#c4a1ff" /><text x="100" y="85" text-anchor="middle" fill="var(--fg)" font-size="11" font-weight="bold">Caller</text><circle cx="70" cy="70" r="7" fill="#6cb2ff" stroke="var(--bg)" stroke-width="2" /><circle cx="130" cy="70" r="7" fill="#6cb2ff" stroke="var(--bg)" stroke-width="2" /><circle cx="70" cy="130" r="7" fill="#6cb2ff" stroke="var(--bg)" stroke-width="2" /><circle cx="130" cy="130" r="7" fill="#6cb2ff" stroke="var(--bg)" stroke-width="2" /><text x="100" y="55" text-anchor="middle" fill="var(--fg)" font-size="10">Tanks</text><circle cx="100" cy="20" r="7" fill="#ff6b6b" stroke="var(--bg)" stroke-width="2" /><circle cx="20" cy="100" r="7" fill="#ff6b6b" stroke="var(--bg)" stroke-width="2" /><text x="100" y="5" text-anchor="middle" fill="var(--fg)" font-size="10">Brawl/Clap DPS</text><circle cx="156" cy="44" r="7" fill="#ffa94d" stroke="var(--bg)" stroke-width="2" /><circle cx="156" cy="156" r="7" fill="#ffa94d" stroke="var(--bg)" stroke-width="2" /><text x="170" y="35" text-anchor="middle" fill="var(--fg)" font-size="10">Support</text><text x="170" y="175" text-anchor="middle" fill="var(--fg)" font-size="10">Support</text><circle cx="44" cy="44" r="7" fill="#5fd38a" stroke="var(--bg)" stroke-width="2" /><circle cx="180" cy="100" r="7" fill="#5fd38a" stroke="var(--bg)" stroke-width="2" /><circle cx="44" cy="156" r="7" fill="#5fd38a" stroke="var(--bg)" stroke-width="2" /><text x="30" y="35" text-anchor="middle" fill="var(--fg)" font-size="10">Heiler</text><text x="30" y="175" text-anchor="middle" fill="var(--fg)" font-size="10">Heiler</text><circle cx="100" cy="180" r="7" fill="#ff6b6b" stroke="var(--bg)" stroke-width="2" /></svg></div><ul style="margin-top:16px;"><li><b>Das Zentrum:</b> Hier steht der Caller. Tanks stehen hier nur, wenn sie volles Leben haben. Wer hier steht, wird von AoE-Clumps bestraft.</li><li><b>Die Seiten (Sides):</b> Heiler und Ranged DPS stehen außen. Sie haben Übersicht, sind sicher vor CC und können in Ruhe arbeiten. Tanks bewegen sich nur dann nach außen zu den Heilern, wenn sie <b>low sind, dringend Hilfe benötigen oder die Heiler selbst Hilfe brauchen</b> (z.B. um sie zu peelen), um die Positionierung nicht zu brechen.</li><li><b>Die Supports:</b> Positionieren sich nah am Caller oder in den Flanks, um ihre Buffs und Debuffs (wie Demon Armor oder Locus) zum richtigen Zeitpunkt setzen zu können und den Engage zu unterstützen.</li><li><b>Die Tanks:</b> Unterstützen den Clump, verteidigen gegen den Engage der Gegner und fungieren als Bindeglied zwischen innen und außen. Sie stören dort, wo Hilfe benötigt wird.</li><li><b>Clumpt nicht!</b> <i>"Safety is not always where no enemies are."</i> Sicherheit ist dort, wo eure Verbündeten <b>nicht</b> stehen, aber nah genug an den Heilern.</li></ul>`, 0, 'border-left: 4px solid var(--mut)', 'mc-kreis')}
+    ${D('Main Engage (Der Clap)', `<div style="margin-bottom:16px;"><p>Der Caller sucht Lücken, wenn Gegner out of position sind. Er zwingt den Gegner, seine Defensives (wie Demon Armor, Locus) zu verbrennen. Orientiert euch an der Kreis-Mechanik: Das Hauptziel ist es, viele Gegner im Zentrum zu clumpen, damit die AOE-Escalation unserer Range-DPS (Longbows/Demonfangs) zuschlägt. Die Range-DPS stehen dabei sicher an den Außenseiten des Kreises. Wichtig ist der <b>5-Sekunden-Countdown</b>, den der Caller vor dem Engage gibt (genaue Aufschlüsselung siehe unten). (Beispiele für Engage: Offensive Great Arcane, Golem). Genauere Timings für die jeweiligen Waffen findest du unter <a href="#weapons-bms" style="text-decoration:underline">Waffen & BMs</a>.</p><div style="display:flex; flex-direction:column; gap:8px; margin-top:16px;"><div style="display:flex; gap:12px; align-items:flex-start; background:var(--hv); padding:12px; border-radius:var(--r-sm); border-left:3px solid #6cb2ff;"><b style="min-width:70px; font-size:0.9em; color:#6cb2ff; margin-top:2px;">5 Sekunden</b><span style="font-size:0.95em;"><b>Tanks:</b> Gehen in Position. (Boots nur situativ zünden, wenn nötig; Boots of Valor für den Clump aufheben).<br><b>DPS:</b> Beginnen, Flanks zu bilden.</span></div><div style="display:flex; gap:12px; align-items:flex-start; background:var(--hv); padding:12px; border-radius:var(--r-sm); border-left:3px solid #ffa94d;"><b style="min-width:70px; font-size:0.9em; color:#ffa94d; margin-top:2px;">4 Sekunden</b><span style="font-size:0.95em;"><b>Setup Tanks:</b> Bereiten in der vom Caller gecallten Richtung ein Setup vor (z.B. GA).<br><b>Offensive Tanks:</b> Stören die Defensiv-Rollen der Gegner (Chaos stiften).</span></div><div style="display:flex; gap:12px; align-items:flex-start; background:var(--hv); padding:12px; border-radius:var(--r-sm); border-left:3px solid #ff6b6b;"><b style="min-width:70px; font-size:0.9em; color:#ff6b6b; margin-top:2px;">3 Sekunden</b><span style="font-size:0.95em;"><b>DPS:</b> Wer auf <b>Boots of Valor</b> (oder Clump-Boots) spielt, zündet diese JETZT, um nicht gestunned/gerootet zu werden und den Clump sicher zu erreichen. Alle anderen nutzen ihre Boots <i>situativ</i> (z.B. für Disengage).</span></div><div style="display:flex; gap:12px; align-items:flex-start; background:var(--hv); padding:12px; border-radius:var(--r-sm); border-left:3px solid #5fd38a;"><b style="min-width:70px; font-size:0.9em; color:#5fd38a; margin-top:2px;">2 Sekunden</b><span style="font-size:0.95em;"><b>Supports:</b> Setzen Debuffs / Pierces.<br><b>Tanks:</b> Weitere Pulls ziehen Gegner zusammen.</span></div><div style="display:flex; gap:12px; align-items:flex-start; background:var(--hv); padding:12px; border-radius:var(--r-sm); border-left:3px solid #c4a1ff;"><b style="min-width:70px; font-size:0.9em; color:#c4a1ff; margin-top:2px;">1 Sekunde</b><span style="font-size:0.95em;"><b>DPS:</b> Der Clap trifft (Schaden kommt).<br><b>Tanks:</b> Halten den Clump.<br><b>Defensive Rollen:</b> Bereiten sich auf den Counter-Engage der Gegner vor.<br><b>Melee Brawler:</b> Bereiten Off-Clap Druck am Kreisrand auf Heiler/DPS vor.</span></div><div style="display:flex; gap:12px; align-items:flex-start; background:var(--hv); padding:12px; border-radius:var(--r-sm); border-left:3px solid #9ca3af;"><b style="min-width:70px; font-size:0.9em; color:#9ca3af; margin-top:2px;">Heiler</b><span style="font-size:0.95em;">Positionieren sich außen am Rand (Backline) und sind bereit zum Heilen.</span></div></div></div>`, 0, '', 'mc-engage')}
+    ${D('Brawl Druck', `<p>Die Melee DPS (oft Leder) bewegen sich entlang der Außenseiten (Sides) des Kreises. Sie setzen massiven Druck durch <b>DoTs (Damage over Time / Schaden über Zeit)</b> und <b>Healing Reduction (Heilungsreduzierung)</b> auf die Gegner an den Seiten, um diese ins Zentrum zu zwingen, wo unser Clap sie erledigt.</p>`, 0, '', 'mc-brawl')}
+    ${D('Bait & Switch (Caller-Taktik)', `<p>Fake Engage: Der Caller tut so, als würde er engagen, um die Defensives des Gegners (wie Demon Armor) zu ziehen. Sobald diese auf Cooldown sind, folgt der echte, tödliche Engage.</p>`, 0, '', 'mc-bait')}
+    ${D('Flood (Caller-Taktik)', `<p>Eine extrem aggressive Welle. Die gesamte Melee Clap flutet in den Gegner. Wichtig: Nutzt eure Mobilität (Boots), um schnell an der gegnerischen Frontline vorbei in die Backline zu kommen. Wir setzen hierbei auf unsere schnellen DPS-Setups (Demonfang/Longbow) für den Burst.</p>`, 0, '', 'mc-tsunami')}
+    <h3 style="margin-top:40px;">Welchem Prinzip gehen wir gegen die verschiedenen Comps nach?</h3>
+    <p class="mut" style="margin-bottom:16px;">Wenn ihr gegen bestimmte Comps spielt, sind diese Verhaltensweisen entscheidend.</p>
+    ${D('Allgemeine Konter-Taktik (Prävention & Überleben)', `<div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;"><div class="card" style="margin:0; border-left: 4px solid #5fd38a;"><b style="color:#5fd38a;">1. Prävention (Vor dem Engage)</b><p class="mut" style="font-size:0.9rem; margin-top:8px; margin-bottom:0;">Spreaden, nicht im Zentrum stapeln. Deftanks/Supports auf gegnerisches Movement achten.</p></div><div class="card" style="margin:0; border-left: 4px solid #6cb2ff;"><b style="color:#6cb2ff;">2. Überleben (Während des Engages)</b><p class="mut" style="font-size:0.9rem; margin-top:8px; margin-bottom:0;">Sofort Defensives zünden, CC cleansen, auf CC-Resistance achten.</p></div><div class="card" style="margin:0; border-left: 4px solid #ffa94d;"><b style="color:#ffa94d;">3. Bestrafen (Nach dem Engage)</b><p class="mut" style="font-size:0.9rem; margin-top:8px; margin-bottom:0;">Cooldown-Fenster für Counter-Engage nutzen. Brawl-Comps gewinnen den Sustain-Kampf danach.</p></div></div>`)}
+    ${D('Gegen Mirror Matchup (Melee Clap)', `<p><b>Die Win-Condition:</b> Wer die Seiten (Sides) des Kreises kontrolliert, gewinnt.</p><p><b>Verhalten:</b> Ihr müsst euch extrem spreaden. Wenn der Gegner engagt, dürfen sie maximal 1-2 Leute von euch killen, wenn ihr richtig steht.</p><p>Eure Off-Timer machen konstanten Druck und ziehen Defensives, während die reine Melee Clap nur den kurzen Moment des Engages hat.</p>`)}
+    ${D('Gegen Clap Kite', `<p><b>Verhalten:</b> Das Matchup ist anspruchsvoller als es aussieht. Es erfordert Disziplin bei der Positionierung und darf nicht als "einfach" abgetan werden.</p><p><b>Taktik:</b> Spielt an den Seiten, lasst euch nicht auf einen sinnlosen Chase ein. Wenn sie engagen, killen sie nur sehr wenige Leute. Danach brawlt ihr einfach die Seiten und holt euch den Druck zurück.</p><p><b>Wichtig (Eigenständiges Handeln):</b> Unsere Tanks müssen hier selbstständig agieren, da der Caller nicht alles frühzeitig sehen kann. Wenn eine Kite-Situation eintritt, müssen Def- und Offensive Tanks sofort aufmounten und dem gegnerischen Zerg den Weg zu Chokes abschneiden. Lasst euch nicht abschießen, sondern zwingt sie in einen direkten Kampf.</p>`)}
+    ${D('Gegen Full Brawl', `<p><b>Realität:</b> Zergs, die Full Brawl spielen und gleich groß oder größer sind, sind sehr schwer zu schlagen.</p><p><b>Verhalten:</b> Oberste Regel: <b>Nicht stacken!</b> Spielt an den Seiten und sterbt nicht durch die Dauer-DoTs und den Flächenschaden des Brawls.</p>`)}
+</div>`,
+
+buffs:()=>`<h2>Buffs und Debuffs</h2><p class=s>Mechaniken, die jeden Fight bestimmen. Werte aus Community-Quellen, nach Patches prüfen.</p>
+<div class="warn-box" style="margin-bottom:24px;"><b>Wichtiger Zusatzpunkt (Dragonfire Patch)</b> Seit Patch 32.000.1 (31. August 2026) ist die Resilience auf 0 gesetzt worden. Trotzdem dominiert Melee Clap aktuell weiterhin bzw. eine Rückänderung wird erwartet. <a href="https://albiononline.com/news" target="_blank" rel="noopener" style="text-decoration:underline">Zu den offiziellen Patchnotes</a>.</div>
+${D('Diminishing Returns', `<p>Wiederholtes CC (Crowd Control) auf dasselbe Ziel wird kürzer. Stuns, Silences, Roots und erzwungene Bewegung zählen getrennt. Cleanse setzt die DR dieser Kategorie zurück.</p><p class="mut" style="font-size:0.9em; margin-bottom:12px;">Jedes weitere CC auf ein Ziel reduziert die Dauer um ca. 20%. <b>Roots sind für das Setup gut, andere Stuns sind aufgrund der DR aber horrible (verschwendet).</b></p><div class=card style="margin-top:12px"><div style="display:flex; justify-content:space-between; margin-bottom:8px;"><span>Anzahl aufeinanderfolgender CCs:</span><b><span id=dr-count>1</span></b></div><input type=range id=dr-slider min=1 max=5 value=1><div class="big" id=dr-val style="margin-top:12px">100% Dauer</div></div>`, 0, '', 'buffs-dr')}
+${D('AoE Escalation',`AoE macht mehr Schaden, je mehr Ziele sie trifft: 8 % pro Ziel ab dem zweiten, maximal 56 % bei 8 Zielen.<div class=card><input type=range id=ae min=1 max=10 value=4><div>Getroffene Spieler: <b id=an>4</b></div><div class=big id=av></div></div>`, 0, '', 'buffs-aoe')}
+${D('Healing Sickness',`Mehrere Heiler auf demselben Ziel schwächen die Heilung für 8 Sekunden ab. Heilung lieber verteilen.<div class=card><input type=range id=hs min=1 max=15 value=4><div>Heiler: <b id=hn>4</b></div><div class=big id=hv></div></div>`)}
+${D('Resilience', `<p>Greifen mehrere Gegner ein Ziel an, sinkt der Schaden des Ziels (ca. 14 % bei 2, 26 % bei 3 Angreifern). Resilience Penetration ignoriert einen Teil dieser Reduzierung.</p><div class=card style="margin-top:12px"><div style="display:flex; justify-content:space-between; margin-bottom:8px;"><span>Anzahl Angreifer:</span><b><span id=res-count>3</span></b></div><input type=range id=res-slider min=1 max=30 value=3><div class="big" id=res-val style="margin-top:12px">-26% Schaden</div><p class="mut" style="font-size:0.85rem; margin-bottom:0;">(Maximal 75% ab 26 Angreifern)</p></div>`)}
+${D('Pierce und Shred', `<p>In Albion Online bezeichnet <b>Pierce</b> das Verringern der Armor und/oder Magic Resistance eines Gegners. Durch diese temporäre Senkung der Verteidigungswerte wird die Schadensreduktion des Ziels reduziert. Das führt dazu, dass das betroffene Ziel deutlich mehr Schaden erleidet.</p><p>In Albion wird der verursachte Schaden anhand der Armor- und Magic Resistance-Werte des Gegners berechnet. <b>Shredding-Effekte</b> reduzieren diese Verteidigungswerte entweder:</p><ul><li>um einen festen Wert (z.B. "- reduziert Armor um 30").</li><li>oder um einen prozentualen Anteil (z.B. "- reduziert Resistances um 20%").</li></ul><p><b>Stacking:</b> Viele Shredding-Debuffs können mehrfach gestapelt werden. Beispielsweise kann eine Waffe pro Treffer einen Debuff anwenden, der die Verteidigung um 10% reduziert. Lässt sich dieser Effekt bis zu 3-mal stacken, ergibt sich insgesamt eine Reduzierung von 30%.</p><p><b>Diminishing Returns:</b> Es gibt einen maximalen Wert, um die die Resistance eines Spielers verringert werden kann. Dieser liegt bei <b>-60%</b>.</p><div class=card style="margin-top:16px;"><div style="display:flex; justify-content:space-between; margin-bottom:8px;"><span>Anzahl Stacks:</span><b><span id=shred-stack>3</span></b></div><input type=range id=shred-slider min=1 max=6 value=3><div class=big id=shred-val style="margin-top:12px">-30% Resistance</div><p class=mut style="font-size:0.85rem; margin-bottom:0;">(Annahme: 10% Shred pro Stack. Maximaler Cap liegt bei 60%)</p></div>`)}`,
+
+disarray:()=>`<h2>Disarray</h2><p class=s>Mechaniken, die große Zergs ausbremsen.</p>${D('Disarray-Rechner', `<div class=card style="margin-top:12px"><div style="display:flex; justify-content:space-between; margin-bottom:8px;"><span>Eigene Zerg-Größe:</span><b><span id=pc-val>40</span> Spieler</b></div><input type=range id=pc min=21 max=200 value=40><div class=big id=pc-tier style="margin-top:12px">Disarray Stufe 15</div><p class=mut style="font-size:0.85rem; margin-bottom:0;">(Basierend auf den offiziellen Schwellenwerten: 21=Stufe 1, 46=Stufe 20, 119=Stufe 40, 445=Stufe 67)</p></div><hr style="border:0;border-top:var(--bw) solid var(--ln);margin:16px 0"><div class=card style="margin:0"><p style="margin-top:0">Angreifer <input class=n type=number id=da value=40 min=1 max=67> Ziel <input class=n type=number id=dt value=20 min=1 max=67></p><div class=big id=dr></div></div>`, 1)}
+${D('Homesick','Entsteht beim Betreten der Outlands über eine Portal Town, wenn das Home in einem Outlands-Hideout oder Smuggler’s Den liegt. Erhöht den Disarray-Debuff um 20 %.')}
+${D('Battlemounts', `<p>Battle Mounts sind dafür gedacht, mächtige Werkzeuge zu sein, die den Verlauf großer Kämpfe entscheiden können. Mit der Zeit wurde es jedoch immer üblicher, große Mengen an Battle Mounts einzusetzen, sodass sie in vielen ZvZs nahezu unverzichtbar wurden.</p><p>Um diesem Problem entgegenzuwirken, tragen Battle Mounts nun zusätzlich zum bestehenden Disarray-System bei. Jedes Battle Mount erhöht den Disarray-Wert seiner Gruppe, solange es sich in der Region befindet.</p><div style="max-height:200px; overflow-y:auto; border:var(--bw) solid var(--ln); border-radius:var(--r-sm); margin-bottom:16px;"><table style="width:100%; margin:0; font-size:0.9em;"><tr><th style="padding:6px 12px;">Battlemount</th><th style="padding:6px 12px;">Disarray Level</th></tr>${BM_DATA.map(b=>`<tr><td style="padding:6px 12px;">${b[0]}</td><td style="padding:6px 12px;">${b[1]}</td></tr>`).join('')}</table></div><p>Der Disarray-Beitrag der Battle Mounts wird zusammen mit der normalen Disarray-Berechnung berücksichtigt. Die Mechanik greift erst, wenn der gesamte Battle-Mount-Disarray-Wert einer Allianz mehr als 15 Punkte beträgt. Nur der Anteil über 15 Punkten wird zur bestehenden Disarray-Stufe der Allianz hinzugefügt.</p><div class="card" style="margin-top:16px;"><p style="margin-top:0">Klicke Mounts an, um sie zu markieren. Mehrfachklicks erhöhen die Anzahl.</p><div class="row bm-grid" id=bm>${BM_DATA.map((b,i)=>`<button class=b data-i=${i}>${b[0]}</button>`).join('')}</div><div style="display:flex; justify-content:space-between; align-items:center; border-top:var(--bw) solid var(--ln); padding-top:12px; margin-top:12px;"><div>Summe: <b id=bs>0</b> | Zusätzliche Punkte: <b id=bx>0</b></div><button class=b id=br>Zurücksetzen</button></div><div style="margin-top:16px; padding:12px; background:var(--hv); border-radius:var(--r-sm); border:var(--bw) solid var(--ln);"><div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>Basis-Disarray (Spieler):</span><b id="total-base">15</b></div><div style="display:flex; justify-content:space-between; margin-bottom:8px;"><span>Battlemount Zusatz:</span><b id="total-bm-extra">0</b></div><div style="display:flex; justify-content:space-between; font-size:1.2em; border-top:var(--bw) solid var(--ln); padding-top:8px;"><span><b>Gesamtes Disarray:</b></span><b id="total-combined" style="color:#ff6b6b;">15</b></div></div></div>`)}
+${D('Invisibility-Schrein','2 Minuten Stealth (nicht sichtbar, nicht angreifbar, keine Angriffe oder Fähigkeiten), danach ein Silence-Debuff. Ausloggen beendet den Stealth sofort und startet den Debuff.')}`,
+
+rollen:()=>`<h2>Rollen</h2><p class=s>Hier findest du die Aufgabenverteilung in unserer Melee Clap Comp. Klicke auf eine Rolle, um mehr zu erfahren.</p>
+${D('Caller', `<p style="margin-top:0">Der Commander des Zergs. Er gibt die Richtung vor, bestimmt den Fokus und leitet den Engage (mit einem 5-Sekunden-Countdown) sowie den Disengage ein. Er spielt meistens eine Tank-Waffe, um von der Frontline aus zu führen. <b>Wichtig:</b> Diese haben meist ein <b>5-Sekunden-Zeitfenster</b>, welches das Engage-Timing vorgibt. Er muss stets den Überblick über die Cooldowns und Positionen behalten. Oft gibt es einen zweiten Caller, der im Falle des Todes einspringt, scoutet oder Fake-Engages leitet. <b>Wichtig:</b> Seine Calls sind das Gesetz im Fight – Diskussionen folgen erst danach.</p><p class="mut" style="font-size:0.9em; margin-bottom:0;">Beispiele: Golem, 1H Mace.</p>`, 0, 'border-left: 4px solid #c4a1ff')}
+${D('Tanks (Offensive & Defensive)', `<p style="margin-top:0">Tanks zeichnen sich durch hohe HP, Widerstandskräfte und Crowd Control (CC) aus. Im Kreiskonzept agieren sie flexibel zwischen Zentrum und Außenseite.</p><h4>Clump Tanks</h4><p>Ihre Aufgabe ist es, <b>Gegner zu stunnen/rooten (zu "clumpen")</b>, sie im Zentrum festzuhalten und den Engage optimal vorzubereiten.<br><span class="mut" style="font-size:0.9em">Beispiele: 1H Mace (Golem Caller), 1H Hammer, Earthrune.</span></p><h4>Offensive Tanks (Setup Tanks)</h4><p>Leiten den Engage ein und stürmen tief in den Gegner, um Chaos zu stiften und Druck aufzubauen.<br><span class="mut" style="font-size:0.9em">Beispiele: 1H Hammer, Stillgaze, evtl. Great Arcane.</span></p><h4>Defensive Tanks (Deftanks)</h4><p>Stoppen gegnerische Engages und peelen die eigene Backline durch CC.<br><span class="mut" style="font-size:0.9em">Beispiele: 1H Arcane, Icicle, Dreadstorm, Staff of Balance, 1H Mace Control, HeavyMace.</span></p>`, 0, 'border-left: 4px solid #6cb2ff')}
+${D('Supports (Offensive & Defensive)', `<p style="margin-top:0">Supports buffen Verbündete, debuffen Gegner und reinigen CC (Cleanse). Sie halten sich meist nahe beim Caller oder in den Flanks auf.</p><h4>Offensive & DPS-Supports</h4><p>Ermöglichen einen effizienteren Engage, reduzieren gegnerische Rüstungen (Pierce/Shred) und buffen die Gruppe.<br><span class="mut" style="font-size:0.9em">Beispiele: Carving, Damnation, Realmbreaker, Incubus.</span></p><h4>Defensive Supports</h4><p>Fokussieren sich darauf, Schaden abzufangen oder zu vermeiden und die Gruppe am Leben zu halten.<br><span class="mut" style="font-size:0.9em">Beispiele: Demon Armor, Locus, Rootbound, Oathkeepers.</span></p>`, 0, 'border-left: 4px solid #ffa94d')}
+${D('DPS (Melee & Ranged)', `<p style="margin-top:0">Man gewinnt Melee Fights in dem man die Seiten des Fights kontrolliert. So kann man den gegnerischen Zerg entweder auseinander drücken oder langsam komprimieren. Wenn sie auseinander gedrückt werden gewinnen wir. Wenn sie clumpen töten wir.</p><h4>Clap/Ranged DPS (Party1)</h4><p>Stehen in der <b>Backline (außen am Rand des Kreises)</b>. Sie warten auf den Clump der Tanks und feuern dann ihre geballte AOE-Eskalation ab.<br><span class="mut" style="font-size:0.9em">Beispiele: Spiked Gauntlets, Longbow, Demonfang, Dawnsong, Permafrost.</span></p><h4>Melee DPS (Brawler)</h4><p>Stehen in der Frontline. Sie fluten die gegnerische Backline, setzen DoTs und Healing Reduction ein, um massiven Druck aufzubauen.<br><span class="mut" style="font-size:0.9em">Beispiele: Galas (Galatine Pair), Ursine Maulers.</span></p>`, 0, 'border-left: 4px solid #ff6b6b')}
+${D('Healer', `<p style="margin-top:0">Die Lebensadern des Zergs. Sie stehen in der <b>Backline (außen am Rand des Kreises)</b> und müssen ihre eigene Position stets im Auge behalten ("Du musst am Leben bleiben, um zu heilen").</p><p>Nature-Heiler sind oft für den Top-Up (HoTs) zuständig, Holy-Heiler für den Burst-Heal (Instant Heals).<br><span class="mut" style="font-size:0.9em">Beispiele: Tank Hallowfall, Exalted, 1H Nature, 1H Holy.</span></p>`, 0, 'border-left: 4px solid #5fd38a')}
+${D('Battlemounts', `<p style="margin-top:0">Battlemounts (BMs) sind mächtige Reittiere, die den Kampf verändern können.</p><p><b>Wichtig:</b> Nicht jedes BM erhöht sofort das Disarray der eigenen Gruppe. Der Disarray-Beitrag greift erst, wenn der gesamte BM-Wert der Allianz 15 Punkte übersteigt. Weitere Details zu den Auswirkungen findest du auf unserer <a href="#disarray" style="text-decoration:underline">Disarray-Seite</a>.<br><span class="mut" style="font-size:0.9rem">Beispiele: Venom, Chariot.</span></p><p class="mut" style="margin-bottom:0; font-size:0.9rem;">Hinweis: Eine detaillierte Aufschlüsselung der einzelnen Battlemounts und Waffen folgt in Kürze auf einer neuen, separaten Seite.</p>`, 0, 'border-left: 4px solid #9ca3af')}
+<div style="margin-top: 40px; border-top: var(--bw) solid var(--ln); padding-top: 20px;"><h3 style="margin-bottom:12px;">Weiterlesen</h3><p class="mut" style="margin-bottom:16px;">Möchtest du mehr über die Mechaniken, die Calls oder deine spezifische Waffe erfahren?</p><div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px;"><a href="#buffs" class="card" style="text-align:center; padding:20px;"><b>Buffs & Debuffs</b><div class="mut" style="font-size:0.85rem; margin-top:4px;">Mechaniken verstehen</div></a><a href="#glossar" class="card" style="text-align:center; padding:20px;"><b>Call-Glossar</b><div class="mut" style="font-size:0.85rem; margin-top:4px;">Calls nachschlagen</div></a><a href="#weapons-bms" class="card" style="text-align:center; padding:20px;"><b>Waffen & BMs</b><div class="mut" style="font-size:0.85rem; margin-top:4px;">Dein Build & Items</div></a></div></div>`,
+
+'weapons-bms':()=>`<h2>Waffen & Battlemounts</h2>
+<div id="weapon-content"></div>
+<h2 style="margin-top:60px;">Battlemounts</h2>
+<div class="card" style="margin-bottom:20px; border-left: 4px solid #9ca3af;">
+    <p><b>Allgemeine Informationen:</b> Battlemounts übernehmen viele zentrale Supportrollen innerhalb des Zergs. Aufgrund der hohen HP haben können sie sich auch gut im Gegner/Engage überleben. Je nach Mount ist man innerhalb des Zergs für Mana/Cooldowns/Pierce/Interrupt/CC oder sogar Damage gegenüber anderen BMs zuständig. Ein Battlemount hat aber auch eine Einschüchternde Rolle gegenüber dem Gegner.</p>
+    <p><b>Wichtig:</b> Grundsätzliche werden BMs in 3 Kategorien Überkategorien unterteilt, die ihre "Hauptaufgabe" darstellen, jedoch haben viele auch mehrere Aufgaben (Bsp: Battle Eagle's Q verkürzt Cooldowns).</p>
+</div>
+<div id="bms-container">
+${Object.entries(BM_CATS).map(([cat, data], index) => `
+    <div style="margin-bottom: 30px;">
+        <h3 class="cat-${data.color}" style="margin-bottom: 4px;">${cat}</h3>
+        <p class="mut" style="font-size: 0.9em; margin-bottom: 12px; margin-left: -14px; padding-left: 14px; border-left: 4px solid transparent;">${data.desc}</p>
+        <div class=row style="margin-bottom: 0;">
+            ${data.items.map(w=>`<button class="b btn-${data.color}" data-bm="${w}" data-target="bm-desc-${index}">${w}</button>`).join('')}
+        </div>
+        <div id="bm-desc-${index}" style="display:none; margin-top:12px;"></div>
+    </div>
+`).join('')}
+</div>
+<div class="card" style="text-align:center; margin-top:60px; padding:40px 20px;">
+    <h3 style="margin-top:0;">Alle Sets & Builds auf Albion ZvZ</h3>
+    <p class="mut" style="margin-bottom:20px;">Hier geht es direkt zu unserer Composition und den aktuellen Builds.</p>
+    <a href="https://www.albionzvz.com/g/the-fallen/compositions/f730f3e1-87cb-4b2d-b1f8-b743cc887cf3" target="_blank" rel="noopener" class="b" style="display:inline-block; padding:10px 20px; text-decoration:none;">Zu den Sets auf AlbionZvZ</a>
+</div>`,
+
+videos:()=>`<h2>Erklärvideos</h2><p class=s>Wichtige Guides, Erklärungen und Praktik-Videos für unsere ZvZ-Comp.</p>
+<div class=grid style="grid-template-columns:1fr;">
+    <div class="card"><h3 style="margin-top:0;">Sentus – Grundlagen bis Min. 36</h3><p class="mut">Grundlegendes Verständnis und Übersicht über die Mechaniken.</p><div class="video-placeholder">Video-Platzhalter</div></div>
+    <div class="card"><h3 style="margin-top:0;">Praktik – Luke (Melee Clap ZvZ) 1</h3><p class="mut">Praxis-Beispiel und Erklärungen zu Positionierung und Engages.</p><div class="video-placeholder">Video-Platzhalter</div></div>
+    <div class="card"><h3 style="margin-top:0;">Praktik – Luke (Melee Clap ZvZ) 2</h3><p class="mut">Weiteres Praxis-Beispiel und taktische Analysen.</p><div class="video-placeholder">Video-Platzhalter</div></div>
+</div>`,
+
+erweitert:()=>`<h2>Erweiterte Ansicht</h2><p class=s>Alle detaillierten Mechaniken, Regeln und Guides unserer Gilde.</p>
+<div class=grid>
+    <a href="#buffs"><b>Buffs und Debuffs</b><span>Mechaniken und Rechner</span></a>
+    <a href="#disarray"><b>Disarray</b><span>Zerg-Größen und Battlemounts</span></a>
+    <a href="#glossar"><b>Call-Glossar</b><span>Wichtige Begriffe für Voice</span></a>
+    <a href="#castles"><b>Castles</b><span>Gates, Kisten, Strategien</span></a>
+    <a href="#terris"><b>Territories</b><span>Mauern, Mage, Angriff</span></a>
+    <a href="#outposts"><b>Outposts</b><span>Wellen, Cap-Kreis</span></a>
+    <a href="#open-world"><b>Open World</b><span>Offene Fights, Chokes</span></a>
+    <a href="#regeln"><b>Regeln</b><span>Verhalten und Standards</span></a>
+    <a href="#lootsplit"><b>Lootsplit & Regear</b><span>Erstattung und Vaults</span></a>
+    <a href="#vod"><b>VODs</b><span>Aufzeichnungen</span></a>
+</div>`,
+
+glossar:()=>`<h2>Call-Glossar</h2><p class=s>Begriffe aus Voice und Chat. Wähle links eine Kategorie oder klicke auf "Gesamtübersicht".</p>${Object.keys(GL_CAT).map((cat, i) => D(cat, L([...GL_CAT[cat]].sort((a,b)=>a[0].localeCompare(b[0])).map(c => `<b>${c[0]}</b> | ${c[1]}`)), 0, '', `gl-cat-${i}`)).join('')}`,
+castles:()=>`<h2>Castles <span class=tag>TODO</span></h2><p class=s>Stand der Informationen bei Patches prüfen.</p>${D('Aufbau und Kisten',L(['Zwei Layouts: 4 Eingänge (NW, NE, SW, SE) oder 2 Eingänge mit One-Way-Choke','Kisten öffnen zu festen Timern: grün, blau, lila, gold. Am Wochenende und am Resetday immer gold','Nach dem Cap alle die Castlekiste klicken: Might und Seasonpoints für die Gilde']),0)}${D('Gates und Lordroom',L(['Gates samt HP stehen auf der Minimap, ein erneutes Cap setzt sie zurück','Zum Durchklicken Force Combat Mode in den Einstellungen ausschalten','Gates mit Belagerungshämmern brechen, Guards dahinter von den DDs töten lassen','Lordroom: Elite-Guards zusammenziehen, dann Castlelord, nur eine Gilde im Cap-Ring','Mörser machen prozentualen Schaden: Treffer vermeiden']))}${D('Strategien',L(['Von Südwest siegen für bessere Sicht, gegen Kite & Clap als Angreifer eher von Norden','Gegen Clap & Kite von Wänden fernhalten','Heiler können in den Pockets von dort aus heilen']))}`,
+terris:()=>`<h2>Territories <span class=tag>TODO</span></h2><p class=s>Stand der Informationen bei Patches prüfen.</p><h3>Territory-Arten</h3><div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:24px;"><div class="card" style="margin:0; padding:0; overflow:hidden; text-align:center; position:relative; background:var(--bg);">${SVG_TERR.farm1}<b style="display:block; padding:12px; border-top:var(--bw) solid var(--ln);">Farm Territory 1</b></div><div class="card" style="margin:0; padding:0; overflow:hidden; text-align:center; position:relative; background:var(--bg);">${SVG_TERR.farm2}<b style="display:block; padding:12px; border-top:var(--bw) solid var(--ln);">Farm Territory 2</b></div><div class="card" style="margin:0; padding:0; overflow:hidden; text-align:center; position:relative; background:var(--bg);">${SVG_TERR.res1}<b style="display:block; padding:12px; border-top:var(--bw) solid var(--ln);">Resource Territory 1</b></div><div class="card" style="margin:0; padding:0; overflow:hidden; text-align:center; position:relative; background:var(--bg);">${SVG_TERR.res2}<b style="display:block; padding:12px; border-top:var(--bw) solid var(--ln);">Resource Territory 2</b></div></div>${D('Grundlagen',L(['Rotes Viereck auf der Karte mit Center-Mage in der Mitte und PvE-Wachen','Launch nur in der Prime Time, der Angriff gilt für den nächsten Tag','Einnehmen in den ersten 20 Minuten: Center-Mage töten, Turm anklicken und channeln','Mauern: zuerst Crystal-Schild, dann zweiter Lebensbalken hämmern','Side-Mages töten gibt Siphoned Energy (Mage-Raiden)']),1)}${D('Angriff und Verteidigung',L(['Viele Wände auf einer Seite öffnen, genug Platz zum Kiten schaffen','Eher von Süden nach Norden spielen, die Sicht ist besser','Gegen Overwall-Comps nie an der Wand stehen, gegen Melee Clap und Full Brawl darf man','Gates nur Person für Person passieren, sonst entstehen Clumps','Center-Mage ist für Angreifer die gefährlichste Zone, Kitewege vorher auf der Minimap planen']))}`,
+outposts:()=>`<h2>Outposts <span class=tag>TODO</span></h2><p class=s>Stand der Informationen bei Patches prüfen.</p><div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom:12px;"><div class=card style="margin:0; border-left:4px solid #6cb2ff;"><b>Outpost als Defender</b><p class="mut" style="font-size:0.9rem; margin-top:8px;">Möchte man als Tank und Support die Chokes zu machen, um das Flüchten der Gegner zu vermeiden, während die Backline einzeln durch die Chokes geht um den Gegnerzerg zu fluten.</p></div><div class=card style="margin:0; border-left:4px solid #ff6b6b;"><b>Outpost als Attacker</b><p class="mut" style="font-size:0.9rem; margin-top:8px;">Gegen Kite & Clap wiederum möchte man sich als Verteidiger eher von den Wänden und den Chokes fernhalten und ggf. den Fight in die Open-World verlagern.</p></div></div>${D('Anmerkungen Outposts', `<ul><li>Outposts sind das "kleine" Castle.</li><li>Um einen Outpost zu übernehmen, muss man 3 Wellen mit steigender Schwierigkeit besiegen (6 Guards, 4 Elite Guards, 1 Lord).</li><li>Nach jeder Welle spawnen die nächsten nach genau einer Minute.</li><li>Nach der Lordphase darf maximal eine Gilde im "Cap-Kreis" stehen.</li><li>Kisten: 4 Raritätsstufen (grün/blau/lila/gold), spawnen wie im Castle.</li><li>Bei PvP um Outposts: Melee-Zerg -> Backline Richtung Norden (nicht über Wand angreifen).</li><li>Kämpft man gegen den Inhaber des Outposts, greifen zusätzlich die Guards an.</li></ul>`, 0)}`,
+'open-world':()=>`<h2>Open World <span class=tag>TODO</span></h2><p class=s>Stand der Informationen bei Patches prüfen.</p>${D('Open World Fights', `<p>In Open World Fights wollen alle auf ihre Swaps tauschen. Bedenkt dabei den unterschiedlichen Playstyle gegen die diversen Comps.</p><p>Unsere Caller wollen häufig im Vorfeld Gegner scouten und dadurch übersteppen, catchen, dismounten und töten. Das sorgt für rapiden Stress beim Gegner, sowie das schnelle dezimieren der Gegnerzahl.</p><p>Zusätzlich kommen in Open-World-Fights mehrere Mechaniken zusammen: Clumps zu erzeugen und den Gegner zu zwingen, die völlig Spieler durch die immer wechselnde Terrain nicht auf ihrer Position agieren. Ebenfalls kann es dafür sorgen, dass es einen schnellen Umschwung der Taktik von Clump-Engage zu Brawl geben kann.</p><p>Anders ist im Fight gegen Clap/Kite: Diese Comp möchte sich von weiten Bereichen möglichst fernhalten und meistens über Wände, um Bends oder in Chokes hinein und laufen dabei in diese Richtungen. Da möchten wir in den einzelnen Rollenbeschreibungen, als Brawler, Tanks und Support, sowie vereinzelte Heiler aufmounten, den Gegnerzergs unterwegs sind, dismounten und sie halten. Gegen z.B. Brawl möchte man hingegen direkt die Healer fokussieren um danach die Brawler und zu guter Letzt die Tanks killen.</p>`, 1)}${D('Chokes', `<p>Der Begriff bezeichnet Engpässe in einem Spielbereich.</p><ul><li><b>Was ist das?</b> Ein Weg, Flur, eine Brücke, ein Tunnel oder ein Bereich zwischen mehreren Terrain durch die Teams zwingend hindurch müssen um zum Ziel zu gelangen.</li><li><b>Taktische Bedeutung:</b> Weil dort das gesamte gegnerische Team durch muss, konzentriert sich das Geschehen an diesen Punkten. Chokes werden oft als Engage-Point genutzt, daher immer wachsam sein.</li></ul>`)}`,
+regeln:()=>`<h2>Regelwerk</h2><p class=s>Unsere Regeln für ein respektvolles Miteinander in der Gilde und der Allianz.</p><div class="card" style="border-left: 4px solid #c4a1ff; background: rgba(196,161,255,0.05); padding: 20px; margin-bottom: 24px;"><h3 style="margin-top:0; color:#c4a1ff; font-size:1.3rem;">Gildenregeln</h3><p class="mut" style="font-size:0.9em; margin-bottom:12px;">Diese Regeln sind das Fundament unserer Gemeinschaft und gelten für jeden.</p><ol style="padding-left:20px; margin:8px 0; font-size: 1.05em; line-height: 1.8; color: var(--fg);"><li>Wir sind eine Gemeinschaft, handelt danach!</li><li>Bringt keine Unruhe von außen in die Gildengemeinschaft hinein.</li><li>Wenn möglich priorisiert Content mit Gildenmembern.</li><li>The-Fallen ist eine Ü18 Gilde, daher wird ein erwachsener Umgangston erwartet.</li><li>Bei CTA dabei sein wenn Online. Wenn der Timer mit freiwillig gekennzeichnet ist entfällt die Pflicht.</li><li>Loot bei Gildenevents/ZVZ Timern beim HO oder Gildeninsel in die ZVZ Tabs abgeben.</li></ol></div><h3>Allianzregeln</h3>${D('Allianzregeln', `<h4>ROID Allianz Regeln</h4><p><b>1. Oberste Regel</b><br>Sei kein Arsch. Wir sind eine Allianz, teilt wo ihr könnt.</p><p><b>2. Vortexe/Cores</b><br>Die Gilde die das HQ HO auf der Map hat, hat Priorität auf den Core. Die Gilde die das HO + Terry besitzt hat Priorität auf den Vortex. Derzeit sind das Fen, Ravine und Mire.</p><p>Auf allen anderen Maps gilt, whoever takes it gets it. Mal hat der eine Glück und bekommt es mal der andere. Kein böses Blut! Sobald eine Gilde ein Objective bekommen hat, hat sie Prio auf das Objective. Kein stealen eines bereits getragenen Cores/Vortex.</p><p><b>3. Ressourcennodes, Kisten etc.</b><br>Teilt untereinander. Wir sind eine Allianz. Handelt danach.</p><p>Regelbrüche müssen per Videoproof bewiesen werden.</p><h4 style="margin-top:20px;">Regeln zu DIOR/Alllys</h4><p>Dior ist mit uns im ZVZ verbündet. Außerhalb gibt es keinen offiziellen NAP jedoch bitte ich euch euren Hausverstand zu nutzen. Gerade mit den Gilden Scourge of Gods und Family of Hefajstos pflegen wir ein diplomatisch gutes Verhältnis. Lasst Spieler dieser Gilden am Leben wenn ihr die Möglichkeit dazu habt.</p><p>Die beiden Gilden leben südlichwestlich von Widemoor Fen in Braemore Lowland und Sandmount Ascent. Diese Heimatgebiete sind für jegliche PVP Aktionen strikt zu meiden.</p><p>Allys die mit uns im ZVZ verbündet sein können: DIOR, II, XDXD -> wenn ZVZ Timer -> nicht hitten.</p><p>Für alles andere gilt Red = Dead.</p>`, 0)}`,
+lootsplit:()=>`<h2>Lootsplit & Regear</h2><p class=s>Alle Infos zur Erstattung und zum Umgang mit Loot bei unseren ZvZ-Events.</p>
+<h3>Regear-System</h3>
+<div class=card><p style="margin-top:0">Allgemein gilt Regear im ZvZ bis <b>Stufe 8-9</b>. Das System ist dafür da, euch nach dem Content schnell wieder ins Spiel zu bringen.</p><ul><li><b>Waffen:</b> Wenn ihr mit einer Waffe eurer Wahl zum ZvZ erscheint, ist es nicht garantiert, dass diese im Regear-Pool verfügbar ist. <b>Bitte tragt eure Waffen möglichst eigenständig ins Hideout.</b></li><li><b>Rüstung, Helme, Capes & Schuhe:</b> Sollten ausreichend vorhanden sein. Wenn etwas fehlt, meldet euch bei <b>Relgok</b>.</li><li><b>Tränke & Food:</b> Es werden pro Person <b>4 Tränke und 1 Bufffood</b> regeared.</li></ul></div>
+<h3 style="margin-top:40px;">Regear Vaults</h3>
+<div class=card><p style="margin-top:0">Es gibt zwei unterschiedliche Regear Vaults im Hideout:</p><ul><li><b>ZVZ Rekruten:</b> Für Rekruten.</li><li><b>ZVZ Mitglieder:</b> Für Mitglieder.</li></ul><p class="mut" style="margin-bottom:0; font-size:0.9em;">Dank der Gildenrollen müsst ihr nicht selbst darauf achten: Rekruten haben Zugriff auf den Rekruten-Vault, Mitglieder haben durch ihre Rolle Zugriff auf beide Vaults.</p></div>
+<h3 style="margin-top:40px;">Lootsplit</h3>
+<div class=card><p style="margin-top:0">Der Loot, welcher während der ZvZs gesammelt wird, geht in den <b>ZvZ Loot-Abgabe Tab</b> im Hideout bzw. auf der Gildeninsel.</p><p>Dieser Loot wird verwendet, um <b>Battlemounts</b> sowie <b>Buyorders für das Regear-System</b> zu bezahlen.</p><p style="font-size:1.1em; font-weight:600; text-align:center; margin-top:24px; color:#c4a1ff;">Nur gemeinsam können wir die Gilde voranbringen!</p></div>
+<div class=card style="border-left: 4px solid var(--mut);"><p style="margin:0;"><b>Ausnahme:</b> Jeder Content außerhalb von gecallten Events ist natürlich den Spielern überlassen, wie sie den Lootsplit regeln. Diese Regel gilt nur für offizielle ZvZ Events.</p></div>`,
+review:()=>`<h2>Nachbesprechung</h2><p class=s>Kurz auswerten, ohne Schuldzuweisung. Statistiken auf <a href="https://www.albionzvz.com/g/the-fallen" target=_blank rel=noopener>AlbionZvZ</a>.</p>
+<div class="card" style="background:var(--bg);"><h3 style="margin-top:0;">Fight Log</h3><div class="row" style="align-items:center;"><input type="text" id="log-name" placeholder="Name (z.B. MaxMustermann)" style="flex:1; min-width:150px;"><input type="datetime-local" id="log-date" style="flex:1; min-width:180px;"><button class="b" id="btn-add-log">Eintrag hinzufügen</button></div><div id="log-list" style="margin-top:16px;"></div></div>
+<h3>Content und Gegner</h3><textarea id="rv-0" rows=2 class=rv oninput="saveReview()"></textarea>
+<h3>Was lief gut?</h3><textarea id="rv-1" rows=2 class=rv oninput="saveReview()"></textarea>
+<h3>Was lief schlecht?</h3><textarea id="rv-2" rows=2 class=rv oninput="saveReview()"></textarea>
+<h3>Was ändern wir?</h3><textarea id="rv-3" rows=2 class=rv oninput="saveReview()"></textarea>
+<div class="row" style="margin-top:20px;"><button class="b" id="cp">Text kopieren</button><button class="b" id="btn-download">Als Dokument herunterladen</button><span class="mut" id="cm"></span></div>`,
+vod:()=>`<h2>VODs</h2><p class=s>Videos und Aufzeichnungen unserer Fights findest du auf AlbionZvZ.</p><div class="card" style="text-align:center; padding:30px 20px;"><p style="margin-top:0;">Alle VODs und Fight-Aufzeichnungen von The-Fallen liegen auf AlbionZvZ.</p><a href="https://www.albionzvz.com/g/the-fallen/vods" target="_blank" rel="noopener" class="b" style="text-decoration:none; display:inline-block;">Zu AlbionZvZ (The-Fallen VODs)</a></div>`,
+changelog:()=>`<h2>Changelog & Ideen</h2>
+<div class="row" style="margin-bottom:20px;"><button class="b on" id="tab-changelog">Changelog</button><button class="b" id="tab-ideas">Update Ideen</button></div>
+<div id="tab-content-changelog">
+    <p class=s>Stand: 11.11.2026 (18:00 Uhr)</p>
+    ${D('11.11.2026 - 18:00 Uhr - v1.70.00 - Live-Editor & Feedback-Entwurf', `<ul><li><b>v1.70.01:</b> Neuer "Live-Editor" im Moderatoren-Bereich. Relgok kann Texte direkt im Browser bearbeiten und speichern, ohne den Code anfassen zu müssen.</li><li><b>v1.70.02:</b> Feedback-Entwurf: Wenn man das Feedback-Fenster schließt, bleibt der geschriebene Text erhalten. Er wird erst nach erfolgreichem Absenden gelöscht.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.70.00">Version herunterladen</button></p>`, 1)}
+    ${D('11.11.2026 - 16:00 Uhr - v1.69.04 - Feedback-System & Feinschliff', `<ul><li><b>v1.69.01:</b> Neue Einstellungsseite mit Theme, Rahmenbreite, Radius, Akzentfarbe via Farbrad, Schriftgröße und Kompaktmodus.</li><li><b>v1.69.02:</b> Vanilla-Farbrad (HSV) für Rahmen- und Akzentfarben implementiert.</li><li><b>v1.69.03:</b> Bugfixes (Prefers-Color-Scheme, Init-Reihenfolge, I-Objekt-Registrierung).</li><li><b>v1.69.04:</b> Splash-Screen übernimmt jetzt die Akzentfarbe. <b>Neu:</b> Feedback-System über Cloudflare Worker. Nutzer können Feedback senden und Mods können es im Admin-Panel einsehen.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.69.04">Version herunterladen</button></p>`)}
+    ${D('11.11.2026 - 09:00 Uhr - v1.68.00 - Tanks-Aufräumen, Clap Kite entfernt & Schriftfarbe', `<ul><li><b>v1.68.00:</b> "Clap Kite" komplett aus dem Guide entfernt (Comps & Waffen). Der Guide fokussiert sich nun vollständig auf die Melee Clap.</li><li><b>v1.68.00:</b> Tanks im <a href="#rollen" style="text-decoration:underline">Rollen-Tab</a> nach Takumotos Vorgaben aufgeräumt (Clump Tanks: 1H Mace, 1H Hammer, Earthrune / Setup Tanks: 1H Hammer, Stillgaze, evtl. GA / Deftanks: alles andere).</li><li><b>v1.68.00:</b> Schriftfarbe der Überschrift "Welchem Prinzip gehen wir..." im <a href="#comps" style="text-decoration:underline">Comps-Tab</a> auf Weiß geändert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.68.00">Version herunterladen</button></p>`)}
+    ${D('11.11.2026 - 08:30 Uhr - v1.67.04 - Schriftfarbe angepasst', `<ul><li><b>v1.67.04:</b> Im <a href="#comps" style="text-decoration:underline">Comps-Tab</a> wurde die Überschrift "Welchem Prinzip gehen wir gegen die verschiedenen Comps nach?" von Rot auf Weiß (Standardfarbe) geändert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.67.04">Version herunterladen</button></p>`)}
+    ${D('11.11.2026 - 08:00 Uhr - v1.67.03 - Waffen-Suffixe, Support DPS & Deftanks', `<ul><li><b>v1.67.03:</b> <a href="#rollen" style="text-decoration:underline">Rollen-Tab</a>: Deftanks-Text gekürzt und um Peelen ergänzt.</li><li><b>v1.67.03:</b> <a href="#weapons-bms" style="text-decoration:underline">Waffen & BMs</a>: (MeleeClap) Suffixe bei allen Waffen entfernt.</li><li><b>v1.67.03:</b> <a href="#weapons-bms" style="text-decoration:underline">Waffen & BMs</a>: Kategorie "Support DPS" ist nun in Orange (Farbe der Supports) anstelle von Rot (DPS).</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.67.03">Version herunterladen</button></p>`)}
+    ${D('11.11.2026 - 07:00 Uhr - v1.67.02 - Tanks-Aufteilung korrigiert', `<ul><li><b>v1.67.02:</b> Rollen-Tab: Kategorisierung der Tanks im <a href="#rollen" style="text-decoration:underline">Rollen-Tab</a> exakt nach Vorgaben aufgeteilt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.67.02">Version herunterladen</button></p>`)}
+    ${D('11.11.2026 - 06:00 Uhr - v1.67.01 - Waffenbeschreibungen & Such-Fix', `<ul><li><b>v1.67.01:</b> Waffenbeschreibungen in <a href="#weapons-bms" style="text-decoration:underline">Waffen & BMs</a> 1:1 aus dem neuen Export übernommen (inkl. neuer Kategorienamen).</li><li><b>v1.67.01:</b> Suchfunktion repariert: Alle Ergebnisse (auch aus der Erweiterten Ansicht) sind wieder korrekt verlinkt und anklickbar.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.67.01">Version herunterladen</button></p>`)}
+    ${D('11.11.2026 - 05:00 Uhr - v1.66.03 - Erweiterte Ansicht & Erklärvideos', `<ul><li><b>v1.66.02:</b> Neuer Tab <a href="#videos" style="text-decoration:underline">Erklärvideos</a> mit Platzhaltern für zukünftige Videos eingefügt.</li><li><b>v1.66.03:</b> Neue Unterseite <a href="#erweitert" style="text-decoration:underline">Erweiterte Ansicht</a> im Kachel-Design erstellt.</li><li><b>v1.66.04:</b> Changelog in den Moderatoren-Bereich verschoben.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.66.03">Version herunterladen</button></p>`)}
+    ${D('11.11.2026 - 04:00 Uhr - v1.65.09 - Rollen, Patchnotes, Text-Fixes & Waffen', `<ul><li><b>v1.65.01:</b> Neue Kategorie „Spezial“ in der Sidebar angelegt (Platzhalter).</li><li><b>v1.65.02:</b> Positionierung (Kreis): Erklärung für Supports ergänzt.</li><li><b>v1.65.03:</b> Dragonfire-Patchnote von Comps in den <a href="#buffs" style="text-decoration:underline">Buffs & Debuffs</a>-Tab verschoben.</li><li><b>v1.65.04:</b> Tanks-Kategorisierung im <a href="#rollen" style="text-decoration:underline">Rollen-Tab</a> angepasst.</li><li><b>v1.65.05:</b> Satz „Die E-Fähigkeit gehört dem Caller!“ aus DPS-Beschreibung entfernt.</li><li><b>v1.65.06:</b> DPS-Beschreibung um die neue "Seiten kontrollieren"-Taktik ergänzt.</li><li><b>v1.65.07:</b> Grammatik-Korrektur: Global „die Clump“ zu „der Clump“ geändert.</li><li><b>v1.65.08:</b> Stillgaze von Supports zu Tanks verschoben.</li><li><b>v1.65.09:</b> 1H Arcane in <a href="#weapons-bms" style="text-decoration:underline">Waffen & BMs</a> in 1H Arcane (Tank) und 1H Arcane (Support) aufgeteilt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.65.09">Version herunterladen</button></p>`)}
+    ${D('11.11.2026 - 03:00 Uhr - v1.64.01 - Waffenbeschreibungen aktualisiert', `<ul><li><b>v1.64.01:</b> Waffenbeschreibungen im Tab <a href="#weapons-bms" style="text-decoration:underline">Waffen & BMs</a> exakt anhand der neuen Screenshots 1:1 überarbeitet. Kategorien unverändert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.64.01">Version herunterladen</button></p>`)}
+    ${D('11.11.2026 - 02:00 Uhr - v1.63.03 - Suchfunktion, Verlinkungen & Basics', `<ul><li><b>v1.63.01:</b> Changelog-Verlinkung: Ab sofort werden Änderungen im Changelog direkt verlinkt.</li><li><b>v1.63.02:</b> Suchfunktion: Ergebnisse werden nun nach Kategorien gruppiert und übersichtlicher dargestellt.</li><li><b>v1.63.03:</b> <a href="#basics" style="text-decoration:underline">ZvZ-Basics</a>: Text unter "Gutes Gear und Economy" durch Verlinkung zur AlbionZvZ-Composition ersetzt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.63.03">Version herunterladen</button></p>`)}
+    ${D('11.11.2026 - 01:00 Uhr - v1.62.03 - Main Engage Verlinkung & Textanpassung', `<ul><li><b>v1.62.01:</b> Comps: <a href="#mc-engage" style="text-decoration:underline">Main Engage Text</a> am Ende um Verlinkung zu "Waffen & BMs" für genauere Timings der jeweiligen Waffen ergänzt.</li><li><b>v1.62.02:</b> Comps: <a href="#mc-regeln" style="text-decoration:underline">Regeln & IP-Anforderungen</a> – Ausdruck "3-5 Sekunden Countdown" zu "5 Sekunden Countdown" geändert.</li><li><b>v1.62.03:</b> Changelog und Download-Links auf v1.62.03 aktualisiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.62.03">Version herunterladen</button></p>`)}
+    ${D('11.11.2026 - 00:00 Uhr - v1.61.05 - VODs, Heiler-Texte & Disarray', `<ul><li><b>v1.61.01:</b> VOD-Verlinkung angepasst (verweist nun auf /vods).</li><li><b>v1.61.02:</b> Exakte Heiler-Texte für Waffen & BMs hinterlegt.</li><li><b>v1.61.03:</b> Disarray-Rechner mit exakten Werten aus dem Screenshot aktualisiert.</li><li><b>v1.61.04:</b> Outposts: "Anmerkungen" standardmäßig eingeklappt.</li><li><b>v1.61.05:</b> Changelog und Download-Links auf v1.61.05 aktualisiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.61.05">Version herunterladen</button></p>`)}
+    ${D('10.11.2026 - 23:59 Uhr - v1.60.05 - Textkorrekturen & BM-Bereinigung', `<ul><li><b>v1.60.01:</b> "Tsunami" aus der Überschrift im Comps-Tab entfernt (jetzt nur noch "Flood").</li><li><b>v1.60.02:</b> Melee DPS Beispiel von "Ursine" auf "Ursine Maulers" geändert.</li><li><b>v1.60.03:</b> "B Fill – Battlemount" aus der Liste der Control BMs entfernt.</li><li><b>v1.60.04:</b> Regear Vaults Text gekürzt.</li><li><b>v1.60.05:</b> Changelog und Download-Links auf v1.60.05 aktualisiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.60.05">Version herunterladen</button></p>`)}
+    ${D('10.11.2026 - 23:30 Uhr - v1.59.03 - Glossar-Fix & Textanpassungen', `<ul><li><b>v1.59.01:</b> Albion Settings: Text für Hotkey angepasst (Kronenmark -> Hotkey Kronenmark).</li><li><b>v1.59.02:</b> Rollen-Tab: Text für Caller angepasst (5-Sekunden-Cooldown -> 5-Sekunden-Zeitfenster).</li><li><b>v1.59.03:</b> Fehler in der Glossar-Navigation behoben.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.59.03">Version herunterladen</button></p>`)}
+    ${D('10.11.2026 - 23:00 Uhr - v1.58.08 - Glossar, Castles & Settings Fixes', `<ul><li><b>v1.58.01:</b> Glossar-Navigation (Sidebar) so angepasst.</li><li><b>v1.58.02:</b> DPS-Beispiel von "Ursine" auf "Ursine Maulers" geändert.</li><li><b>v1.58.03:</b> Castles-Tab: Text unter Grafiken standardmäßig eingeklappt.</li><li><b>v1.58.04:</b> TODOs für die Bilder finalisiert.</li><li><b>v1.58.05:</b> Text "Gutes Gear und Economy" von T7 auf T8 geändert.</li><li><b>v1.58.06:</b> "Force Combat Mode" aus den Albion Settings entfernt.</li><li><b>v1.58.07:</b> "Quick Hotkey" Text präzisiert.</li><li><b>v1.58.08:</b> "Auto-Attack" aus den Albion Settings entfernt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.58.08">Version herunterladen</button></p>`)}
+    ${D('10.11.2026 - 22:15 Uhr - v1.57.08 - Vollständige Wiederherstellung', `<ul><li><b>v1.57.08:</b> Alle Changelog-Einträge wiederhergestellt und der VOD-Tab wurde wieder in die Navigation eingefügt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.57.08">Version herunterladen</button></p>`)}
+    ${D('10.11.2026 - 22:00 Uhr - v1.57.06 - Settings & Admin-Fixes', `<ul><li><b>v1.57.01:</b> "Venom" und "Chariot" aus den BM-Listen entfernt.</li><li><b>v1.57.02:</b> Venom Basilisk Beschreibung geprüft (Q, E, F).</li><li><b>v1.57.03:</b> "Nachbesprechung" in den Admin-Bereich verschoben.</li><li><b>v1.57.04:</b> Call "Sword Engage" aus dem Glossar entfernt.</li><li><b>v1.57.05:</b> Albion Settings erweitert (Party Marker, Quick Hotkeys).</li><li><b>v1.57.06:</b> Changelog und Download-Links auf v1.57.06 aktualisiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.57.06">Version herunterladen</button></p>`)}
+    ${D('09.11.2026 - 22:30 Uhr - v1.56.05 - Mobile-Optimierung & Text-Fixes', `<ul><li><b>v1.56.01:</b> "Positionierung (wichtigster Tipp)" standardmäßig eingeklappt.</li><li><b>v1.56.02:</b> "Main Engage" Text um den Hinweis auf den 5-Sekunden-Countdown ergänzt.</li><li><b>v1.56.03:</b> Sektion "Mindestvoraussetzungen" nach oben verschoben.</li><li><b>v1.56.04:</b> Mobile Optimierung für iOS & Android.</li><li><b>v1.56.05:</b> Changelog und Download-Links auf v1.56.05 aktualisiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.56.05">Version herunterladen</button></p>`)}
+    ${D('09.11.2026 - 22:17 Uhr - v1.55.03 - Performance-Optimierung', `<ul><li><b>v1.55.01:</b> Event-Delegation für Waffen-Buttons in <code>#weapon-content</code> implementiert.</li><li><b>v1.55.02:</b> Event-Delegation für BM-Buttons in <code>#bms-container</code> implementiert.</li><li><b>v1.55.03:</b> Globaler Click-Listener auf <code>#m</code> beschränkt. Changelog auf v1.55.03 aktualisiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.55.03">Version herunterladen</button></p>`)}
+    ${D('09.11.2026 - 22:17 Uhr - v1.54.03 - Comp-Switcher & Waffen-Bereinigung', `<ul><li><b>v1.54.01:</b> Waffennamen bereinigt.</li><li><b>v1.54.02:</b> Comp-Switcher für Waffen & BMs eingebaut.</li><li><b>v1.54.03:</b> Changelog und Download-Links auf v1.54.03 aktualisiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.54.03">Version herunterladen</button></p>`)}
+    ${D('09.11.2026 - 21:30 Uhr - v1.53.03 - Changelog-Rekonstruktion & Comp-Auswahl', `<ul><li><b>v1.53.01:</b> Changelog-Historie auf den 09.11.2026 rekonstruiert und chronologisch sortiert.</li><li><b>v1.53.02:</b> Comps-Auswahl oben im Tab.</li><li><b>v1.53.03:</b> Changelog und Download-Links auf v1.53.03 aktualisiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.53.03">Version herunterladen</button></p>`)}
+    ${D('09.11.2026 - 21:30 Uhr - v1.52.03 - Comp-Platzhalter & Datum', `<ul><li><b>v1.52.01:</b> Datumsformat im Changelog aktualisiert.</li><li><b>v1.52.02:</b> "In Arbeit" Platzhalter für den Clap & Kite Tab im Comps-Bereich eingebaut.</li><li><b>v1.52.03:</b> Changelog und Download-Links auf v1.52.03 aktualisiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.52.03">Version herunterladen</button></p>`)}
+    ${D('09.11.2026 - 20:45 Uhr - v1.51.02 - Waffen-Kategorisierung', `<ul><li><b>v1.51.01:</b> Waffen in die 6 Kategorien aus den Screenshots unterteilt. Locus in Defensiv/Offensiv aufgeteilt, Galatine zu Offtimer umbenannt.</li><li><b>v1.51.02:</b> Changelog und Download-Links auf v1.51.02 aktualisiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.51.02">Version herunterladen</button></p>`)}
+    ${D('09.11.2026 - 19:15 Uhr - v1.50.04 - UI-Anpassungen & Waffenlisten', `<ul><li><b>v1.50.01:</b> Waffen- und BM-Listen an die aktuellen Composition-Bilder angepasst.</li><li><b>v1.50.02:</b> Toggle-Verhalten implementiert.</li><li><b>v1.50.03:</b> Überschrift im Comps-Tab (Konter-Sektion) geändert.</li><li><b>v1.50.04:</b> Changelog und Download-Links auf v1.50.04 aktualisiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.50.04">Version herunterladen</button></p>`)}
+    ${D('09.11.2026 - 18:30 Uhr - v1.49.02 - UI-Verbesserungen & Text-Update', `<ul><li><b>v1.49.01:</b> Waffen- und BM-Beschreibungen erscheinen nun direkt unter der jeweiligen Kategorie.</li><li><b>v1.49.02:</b> Beschreibung für 'Damnation' basierend auf den neuesten Erkenntnissen aktualisiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.49.02">Version herunterladen</button></p>`)}
+    ${D('09.11.2026 - 17:00 Uhr - v1.48.04 - BM-Update & Detail-Texte', `<ul><li><b>v1.48.01:</b> Interaktive Einleitungen für die BM-Kategorien hinzugefügt.</li><li><b>v1.48.02:</b> Detaillierte Q/W/E/F-Beschreibungen für alle Battlemounts implementiert.</li><li><b>v1.48.03:</b> Dezente graue Hervorhebung bei Auswahl eines Battlemounts hinzugefügt.</li><li><b>v1.48.04:</b> Changelog und Download-Links auf v1.48.04 aktualisiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.48.04">Version herunterladen</button></p>`)}
+    ${D('09.11.2026 - 15:30 Uhr - v1.47.01 - Detaillierte BM-Fähigkeiten', `<ul><li><b>v1.47.01:</b> Detaillierte Fähigkeiten (Q, W, E, F) für Battle Eagle, Tower Chariot, Venom Basilisk und Colossus Beetle basierend auf den Screenshots hinzugefügt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.47.01">Version herunterladen</button></p>`)}
+    ${D('09.11.2026 - 14:00 Uhr - v1.46.04 - BM-Infos & Farben', `<ul><li><b>v1.46.01:</b> Battlemounts (BMs) im Tab „Waffen & BMs“ als interaktiver Bereich hinzugefügt.</li><li><b>v1.46.02:</b> Großes Fenster am Ende des Waffen-Tabs für die AlbionZvZ Sets eingefügt.</li><li><b>v1.46.03:</b> Farbliche Hervorhebung der Kategorien implementiert.</li><li><b>v1.46.04:</b> Changelog und Download-Links auf v1.46.04 aktualisiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.46.04">Version herunterladen</button></p>`)}
+    ${D('09.11.2026 - 12:00 Uhr - v1.45.03 - Waffen-Texte & UI-Fixes', `<ul><li><b>v1.45.01:</b> Alle Waffen-Beschreibungen 1:1 aus den bereitgestellten Screenshots übernommen.</li><li><b>v1.45.02:</b> Platzhalter-Tabellen im Waffen-Tab entfernt.</li><li><b>v1.45.03:</b> Prominenter Button/Link zur AlbionZvZ-Composition im Waffen-Tab hinzugefügt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.45.03">Version herunterladen</button></p>`)}
+    ${D('09.11.2026 - 10:00 Uhr - v1.44.01 - Waffen-Details aus Sheet', `<ul><li><b>v1.44.01:</b> Die Daten aus den bereitgestellten Screenshots in die Kategorien und Detailbeschreibungen der Waffen-Seite übertragen.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.44.01">Version herunterladen</button></p>`)}
+    ${D('09.11.2026 - 08:00 Uhr - v1.43.02 - Rollen-Details & Boots of Valor', `<ul><li><b>v1.43.01:</b> Comps → Main Engage: Text bei "3 Sekunden" angepasst.</li><li><b>v1.43.02:</b> Rollen-Tab: Alle Rollen mit detaillierten Erklärungen und farblichen Rahmen versehen.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.43.02">Version herunterladen</button></p>`)}
+    ${D('08.11.2026 - 23:59 Uhr - v1.42.02 - Albion Settings & Waffen-Kategorien', `<ul><li><b>v1.42.01:</b> Albion Settings als aufklappbaren Bereich in den ZvZ-Basics hinzugefügt.</li><li><b>v1.42.02:</b> Die Waffen- und BM-Liste auf der Seite „Waffen & BMs“ nach Kategorien sortiert und gruppiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.42.02">Version herunterladen</button></p>`)}
+    ${D('08.11.2026 - 22:00 Uhr - v1.41.01 - Neues Google Spreadsheet', `<ul><li><b>v1.41.01:</b> Den Link zum Google Spreadsheet im Brainstorm-Tab auf die neue URL aktualisiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.41.01">Version herunterladen</button></p>`)}
+    ${D('08.11.2026 - 20:00 Uhr - v1.40.06 - Waffen, Log & Ideen', `<ul><li><b>v1.40.01:</b> Regear-System: „Capes“ ergänzt.</li><li><b>v1.40.02:</b> Nachbesprechung: Download-Button für Notizen hinzugefügt.</li><li><b>v1.40.03:</b> Nachbesprechung: Log-System implementiert.</li><li><b>v1.40.04:</b> Waffen & BMs: Rollen-Beschreibungen aus dem Transkript eingebaut.</li><li><b>v1.40.05:</b> Changelog: Reiter „Update Ideen“ eingeführt.</li><li><b>v1.40.06:</b> Discord-Integration als erste große Idee im neuen Reiter dokumentiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.40.06">Version herunterladen</button></p>`)}
+    ${D('08.11.2026 - 18:00 Uhr - v1.39.05 - Scouting, Comms & Regel-Fixes', `<ul><li><b>v1.39.01:</b> Regear Vault Text angepasst.</li><li><b>v1.39.02:</b> Resetday im Glossar korrigiert.</li><li><b>v1.39.03:</b> Allianzregeln im Regel-Tab standardmäßig eingeklappt.</li><li><b>v1.39.04:</b> Text zur „Klaren Kommunikation“ in den ZvZ-Basics ergänzt.</li><li><b>v1.39.05:</b> Neuer Abschnitt für „Scouting-Informationen“ in den ZvZ-Basics hinzugefügt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.39.05">Version herunterladen</button></p>`)}
+    ${D('08.11.2026 - 16:00 Uhr - v1.38.01 - Neuer Sheet-Link', `<ul><li><b>v1.38.01:</b> Der Link zum Google Sheet im Brainstorm-Tab wurde auf die neue URL aktualisiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.38.01">Version herunterladen</button></p>`)}
+    ${D('08.11.2026 - 14:00 Uhr - v1.37.01 - Regear Vault entfernt', `<ul><li><b>v1.37.01:</b> Das interaktive Regear-Vault-Raster wurde aus dem Tab „Lootsplit & Regear“ entfernt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.37.01">Version herunterladen</button></p>`)}
+    ${D('08.11.2026 - 12:00 Uhr - v1.36.02 - Fix: Syntax-Fehler im Changelog', `<ul><li><b>v1.36.02:</b> Syntax-Fehler im Changelog behoben.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.36.02">Version herunterladen</button></p>`)}
+    ${D('08.11.2026 - 10:00 Uhr - v1.36.01 - Regear Vault Präzisierung', `<ul><li><b>v1.36.01:</b> Den Regear-Vault (ZVZ Rekruten) präzisiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.36.01">Version herunterladen</button></p>`)}
+    ${D('08.11.2026 - 08:00 Uhr - v1.35.05 - Regear Vault (Rekruten)', `<ul><li><b>v1.35.05:</b> Regear-Vault für „ZVZ Rekruten“ implementiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.35.05">Version herunterladen</button></p>`)}
+    ${D('07.11.2026 - 23:59 Uhr - v1.35.04 - Regear, Sheet & Links', `<ul><li><b>v1.35.01:</b> Im Changelog-Format das Wort „TODO“ samt Nummerierung entfernt.</li><li><b>v1.35.02:</b> Tab „Lootsplit & Regear“ Text angepasst.</li><li><b>v1.35.03:</b> Google-Sheet-Verknüpfung im Brainstorm-Tab fest im Code hinterlegt.</li><li><b>v1.35.04:</b> Link zur AlbionZvZ-Composition im Waffen-Tab eingebaut.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.35.04">Version herunterladen</button></p>`)}
+    ${D('07.11.2026 - 22:00 Uhr - v1.34.04 - Regear & Content Update', `<ul><li><b>v1.34.01:</b> Text im Bereich „Gegen Clap Kite“ erweitert.</li><li><b>v1.34.02:</b> Neues Changelog-Format mit unterteilten Versionen eingeführt.</li><li><b>v1.34.03:</b> „Soft Kiting“ hinzugefügt.</li><li><b>v1.34.04:</b> „Lootsplit & Regear“ Tab komplett überarbeitet.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.34.04">Version herunterladen</button></p>`)}
+    ${D('07.11.2026 - 20:00 Uhr - v1.33.01 - Clap Kite Update & Changelog-Fix', `<ul><li>Comps → Clap Kite: Text angepasst.</li><li>Comps → Clap Kite: Hinweis ergänzt.</li><li>Changelog: Uhrzeiten korrigiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.33.01">Version herunterladen</button></p>`)}
+    ${D('07.11.2026 - 18:00 Uhr - v1.32 - Brainstorm Sheet', `<ul><li>Brainstorm-Tab: Google Sheet kann über ein Eingabefeld verknüpft werden.</li><li>Sheet-Vorschau wird eingebettet.</li><li>Verknüpfung wird im Browser (localStorage) gespeichert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.32">Version herunterladen</button></p>`)}
+    ${D('07.11.2026 - 16:00 Uhr - v1.31 - Waffen-Subpages & Grau', `<ul><li>Farbschema angepasst.</li><li>Waffen & BMs Tab: Raster mit Buttons erstellt.</li><li>Beim Klick auf eine Waffe öffnet sich das Template für die Spell-Datenbank.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.31">Version herunterladen</button></p>`)}
+    ${D('07.11.2026 - 14:00 Uhr - v1.30 - Admin Brainstorm', `<ul><li>Passwort für Moderatoren-Login auf <code>1230</code> geändert.</li><li>Neuer "Brainstorm" Tab im Admin-Bereich erstellt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.30">Version herunterladen</button></p>`)}
+    ${D('07.11.2026 - 12:00 Uhr - v1.29 - Moderatoren Login', `<ul><li>Passwortgeschützter Bereich "Moderatoren Login" hinzugefügt.</li><li>Layout für den Admin-Bereich erstellt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.29">Version herunterladen</button></p>`)}
+    ${D('07.11.2026 - 10:00 Uhr - v1.28 - Rollen-Fixes', `<ul><li>Caller-Beispiele (Golem, 1H Mace) formatiert.</li><li>Rollen-Seite: Alle Rollen-Boxen starten standardmäßig eingeklappt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.28">Version herunterladen</button></p>`)}
+    ${D('07.11.2026 - 08:00 Uhr - v1.27 - Caller & DPS Fixes', `<ul><li>Caller: Countdown auf 5-Sekunden angepasst.</li><li>Caller: Waffenbeispiele geändert.</li><li>DPS: Spiked Gauntlets als Beispiel ergänzt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.27">Version herunterladen</button></p>`)}
+    ${D('07.11.2026 - 06:00 Uhr - v1.26 - Rollen- & Link-Fixes', `<ul><li>Caller: 5-Sekunden-Cooldown erwähnt.</li><li>Positionierung: Tank-Heilungs-Regel präzisiert.</li><li>AoE Escalation: Link korrigiert.</li><li>Defensive Tanks: Beispiele aktualisiert.</li><li>Offensive Tanks: Heavy Mace Hybrid/Purge-Funktion ergänzt.</li><li>Melee DPS: Beispiele auf Galas und Ursine geändert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.26">Version herunterladen</button></p>`)}
+    ${D('07.11.2026 - 04:00 Uhr - v1.25 - Navigation & Open World', `<ul><li>Startseite: (TODO) Tags hinzugefügt.</li><li>"Open World" als eigener Tab eingerichtet.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.25">Version herunterladen</button></p>`)}
+    ${D('07.11.2026 - 02:00 Uhr - v1.24 - Splash & Konter-Matchups', `<ul><li>Neuer Splash Screen mit "Fortfahren" Button.</li><li>Tank Boots bei 5s umgeschrieben.</li><li>Positionierung (Kreis) über Main Engage verschoben.</li><li>Konter-Bereich umgewandelt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.24">Version herunterladen</button></p>`)}
+    ${D('06.11.2026 - 22:00 Uhr - v1.23 - Regelwerk-Redesign', `<ul><li>Regelseite: Alles außer den Regeln entfernt.</li><li>Gildenregeln: Dauerhaft ausgeklappt.</li><li>Allianzregeln: Als aufklappbare Sektion darunter.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.23">Version herunterladen</button></p>`)}
+    ${D('06.11.2026 - 20:00 Uhr - v1.22 - Regeln, VODs & Text-Fixes', `<ul><li>Regeln: Tab in aufklappbare Kategorien unterteilt.</li><li>VODs: Manueller Tab durch einen Link zu AlbionZvZ ersetzt.</li><li>Buffs: DR-Text erweitert.</li><li>Comps: "Space nutzen" Text geändert.</li><li>Basics: "besserer DPS" in "besserer Spieler" geändert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.22">Version herunterladen</button></p>`)}
+    ${D('06.11.2026 - 18:00 Uhr - v1.21 - Main Engage & Rollen Fixes', `<ul><li>Main Engage: Komplett überarbeitet.</li><li>Rollen: "Demon Armor" bei Defensive Supports ergänzt.</li><li>Rollen: "Backline" Definition erweitert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.21">Version herunterladen</button></p>`)}
+    ${D('06.11.2026 - 16:00 Uhr - v1.20 - Rollen & Engage Text-Fixes', `<ul><li>Rollen: "Demon Armor" bei Defensive Supports ergänzt.</li><li>Rollen: "Backline" Definition erweitert.</li><li>Comps: Main Engage überarbeitet.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.20">Version herunterladen</button></p>`)}
+    ${D('06.11.2026 - 14:00 Uhr - v1.19 - Kreis & BM-Text Fix', `<ul><li>Kreis-SVG: Der untere grüne Kreis zu einem roten geändert.</li><li>Rollen-Tab: Battlemount-Text angepasst.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.19">Version herunterladen</button></p>`)}
+    ${D('06.11.2026 - 12:00 Uhr - v1.18 - Kreis-Fix & Disarray-Gesamtsumme', `<ul><li>Kreis-SVG: Farben getauscht.</li><li>Disarray-Rechner: Live-Berechnung implementiert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.18">Version herunterladen</button></p>`)}
+    ${D('06.11.2026 - 10:00 Uhr - v1.17 - Kreis-Mechanik Update', `<ul><li>Kreis-SVG: Exakt an das neue Paint-Dokument angepasst.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.17">Version herunterladen</button></p>`)}
+    ${D('06.11.2026 - 08:00 Uhr - v1.16 - SVG, BM-Sortierung & Interaktionen', `<ul><li>Kreis-SVG: Punkt-Anordnung angepasst.</li><li>Battlemount-Tabelle sortiert.</li><li>Diminishing Returns und Resilience: Slider hinzugefügt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.16">Version herunterladen</button></p>`)}
+    ${D('06.11.2026 - 06:00 Uhr - v1.15 - BM-Counts, Shred-Slider & SVG-Fix', `<ul><li>Kreis-SVG: Layout optimiert.</li><li>Battlemount-Mechanik: Nach Screenshot überarbeitet.</li><li>Rollen: Clap/Ranged DPS vor Melee DPS.</li><li>Pierce & Shred: Slider hinzugefügt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.15">Version herunterladen</button></p>`)}
+    ${D('06.11.2026 - 04:00 Uhr - v1.14 - Kreis, Glossar & Transition', `<ul><li>Kreis-Mechanik (SVG): Exakt an die Paint-Zeichnung angepasst.</li><li>Glossar: Einträge alphabetisch sortiert.</li><li>Rollen: Interaktiver "Weiterlesen"-Bereich hinzugefügt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.14">Version herunterladen</button></p>`)}
+    ${D('06.11.2026 - 02:00 Uhr - v1.13 - Flanks, Kreis & Text-Fixes', `<ul><li>Flanks-Erklärung in die Basics eingebaut.</li><li>Kreis-SVG: Heiler und Brawl DPS verteilt.</li><li>Main Engage: Perma durch Offensive GA ersetzt.</li><li>Regeln & IP: Text angepasst.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.13">Version herunterladen</button></p>`)}
+    ${D('05.11.2026 - 23:00 Uhr - v1.12 - Comp & Rollen-Anpassungen', `<ul><li>Grundkonzept: Meta-Fokus hervorgehoben.</li><li>Kreis-Mechanik: Mehrere Punkte pro Rolle.</li><li>Regeln & IP: 1450+ IP durch 100 Specs ersetzt.</li><li>Rollen: Tanks in Clump, Offensive, Defensive unterteilt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.12">Version herunterladen</button></p>`)}
+    ${D('05.11.2026 - 20:00 Uhr - v1.11 - Glossar Fix & Territory SVGs', `<ul><li>Glossar: Akkordeon-Verhalten eingebaut.</li><li>Glossar: "Übersicht" in "Gesamtübersicht" umbenannt.</li><li>Territories: SVG-Grafiken eingefügt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.11">Version herunterladen</button></p>`)}
+    ${D('05.11.2026 - 18:00 Uhr - v1.10 - Glossar Fix', `<ul><li>Glossar-Navigation (Seitenleiste) funktioniert jetzt korrekt.</li><li>Klick auf einen Unterpunkt schließt alle anderen Kategorien.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.10">Version herunterladen</button></p>`)}
+    ${D('05.11.2026 - 16:00 Uhr - v1.09 - Bilder-Fix & Objektives', `<ul><li>Territory-Bilder angepasst.</li><li>Glossar-Navigation in die aufklappbare Seitenleiste verschoben.</li><li>Navigation: "Waffen & BMs" direkt unter "Rollen" verschoben.</li><li>Zeitformat im Changelog auf "Uhr" umgestellt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.09">Version herunterladen</button></p>`)}
+    ${D('05.11.2026 - 14:00 Uhr - v1.08 - Objectives & Struktur Update', `<ul><li>Iron Dome-Vergleich entfernt.</li><li>Glossar-Navigation verschoben.</li><li>Navigation: "Waffen & BMs" verschoben.</li><li>Zeitformat umgestellt.</li><li>Territory-Bilder eingebaut.</li><li>Outposts- und Open-World-Texte übernommen.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.08">Version herunterladen</button></p>`)}
+    ${D('05.11.2026 - 12:00 Uhr - v1.07 - Glossar-Sprungmarken & Kontersektion', `<ul><li>Regeln & IP-Anforderungen nach oben verschoben.</li><li>IP-Anforderungstext aktualisiert.</li><li>Neue Sektion "Wie kontert man Melee Clap?" hinzugefügt.</li><li>Glossar mit Sprungmarken versehen.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.07">Version herunterladen</button></p>`)}
+    ${D('05.11.2026 - 10:00 Uhr - v1.06 - Glossar & Struktur Update', `<ul><li>Melee Clap Grundkonzept gekürzt.</li><li>Reihenfolge der "Phasen des Fights" angepasst.</li><li>Glossar überarbeitet.</li><li>Tab "Regeln und Regear" aufgeteilt.</li><li>Platzhalter-Seite für Waffen & BMs hinzugefügt.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.06">Version herunterladen</button></p>`)}
+    ${D('05.11.2026 - 08:00 Uhr - v1.05 - Disarray & Text-Fixes', `<ul><li>Melee Clap Grundkonzept-Text überarbeitet.</li><li>Disarray-Rechner um Spieleranzahl-Slider erweitert.</li><li>Battlemount-Buttons leuchten nun beim Anklicken auf.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.05">Version herunterladen</button></p>`)}
+    ${D('04.11.2026 - 20:00 Uhr - v1.04 - Rollen-Farben & Kreis-Mechanik', `<ul><li>Rollen-Seite mit farblichen Markierungen versehen.</li><li>Caller-Rolle (lila) hinzugefügt.</li><li>Visuelle "Kreis-Mechanik" integriert.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.04">Version herunterladen</button></p>`)}
+    ${D('04.11.2026 - 18:00 Uhr - v1.03 - Neue Rollenseite', `<ul><li>Rollen-Seite überarbeitet.</li><li>Neue, aufklappbare Rollen-Übersicht hinzugefügt.</li><li>Waffenbeispiele aus der aktuellen Comp integriert.</li><li>Verweis auf Disarray-Seite bei Battlemounts eingebaut.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.03">Version herunterladen</button></p>`)}
+    ${D('04.11.2026 - 16:00 Uhr - v1.02 - Layout & Search Fix', `<ul><li>Melee Clap Struktur überarbeitet.</li><li>Main Engage als visuelles Schritt-für-Schritt-Diagramm.</li><li>Suchfunktion repariert.</li><li>Changelog-Historie mit exakten Uhrzeiten.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.02">Version herunterladen</button></p>`)}
+    ${D('04.11.2026 - 14:00 Uhr - v1.01 - Melee Clap Überarbeitung', `<ul><li>ZvZ-Basics überarbeitet.</li><li>Offensive Tank zur Rollen-Übersicht hinzugefügt.</li><li>Melee Clap Comp erweitert.</li><li>Dragonfire-Patch-Hinweis hinzugefügt.</li><li>Bleed Brawl Comp entfernt.</li><li>Navigation modernisiert.</li><li>VOD-Tab integriert.</li><li>Changelog aufklappbar gemacht.</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-v1.01">Version herunterladen</button></p>`)}
+    ${D('04.11.2026 - 12:00 Uhr - Erste Version', `<ul><li>Erste Version als Website</li></ul><p><button class=b data-dl="the-fallen-zvz-guide-erste-version">Version herunterladen</button></p>`)}
+    <p>Ansprechpartner: <span class=tag>TODO</span></p><p class=mut>Mechanik-Werte stammen aus Community-Material und sind in eigenen Worten zusammengefasst. Nach Patches prüfen.</p>
+</div>
+<div id="tab-content-ideas" style="display:none;">
+    <h3>Große Ideen & Konzepte</h3>
+    <div class="card"><h4>1. Discord Live-Sync (Albion Zvz)</h4><p class="mut">Status: In Planung / Konzept</p><p><b>Ziel:</b> Automatische Synchronisation der aktuellen Comp-Waffen (Offen/Belegt) von AlbionZvZ in einen Discord-Channel.</p><p><b>Wie es funktionieren würde:</b></p><ul><li><b>Backend/Datenbank:</b> Wir benötigen einen kleinen Server (z.B. Firebase), der die aktuellen Waffenzuweisungen speichert.</li><li><b>Discord Webhook:</b> Ein Bot oder Webhook sendet eine Nachricht in den Channel. Diese Nachricht wird live aktualisiert (Embed), wenn sich etwas ändert.</li><li><b>AlbionZvZ API:</b> Der Server fragt periodisch (oder per Webhook von AlbionZvZ) die aktuellen Daten des Events ab.</li></ul></div>
+</div>`
+};
+
+function renderWeaponsContent() {
+    let html = `<div class="card" style="text-align:center; margin-bottom:20px;"><h3 style="margin-top:0;">Unsere Sets auf Albion Zvz</h3><p class="mut">Klicke auf den Button, um direkt zu unserer aktuellen Composition auf der AlbionZvZ-Seite zu gelangen.</p><a href="https://www.albionzvz.com/g/the-fallen/compositions/f730f3e1-87cb-4b2d-b1f8-b743cc887cf3" target="_blank" rel="noopener" class="b" style="display:inline-block; padding:10px 20px; text-decoration:none;">Zu den Sets auf AlbionZvZ</a></div>`;
+    Object.entries(WEAPON_CATS).forEach(([cat, data], index) => {
+        html += `<div style="margin-bottom: 24px;"><h3 class="cat-${data.color}">${cat}</h3><div class=row style="margin-bottom: 0;">${data.items.map(w=>`<button class="b btn-${data.color}" data-w="${w}" data-target="w-desc-${index}" data-color="${data.color}">${w}</button>`).join('')}</div><div id="w-desc-${index}" style="display:none; margin-top:12px;"></div></div>`;
+    });
+    const wc = $('#weapon-content'); if (wc) wc.innerHTML = html;
+}
+
+const I={
+settings: initSettings,
+'admin-editor': initAdminEditor,
+basics(){const s=i=>{const p=PT[i];A('#ps button').forEach(x=>x.classList.toggle('on',x.dataset.i==i));$('#pd').innerHTML=`<b>${p[0]}</b> · <span class=mut>${p[1]}</span><p style="margin:6px 0 0">${p[2]}</p>`};A('#ps button').forEach(b=>b.onclick=()=>s(b.dataset.i));s(0)},
+comps(){},
+buffs(){
+    const a=()=>{if($('#ae')){const n=+$('#ae').value;$('#an').textContent=n;$('#av').textContent='+'+Math.min(Math.max(n-1,0),7)*8+' % Schaden'}};
+    const h=()=>{if($('#hs')){const n=+$('#hs').value;$('#hn').textContent=n;$('#hv').textContent='–'+HS[n]+' % Heilung'}};
+    const dr=()=>{if($('#dr-slider')){const n=+$('#dr-slider').value;$('#dr-count').textContent=n;$('#dr-val').textContent=Math.round(Math.pow(0.8, n-1)*100)+'% Dauer'}};
+    const res=()=>{if($('#res-slider')){const n=+$('#res-slider').value;$('#res-count').textContent=n;let red=0;if(n>=26)red=75;else if(n>=3)red=Math.round(26+(n-3)*(75-26)/(26-3));else if(n===2)red=14;else red=0;$('#res-val').textContent='-'+red+'% Schaden'}};
+    const shred=()=>{if($('#shred-slider')){const n=+$('#shred-slider').value;$('#shred-stack').textContent=n;const total=Math.min(n*10,60);$('#shred-val').textContent='-'+total+'% Resistance'}};
+    if($('#ae')){ $('#ae').oninput=a; a(); }
+    if($('#hs')){ $('#hs').oninput=h; h(); }
+    if($('#dr-slider')){ $('#dr-slider').oninput=dr; dr(); }
+    if($('#res-slider')){ $('#res-slider').oninput=res; res(); }
+    if($('#shred-slider')){ $('#shred-slider').oninput=shred; shred(); }
+},
+disarray(){
+    const DIS_MIN_PLAYERS = [0,21,22,23,24,25,26,27,28,29,30,31,32,33,34,36,37,39,41,44,46,48,49,51,54,56,58,61,64,67,70,74,79,83,89,95,99,103,108,114,119,126,133,141,148,154,160,167,175,183,192,200,207,215,223,232,242,252,264,276,290];
+    const getTier = (p) => { if (p < 21) return 0; for (let i = 60; i >= 1; i--) { if (p >= DIS_MIN_PLAYERS[i]) return i; } return 0; };
+    const updateTotal = () => {
+        if(!$('#total-combined')) return;
+        const players = +$('#pc').value;
+        const baseTier = getTier(players);
+        let bmSum = 0;
+        A('#bm button').forEach(b => {
+            if(b.classList.contains('on')) {
+                const i = b.dataset.i;
+                const countMatch = b.innerHTML.match(/\((\d+)x\)/);
+                const count = countMatch ? parseInt(countMatch[1]) : 1;
+                bmSum += count * BM_DATA[i][1];
+            }
+        });
+        const bmExtra = Math.max(0, bmSum - 15);
+        const total = baseTier + bmExtra;
+        $('#total-base').textContent = baseTier;
+        $('#total-bm-extra').textContent = bmExtra;
+        $('#total-combined').textContent = total;
+    };
+    const pSlider = $('#pc');
+    if(pSlider) {
+        const pVal = $('#pc-val'); const pTier = $('#pc-tier');
+        const updatePc = () => { const p = +pSlider.value; pVal.textContent = p; pTier.textContent = 'Disarray Stufe: ' + getTier(p); updateTotal(); };
+        pSlider.oninput = updatePc; updatePc();
+    }
+    const d=()=>{if($('#da')){const v=Math.max(0,$('#da').value-$('#dt').value);$('#dr').textContent=v?'–'+v+' % Schaden und CC-Dauer des Angreifers':'Kein Effekt'}};
+    if($('#da')){ $('#da').oninput=$('#dt').oninput=d; d(); }
+    let bmCounts = {};
+    const u=()=>{
+        let total = 0;
+        A('#bm button').forEach(b => {
+            const i = b.dataset.i; const count = bmCounts[i] || 0; const name = BM_DATA[i][0]; const weight = BM_DATA[i][1];
+            b.innerHTML = `${name} ${count > 0 ? '('+count+'x)' : ''}`;
+            b.classList.toggle('on', count > 0);
+            total += count * weight;
+        });
+        if($('#bs')) { $('#bs').textContent = total; $('#bx').textContent = Math.max(0, total - 15); }
+        updateTotal();
+    };
+    A('#bm button').forEach(b=>b.onclick=()=>{ const i = b.dataset.i; bmCounts[i] = (bmCounts[i] || 0) + 1; u(); });
+    if($('#br')) { $('#br').onclick=()=>{ bmCounts = {}; u(); }; }
+    u();
+},
+'weapons-bms'(){
+    const COLORS = { tanks:{hex:'#6cb2ff',bg:'rgba(108,178,255,0.05)'}, supports:{hex:'#ffa94d',bg:'rgba(255,169,77,0.05)'}, dps:{hex:'#ff6b6b',bg:'rgba(255,107,107,0.05)'}, healer:{hex:'#5fd38a',bg:'rgba(95,211,138,0.05)'}, bm:{hex:'#9ca3af',bg:'rgba(156,163,175,0.05)'} };
+    renderWeaponsContent();
+    const weaponContainer = $('#weapon-content');
+    if (weaponContainer) {
+        weaponContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-w]');
+            if (!btn) return;
+            const targetId = btn.dataset.target; const color = btn.dataset.color;
+            const descContainer = $(`#${targetId}`); const group = btn.parentElement;
+            const wasActive = btn.classList.contains('on');
+            A(`button[data-w]`, group).forEach(x=>x.classList.remove('on'));
+            descContainer.style.display = 'none'; descContainer.innerHTML = '';
+            if (wasActive) return;
+            btn.classList.add('on');
+            const w = btn.dataset.w; let contextHtml = '';
+            const c = COLORS[color] || COLORS.bm;
+            if (WEAPON_CONTEXT[w]) contextHtml = `<div class="card" style="border-left: 4px solid ${c.hex}; background: ${c.bg}; margin:0;"><b style="color:${c.hex};">Rolle in unserer Comp:</b><p style="margin:8px 0 0; font-size:0.95em; line-height:1.6;">${WEAPON_CONTEXT[w]}</p></div>`;
+            if (contextHtml) { descContainer.innerHTML = contextHtml; descContainer.style.display = 'block'; }
+        });
+    }
+    const bmContainer = $('#bms-container');
+    if (bmContainer) {
+        bmContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-bm]');
+            if (!btn) return;
+            const targetId = btn.dataset.target; const descContainer = $(`#${targetId}`); const group = btn.parentElement;
+            const wasActive = btn.classList.contains('on');
+            A(`button[data-bm]`, group).forEach(x=>x.classList.remove('on'));
+            descContainer.style.display = 'none'; descContainer.innerHTML = '';
+            if (wasActive) return;
+            btn.classList.add('on');
+            const w = btn.dataset.bm; let contextHtml = '';
+            const c = COLORS.bm;
+            if (BM_CONTEXT[w]) contextHtml = `<div class="card" style="border-left: 4px solid ${c.hex}; background: ${c.bg}; margin:0;"><b style="color:${c.hex};">Battlemount Info:</b><div style="margin:8px 0 0; font-size:0.95em; line-height:1.6;">${BM_CONTEXT[w]}</div></div>`;
+            if (contextHtml) { descContainer.innerHTML = contextHtml; descContainer.style.display = 'block'; }
+        });
+    }
+},
+'admin-feedback': initAdminFeedback,
+lootsplit(){},
+review(){
+    let logs = JSON.parse(localStorage.getItem('review_logs') || '[]');
+    const logList = $('#log-list'); const logName = $('#log-name'); const logDate = $('#log-date'); const btnAddLog = $('#btn-add-log');
+    const renderLogs = () => {
+        if(!logList) return;
+        if(logs.length === 0) logList.innerHTML = '<p class="mut" style="font-size:0.9em; margin:0;">Noch keine Einträge vorhanden.</p>';
+        else logList.innerHTML = logs.map((log, i) => `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:var(--bw) solid var(--ln);"><span style="font-size:0.95em;"><b>${log.name}</b> - ${log.date}</span><button class="b" onclick="removeLog(${i})" style="padding:2px 8px; font-size:0.8em; color:#ff6b6b;">X</button></div>`).join('');
+    };
+    window.removeLog = (index) => { logs.splice(index, 1); localStorage.setItem('review_logs', JSON.stringify(logs)); renderLogs(); };
+    if(btnAddLog) btnAddLog.onclick = () => {
+        if(!logName.value || !logDate.value) { alert("Bitte Name und Datum/Uhrzeit angeben."); return; }
+        const d = new Date(logDate.value);
+        const dateStr = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getFullYear()).slice(-2)}.${String(d.getHours()).padStart(2,'0')}UTC`;
+        logs.push({ name: logName.value, date: dateStr });
+        localStorage.setItem('review_logs', JSON.stringify(logs));
+        logName.value = ''; logDate.value = ''; renderLogs();
+    };
+    renderLogs();
+    const reviewData = JSON.parse(localStorage.getItem('review_data') || '{}');
+    A('.rv').forEach((el, i) => { el.value = reviewData[`rv-${i}`] || ''; });
+    window.saveReview = () => { const data = {}; A('.rv').forEach((el, i) => { data[`rv-${i}`] = el.value; }); localStorage.setItem('review_data', JSON.stringify(data)); };
+    if($('#cp')) $('#cp').onclick = async () => {
+        const t = A('.rv').map((x,i)=>['Content','Gut','Schlecht','Ändern'][i]+': '+x.value).join('\n') + '\n\nLog:\n' + logs.map(l => `- ${l.name} (${l.date})`).join('\n');
+        try { await navigator.clipboard.writeText(t); $('#cm').textContent='Kopiert'; setTimeout(()=>$('#cm').textContent='', 2000); } catch(e) { $('#cm').textContent='Kopieren nicht möglich'; }
+    };
+    if($('#btn-download')) $('#btn-download').onclick = () => {
+        const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Nachbesprechung</title></head><body>`;
+        const footer = `</body></html>`;
+        const content = `<h1>Nachbesprechung</h1><h3>Log:</h3><ul>${logs.map(l => `<li><b>${l.name}</b> - ${l.date}</li>`).join('')}</ul><h3>Content und Gegner</h3><p>${$('#rv-0').value.replace(/\n/g,'<br>')}</p><h3>Was lief gut?</h3><p>${$('#rv-1').value.replace(/\n/g,'<br>')}</p><h3>Was lief schlecht?</h3><p>${$('#rv-2').value.replace(/\n/g,'<br>')}</p><h3>Was ändern wir?</h3><p>${$('#rv-3').value.replace(/\n/g,'<br>')}</p>`;
+        const blob = new Blob([header + content + footer], {type: 'application/msword'});
+        const url = URL.createObjectURL(blob); const a = document.createElement('a');
+        a.href = url; a.download = 'Nachbesprechung.doc'; a.click(); URL.revokeObjectURL(url);
+    };
+},
+changelog(){
+    const dl=(name)=>{ const htmlContent='<!doctype html>\n'+document.documentElement.outerHTML; const blob=new Blob([htmlContent],{type:'text/html'}); const url=URL.createObjectURL(blob); const a=document.createElement('a');a.href=url;a.download=name+'.html';a.click();URL.revokeObjectURL(url); };
+    A('[data-dl]').forEach(btn=>btn.onclick=()=>dl(btn.dataset.dl));
+    const btnChangelog = $('#tab-changelog'); const btnIdeas = $('#tab-ideas');
+    const contentChangelog = $('#tab-content-changelog'); const contentIdeas = $('#tab-content-ideas');
+    if(btnChangelog && btnIdeas) {
+        btnChangelog.onclick = () => { btnChangelog.classList.add('on'); btnIdeas.classList.remove('on'); contentChangelog.style.display = 'block'; contentIdeas.style.display = 'none'; };
+        btnIdeas.onclick = () => { btnIdeas.classList.add('on'); btnChangelog.classList.remove('on'); contentIdeas.style.display = 'block'; contentChangelog.style.display = 'none'; };
+    }
+}};
+
+const getText=(id)=>{ let text = P[id]().replace(/<[^>]+>/g,' ').replace(/\s+/g,' '); if(id==='comps') text += ' ' + MC_TEXT; if(id==='glossar') text += ' ' + Object.values(GL_CAT).flat().map(g=>g[0]+' '+g[1]).join(' '); if(id==='weapons-bms') text += ' ' + Object.values(WEAPON_CATS).flatMap(c=>c.items).join(' ') + ' ' + Object.values(BM_CONTEXT).join(' '); return text; };
+const X=N_ALL.map(n=>[n[0],n[1],getText(n[0])]);
+const nv=$('#nv'),m=$('#m');
+
+function renderSidebar() {
+    let navHtml='';
+    const subPages = ['buffs','disarray','glossar','castles','terris','outposts','open-world','regeln','lootsplit','vod','settings'];
+    if (isAdmin) {
+        navHtml += `<a href="#admin" data-p="admin" class="${location.hash === '#admin' ? 'on' : ''}" style="color:#ff6b6b; font-weight:bold;">Admin Panel</a>`;
+        navHtml += `<a href="#admin-editor" data-p="admin-editor" class="${location.hash === '#admin-editor' ? 'on' : ''}">Live-Editor</a>`;
+        navHtml += `<a href="#admin-feedback" data-p="admin-feedback" class="${location.hash === '#admin-feedback' ? 'on' : ''}">Feedback Übersicht</a>`;
+        navHtml += `<a href="#admin-brainstorm" data-p="admin-brainstorm" class="${location.hash === '#admin-brainstorm' ? 'on' : ''}">Brainstorm (Waffen & BMs)</a>`;
+        navHtml += `<a href="#review" data-p="review" class="${location.hash === '#review' ? 'on' : ''}">Nachbesprechung</a>`;
+        navHtml += `<a href="#changelog" data-p="changelog" class="${location.hash === '#changelog' ? 'on' : ''}">Changelog</a>`;
+        navHtml += `<div style="margin-top:20px; border-top:var(--bw) solid var(--ln); padding-top:20px;"><a href="#" onclick="adminLogout(event)">Abmelden</a></div>`;
+    } else {
+        N.forEach(n => {
+            const isErweitert = n[0] === 'erweitert' && subPages.includes(location.hash.slice(1)) && location.hash.slice(1) !== 'settings';
+            navHtml += `<a href="#${n[0]}" data-p="${n[0]}" class="${isErweitert ? 'on' : ''}">${n[1]}</a>`;
+        });
+        navHtml += `<div style="margin-top: 30px; padding-top: 15px; border-top: var(--bw) solid var(--ln);"><a href="#admin" data-p="admin" onclick="adminLogin(event)">Moderatoren Login</a></div>`;
+    }
+    nv.innerHTML = navHtml;
+}
+
+document.addEventListener('click', function(e) {
+    const buffLink = e.target.closest('a.jump-to-buff');
+    if (buffLink) {
+        e.preventDefault();
+        const targetId = buffLink.dataset.buff;
+        if(location.hash === '#buffs') { A('#m details').forEach(d => d.open = false); const target = document.getElementById(targetId); if(target) target.open = true; }
+        else { location.hash = '#buffs'; setTimeout(() => { A('#m details').forEach(d => d.open = false); const target = document.getElementById(targetId); if(target) target.open = true; }, 50); }
+    }
+});
+
+function go(){
+    renderSidebar();
+    let id=location.hash.slice(1); if(!P[id] && !customContent[id])id='start';
+    if (id.startsWith('admin') && !isAdmin) { adminLogin(); return; }
+    
+    // CUSTOM CONTENT INJEKTION
+    let pageHtml = customContent[id] || (P[id] ? P[id]() : '');
+    m.innerHTML = pageHtml;
+    
+    // Initialisierung (mit try/catch, falls durch den Editor Elemente fehlen)
+    if (I[id]) {
+        try { I[id](); } catch(e) { console.warn("Init Error for", id, e); }
+    }
+    
+    const subPages = ['buffs','disarray','glossar','castles','terris','outposts','open-world','regeln','lootsplit','vod','settings'];
+    A('nav a').forEach(a => { const targetId = subPages.includes(id) && id !== 'settings' ? 'erweitert' : id; a.classList.toggle('on', a.dataset.p == targetId); });
+    nv.classList.remove('o'); $('#q').value=''; scrollTo(0,0);
+}
+
+$('#q').oninput=e=>{
+    const q=e.target.value.trim().toLowerCase();
+    if(q.length === 0){ go(); return; }
+    if(q.length < 2) return;
+    const results = [];
+    X.forEach(x => { const idx = x[2].toLowerCase().indexOf(q); if (idx >= 0) { results.push({ id: x[0], title: x[1], snippet: '…' + x[2].slice(Math.max(0, idx-50), idx+90) + '…' }); } });
+    if (results.length === 0) { m.innerHTML = `<h2>Suche</h2><p class=mut>Nichts gefunden. Probiere einen anderen Begriff.</p>`; return; }
+    const grouped = {};
+    results.forEach(r => { if (!grouped[r.title]) grouped[r.title] = []; grouped[r.title].push(r); });
+    let html = `<h2>Suchergebnisse für "${e.target.value}"</h2>`;
+    for (const [title, items] of Object.entries(grouped)) {
+        html += `<div class="search-section"><h3 class="cat-name">${title}</h3>`;
+        items.forEach(item => { html += `<a href="#${item.id}" class="search-item"><b>${item.title}</b><span>${item.snippet}</span></a>`; });
+        html += `</div>`;
+    }
+    m.innerHTML = html;
+};
+
+// FEEDBACK EVENTS
+$('#feedback-btn').onclick = openFeedback;
+$('#fb-cat').addEventListener('change', function() {
+    const subcat = document.getElementById('fb-subcat');
+    subcat.innerHTML = '<option value="">Bitte wählen...</option>';
+    if(this.value) {
+        subcat.disabled = false;
+        FB_CATS[this.value].forEach(sub => {
+            const opt = document.createElement('option');
+            opt.value = sub; opt.textContent = sub;
+            subcat.appendChild(opt);
+        });
+    } else {
+        subcat.disabled = true;
+    }
+});
+$('#settings-btn').onclick=()=>{ location.hash = '#settings'; };
+
+// Initial Load
+loadCustomContent().then(() => {
+    addEventListener('hashchange',go);go();
+});
+</script></body></html>
