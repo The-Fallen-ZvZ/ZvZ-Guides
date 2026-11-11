@@ -10,11 +10,14 @@
 - [x] Sicherung des Originals in `Backups/The-Fallen_2026-11-11_original.html`
 - [x] Git-Repository in `02_Projekte/HTML-App` angelegt (Branch `main`)
 - [x] Erste Sicherung committet: `4f25e32` – „Erste vollständige Projektsicherung“ (11 Dateien)
+- [x] Repository in GitHub Desktop geöffnet und gepusht (`origin/main` = `0d8350f`)
+- [x] Versehentliches Unter-Repo `HTML-App/HTML-App` entfernt
+- [x] Root-Duplikat `index.html` entfernt – Website wird aus `Anwendung/` gebaut
+- [x] GitHub Pages aktiv (`https://the-fallen-zvz.github.io/ZvZ-Guides/`), Deploy über GitHub Actions
+- [x] Rollen-Intro mit Link zur AlbionZvZ-Composition ergänzt
 
 ## Offen
 
-- [ ] Versehentliches Unter-Repo `HTML-App/HTML-App` entfernen (nur `.gitattributes`, derzeit in `.git/info/exclude` ausgeschlossen) – braucht dein OK
-- [ ] Repository in GitHub Desktop öffnen (`File → Add Local Repository` → `02_Projekte/HTML-App`)
 - [ ] OpenCode mit dem Vault als Arbeitsverzeichnis öffnen und [[AGENTS]] beachten lassen
 - [ ] Erste Teständerung an einer einzelnen Funktion durchführen und prüfen
 - [ ] [[Bedienungsanleitung]] und [[Fehler]] mit Inhalten füllen

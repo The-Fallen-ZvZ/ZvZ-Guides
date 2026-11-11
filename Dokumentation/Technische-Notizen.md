@@ -63,9 +63,7 @@ Die Website wird aus dem Unterordner `Anwendung/` veröffentlicht; Notizen und D
 1. Lokal ändern → Commit → `Push origin`
 2. GitHub Actions baut (~30–60 s), die Seite ist danach aktuell
 
-**Umstellung noch offen:** `Settings → Pages → Build and deployment → Source: GitHub Actions`. Solange dort „Deploy from a branch“ steht, wird die alte `index.html` im Wurzelverzeichnis ausgeliefert und der Workflow läuft ins Leere.
-
-**Altlast:** Im Repo liegt weiterhin eine `index.html` im Wurzelverzeichnis (ältere Kopie der Anwendung, 185.814 Bytes). Sie wird nach der Umstellung nicht mehr ausgeliefert und kann entfernt werden – die History bleibt erhalten.
+**Pages-Quelle:** `Settings → Pages → Build and deployment → Source: GitHub Actions` ist aktiv. Die Website wird ausschließlich aus dem Artefakt von `Anwendung/` gebaut – eine Kopie im Wurzelverzeichnis gibt es nicht mehr, `Anwendung/index.html` ist die einzige Quelle.
 
 **Wichtig:** Es gibt keine Echtzeit-Übertragung. Obsidian speichert lokal, GitHub Pages baut erst nach dem Push. Für „automatisch“ müsste ein Watcher regelmäßig committen und pushen.
 
@@ -77,4 +75,4 @@ Die Website wird aus dem Unterordner `Anwendung/` veröffentlicht; Notizen und D
   - Erster Commit `4f25e32` – „Erste vollständige Projektsicherung“ (11 Dateien, 1.623 Zeilen)
   - `core.autocrlf=false` (keine Zeilenenden-Umwandlung, Dateien bleiben byte-identisch)
   - `Backups/` wird über `.gitignore` nicht versioniert
-- Altlast: `HTML-App/HTML-App/` ist ein versehentlich angelegtes, leeres Repo (nur `.gitattributes`); es ist über `.git/info/exclude` ausgeschlossen und kann entfernt werden.
+- Altlasten bereinigt: versehentliches Unter-Repo `HTML-App/HTML-App` gelöscht, Root-Duplikat `index.html` aus dem Repo entfernt (`Anwendung/index.html` ist einzige Quelle)

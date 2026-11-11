@@ -12,6 +12,13 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-11 – Aufräumen: eine Quelle für die Website
+
+- Root-`index.html` aus dem Repo entfernt (alte Kopie, 185.814 Bytes) – die Website wird nur noch aus `Anwendung/index.html` gebaut
+- Versehentliches Unter-Repo `HTML-App/HTML-App` gelöscht (enthielt nur `.gitattributes`)
+- `.git/info/exclude`-Eintrag entfernt, da der Ordner nicht mehr existiert
+- Live-Seite geprüft: `https://the-fallen-zvz.github.io/ZvZ-Guides/` liefert 186.008 Bytes inkl. Rollen-Link, `/Anwendung/` und `/AGENTS.md` sind 404
+
 ### 2026-11-11 – Deploy-Workflow für GitHub Pages
 
 - `.github/workflows/pages.yml` angelegt: veröffentlicht bei jedem Push auf `main` ausschließlich den Ordner `Anwendung/`
