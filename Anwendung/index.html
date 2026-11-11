@@ -615,9 +615,10 @@ function initAdminFeedback() {
     }
     container.innerHTML = '<p class="mut">Lade Feedback...</p>';
 
-    fetch(`${FEEDBACK_ENDPOINT}/feedback?key=${encodeURIComponent(modKey)}`)
+    fetch(`${FEEDBACK_ENDPOINT}/?key=${encodeURIComponent(modKey)}`)
         .then(res => {
-            if(!res.ok) throw new Error('Auth failed');
+            if(res.status === 401) { sessionStorage.removeItem('feedbackModKey'); sessionStorage.removeItem('isAdmin'); throw new Error('Auth failed'); }
+            if(!res.ok) throw new Error('Server error');
             return res.json();
         })
         .then(data => {
@@ -655,7 +656,7 @@ function initAdminFeedback() {
         })
         .catch(err => {
             console.error(err);
-            container.innerHTML = '<p class="mut" style="color:#ff6b6b;">Fehler beim Laden. Falsches Passwort oder Server nicht erreichbar.</p>';
+            container.innerHTML = '<p class="mut" style="color:#ff6b6b;">Fehler beim Laden. Key ungültig oder Server nicht erreichbar. Bitte neu anmelden.</p>';
         });
 }
 
@@ -775,7 +776,7 @@ async function adminLogin(e){
 
     let ok = false;
     try {
-        const res = await fetch(`${FEEDBACK_ENDPOINT}/feedback?key=${encodeURIComponent(modKey)}`);
+        const res = await fetch(`${FEEDBACK_ENDPOINT}/?key=${encodeURIComponent(modKey)}`);
         ok = res.ok;
     } catch (err) { ok = false; }
 

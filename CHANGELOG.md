@@ -12,6 +12,13 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-11 – Worker-Routen korrigiert
+
+- Der Worker kennt keinen Pfad `/feedback` (antwortet 405). Login-Prüfung und Feedback-Liste nutzen jetzt `GET /?key=…`
+- 401 beim Feedback-Laden löscht die Sitzung und meldet „Key ungültig … bitte neu anmelden“
+- Öffentliches Feedback sendet weiterhin an `POST /` (unverändert korrekt)
+- Code-Landkarte: Tabelle der Worker-Routen ergänzt
+
 ### 2026-11-11 – Moderatoren-Login: eine Abfrage statt drei
 
 - `adminLogin()` (Zeile 764) prüft den Mod-Key jetzt einmalig gegen den Worker (`GET /feedback?key=…`); das hartkodierte Klartext-Passwort ist entfernt

@@ -80,7 +80,7 @@ Zwei getrennte Ebenen – das ist wichtig, wenn ein Passwort geändert wird:
 Ablauf beim Login:
 
 1. Key abfragen (nur wenn noch keiner in der Sitzung liegt)
-2. `GET {FEEDBACK_ENDPOINT}/feedback?key=…` – der Worker prüft gegen `MOD_KEY`
+2. `GET {FEEDBACK_ENDPOINT}/?key=…` – der Worker prüft gegen `MOD_KEY`
 3. Erfolg → Key in `sessionStorage`, `isAdmin` setzen, Moderatorenbereich öffnen
 4. Fehlschlag → „Moderatoren-Key ungültig oder Server nicht erreichbar“
 
@@ -90,10 +90,12 @@ Feedback und Live-Editor fragen **kein** Passwort mehr ab; sie nutzen den gespei
 
 | Aktion | Aufruf |
 | --- | --- |
-| Feedback lesen | `GET {FEEDBACK_ENDPOINT}/feedback?key=…` |
+| Feedback lesen | `GET {FEEDBACK_ENDPOINT}/?key=…` |
 | Inhalt speichern | `POST {CUSTOM_CONTENT_ENDPOINT}` mit `{ key, pageId, html }` |
 | Inhalt zurücksetzen | `DELETE {CUSTOM_CONTENT_ENDPOINT}` mit `{ key, pageId }` |
-| Feedback senden (öffentlich) | `POST {FEEDBACK_ENDPOINT}` mit `{ category, subcategory, message }` – ohne Key |
+| Feedback senden (öffentlich) | `POST {FEEDBACK_ENDPOINT}/` mit `{ category, subcategory, message }` – ohne Key |
+
+Der Worker hat **keinen** `/feedback`-Pfad; alles außer `/` und `/content` beantwortet er mit 405.
 
 **Wenn `MOD_KEY` im Worker geändert wird:**
 - Im Repository ist **nichts** zu ändern und nichts zu deployen – der Wert liegt nur in Cloudflare.
