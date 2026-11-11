@@ -12,6 +12,14 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-11 – Moderatoren-Login: eine Abfrage statt drei
+
+- `adminLogin()` (Zeile 764) prüft den Mod-Key jetzt einmalig gegen den Worker (`GET /feedback?key=…`); das hartkodierte Klartext-Passwort ist entfernt
+- Passwort-Prompt in `initAdminFeedback()` (607) und `initAdminEditor()` (674) entfernt – beide nutzen den gespeicherten `sessionStorage.feedbackModKey`
+- `adminLogout()` (794) löscht `isAdmin` und `feedbackModKey`
+- Verhalten bei geändertem `MOD_KEY`: kein Deploy nötig, aber abmelden und mit neuem Key anmelden
+- Code-Landkarte auf die neuen Zeilennummern aktualisiert (1.421 Zeilen)
+
 ### 2026-11-11 – Code-Landkarte
 
 - `Dokumentation/Code-Landkarte.md` angelegt: Zeilenbereiche, Seiten-Renderer (`P`), Init-Funktionen (`I`), Einstellungen, Datenkonstanten, externe Quellen, Storage-Keys und „wo ändere ich was“

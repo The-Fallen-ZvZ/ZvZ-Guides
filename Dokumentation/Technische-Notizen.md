@@ -74,8 +74,17 @@ Zwei getrennte Ebenen – das ist wichtig, wenn ein Passwort geändert wird:
 
 | Ebene | Wo gespeichert | Wirkung |
 | --- | --- | --- |
-| Admin-Login (Seitenzugriff) | Client-JS, `adminLogin()` Zeile 766, Status in `sessionStorage.isAdmin` | entscheidet nur, ob der Moderatorenbereich angezeigt wird |
-| Mod-Key (`modKey`) | Eingabe im Browser, `sessionStorage.feedbackModKey`; serverseitig als Binding **`MOD_KEY`** im Cloudflare Worker | entscheidet, ob Feedback gelesen und Inhalte gespeichert werden dürfen |
+| Mod-Key (`modKey`) | Eingabe einmalig beim Moderatoren-Login (`adminLogin`, Zeile 764); `sessionStorage.feedbackModKey`; serverseitig Binding **`MOD_KEY`** im Cloudflare Worker | entscheidet über Zugriff auf Moderatorenbereich, Feedback und Editor |
+| Admin-Status | `sessionStorage.isAdmin` | nur noch Anzeige-Flag, wird nach erfolgreicher Key-Prüfung gesetzt |
+
+Ablauf beim Login:
+
+1. Key abfragen (nur wenn noch keiner in der Sitzung liegt)
+2. `GET {FEEDBACK_ENDPOINT}/feedback?key=…` – der Worker prüft gegen `MOD_KEY`
+3. Erfolg → Key in `sessionStorage`, `isAdmin` setzen, Moderatorenbereich öffnen
+4. Fehlschlag → „Moderatoren-Key ungültig oder Server nicht erreichbar“
+
+Feedback und Live-Editor fragen **kein** Passwort mehr ab; sie nutzen den gespeicherten Key. `adminLogout()` löscht beide Einträge.
 
 Übertragung an den Worker:
 
@@ -88,10 +97,9 @@ Zwei getrennte Ebenen – das ist wichtig, wenn ein Passwort geändert wird:
 
 **Wenn `MOD_KEY` im Worker geändert wird:**
 - Im Repository ist **nichts** zu ändern und nichts zu deployen – der Wert liegt nur in Cloudflare.
-- Wer noch den alten Key im Tab hat, bekommt `Auth failed` bzw. „Server-Fehler“. Einmal neu eingeben (Prompt „Bitte Moderatoren-Passwort …“) oder den Tab schließen; `sessionStorage` wird beim Schließen geleert.
-- Der Seitenzugriff (Admin-Login) bleibt davon unberührt.
+- Offene Sitzungen verlieren den Zugriff: „Moderatoren-Key ungültig …“ bzw. `Auth failed` beim Feedback. Lösung: abmelden (löscht den gespeicherten Key) und neu anmelden, dann den neuen Key eingeben. Alternativ den Tab schließen – `sessionStorage` wird dabei geleert.
 
-**Sicherheitshinweis:** Das Passwort in `adminLogin()` steht im Klartext im öffentlichen Repo und ist im Browser lesbar – es ist kein echter Schutz. Der `MOD_KEY` ist der einzige wirksame Riegel, weil er serverseitig geprüft wird.
+**Sicherheitshinweis:** Der Mod-Key ist jetzt die einzige Prüfung und läuft über den Worker – das ist der wirksame Riegel. Er wird allerdings als Query-Parameter (`?key=…`) übertragen und landet damit in Logs und im Browserverlauf; sauberer wäre ein Header oder ein HttpOnly-Cookie.
 
 ## Umgebung
 

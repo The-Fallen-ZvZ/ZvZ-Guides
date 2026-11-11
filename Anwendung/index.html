@@ -605,15 +605,14 @@ async function submitFeedback(){
 }
 
 function initAdminFeedback() {
-    let modKey = sessionStorage.getItem('feedbackModKey');
-    if(!modKey) {
-        modKey = prompt("Bitte Moderatoren-Passwort für Feedback eingeben:");
-        if(modKey) sessionStorage.setItem('feedbackModKey', modKey);
-        else return;
-    }
-    
     const container = document.getElementById('admin-feedback-content');
     if(!container) return;
+
+    const modKey = sessionStorage.getItem('feedbackModKey');
+    if(!modKey) {
+        container.innerHTML = '<p class="mut">Bitte erneut über den Moderatoren-Login anmelden.</p>';
+        return;
+    }
     container.innerHTML = '<p class="mut">Lade Feedback...</p>';
 
     fetch(`${FEEDBACK_ENDPOINT}/feedback?key=${encodeURIComponent(modKey)}`)
@@ -676,11 +675,10 @@ function initAdminEditor() {
     const container = document.getElementById('admin-editor-content');
     if(!container) return;
 
-    let modKey = sessionStorage.getItem('feedbackModKey');
+    const modKey = sessionStorage.getItem('feedbackModKey');
     if(!modKey) {
-        modKey = prompt("Bitte Moderatoren-Passwort eingeben:");
-        if(modKey) sessionStorage.setItem('feedbackModKey', modKey);
-        else { container.innerHTML = '<p class="mut">Passwort erforderlich.</p>'; return; }
+        container.innerHTML = '<p class="mut">Bitte erneut über den Moderatoren-Login anmelden.</p>';
+        return;
     }
 
     container.innerHTML = `
@@ -763,8 +761,37 @@ const L=a=>`<ul>${a.map(x=>`<li>${x}</li>`).join('')}</ul>`;
 const D=(t,b,o,s,i)=>`<details${o?' open':''} ${s?`style="${s}"`:''} ${i?`id="${i}"`:''}><summary>${t}</summary><div class=db>${b}</div></details>`;
 
 let isAdmin = sessionStorage.getItem('isAdmin') === 'true';
-function adminLogin(e){ if(e) e.preventDefault(); if (isAdmin) { location.hash = '#admin'; return; } const pwd = prompt("Bitte Moderatoren-Passwort eingeben:"); if (pwd === "1230") { isAdmin = true; sessionStorage.setItem('isAdmin', 'true'); location.hash = '#admin'; location.reload(); } else if (pwd !== null) { alert("Falsches Passwort!"); } }
-function adminLogout(e){ e.preventDefault(); isAdmin = false; sessionStorage.removeItem('isAdmin'); location.hash = '#start'; location.reload(); }
+async function adminLogin(e){
+    if(e) e.preventDefault();
+    if (isAdmin) { if (!location.hash.startsWith('#admin')) location.hash = '#admin'; return; }
+
+    let modKey = sessionStorage.getItem('feedbackModKey');
+    if (!modKey) {
+        modKey = prompt("Bitte Moderatoren-Key eingeben:");
+        if (!modKey) return;
+        modKey = modKey.trim();
+    }
+    if (!modKey) return;
+
+    let ok = false;
+    try {
+        const res = await fetch(`${FEEDBACK_ENDPOINT}/feedback?key=${encodeURIComponent(modKey)}`);
+        ok = res.ok;
+    } catch (err) { ok = false; }
+
+    if (!ok) {
+        sessionStorage.removeItem('feedbackModKey');
+        alert("Moderatoren-Key ungültig oder Server nicht erreichbar.");
+        return;
+    }
+
+    sessionStorage.setItem('feedbackModKey', modKey);
+    sessionStorage.setItem('isAdmin', 'true');
+    isAdmin = true;
+    if (!location.hash.startsWith('#admin')) history.replaceState(null, '', '#admin');
+    go();
+}
+function adminLogout(e){ e.preventDefault(); isAdmin = false; sessionStorage.removeItem('isAdmin'); sessionStorage.removeItem('feedbackModKey'); location.hash = '#start'; location.reload(); }
 
 const GL_CAT = {
     'Caller & Movement': [
