@@ -12,6 +12,13 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-12 – Erklärvideos: zweites Video, Platzhalter reduziert
+
+- Neues Video als zweite Karte: „84s vs CG – 150 Kills“ (`gyDtY8G9tz8`), eingebettet über `youtube-nocookie` plus YouTube-Link
+- Platzhalter „Praktik – Luke (Melee Clap ZvZ) 2“ entfernt; „Praktik 1“ bleibt als einziger Platzhalter
+- Reihenfolge jetzt: Sentus-Video → 84s vs CG → Praktik-Platzhalter
+- JS-Syntax und Tag-Bilanz geprüft
+
 ### 2026-11-11 – Worker-Routen korrigiert
 
 - Der Worker kennt keinen Pfad `/feedback` (antwortet 405). Login-Prüfung und Feedback-Liste nutzen jetzt `GET /?key=…`
