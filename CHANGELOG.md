@@ -14,7 +14,8 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ### 2026-11-12 – Erklärvideos: zweites Video, Platzhalter reduziert
 
-- Neues Video als zweite Karte: „84s vs CG – 150 Kills“ (`gyDtY8G9tz8`), eingebettet über `youtube-nocookie` plus YouTube-Link
+- Neues Video als zweite Karte: „84s (Luke Melee Clap) vs Contigent (CG) 150 Kills“ (`gyDtY8G9tz8`), eingebettet über `youtube-nocookie` plus YouTube-Link
+- Beschreibung: „Kampfausschnitt aus Lukes ZvZ (Calls, Movement sowie Spells erkennt man sehr gut).“ – die Formulierung „150 Kills in 84 Sekunden“ war falsch
 - Beide Platzhalter („Praktik – Luke 1“ und „2“) entfernt – es bleiben nur die zwei echten Videos
 - Reihenfolge: Sentus-Video → 84s vs CG
 - JS-Syntax und Tag-Bilanz geprüft
