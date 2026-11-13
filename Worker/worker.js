@@ -378,7 +378,7 @@ async function guildMembers(env, guildId) {
 
 /** Todes-Ereignisse eines Spielers (Zeit + ZvZ-Flag), 12 h gecacht. */
 async function playerDeaths(env, id, zvzSet) {
-  const key = 'rb:deaths2:' + id;
+  const key = 'rb:deaths3:' + id;
   const cached = await kvGet(env, key);
   if (cached && cached.at && Date.now() - cached.at < DEATH_TTL_MS) return cached;
 
@@ -545,7 +545,7 @@ async function fetchPlayerEvents(env, id, kind, zvzSet) {
 
 /** Tode und Kills eines Spielers, 12 h gecacht. */
 async function playerDeathDetail(env, id, zvzSet) {
-  const key = 'rb:detail2:' + id;
+  const key = 'rb:detail3:' + id;
   const cached = await kvGet(env, key);
   if (cached && cached.at && Date.now() - cached.at < DEATH_TTL_MS) return cached;
 
