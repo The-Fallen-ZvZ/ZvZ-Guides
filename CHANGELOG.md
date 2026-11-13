@@ -12,6 +12,13 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-13 – Mobile: Menü-Button funktioniert
+
+- Der Button **Menü** hatte keinen Klick-Handler – jetzt öffnet/schließt er die Navigation (`aria-expanded`, aktiver Zustand)
+- Overlay-Navigation: feste Position unter dem Header, eigener Scrollbereich, abgedunkelter Hintergrund, Body-Scroll gesperrt
+- Schließen per zweitem Klick, per Klick daneben, per Link-Auswahl, per Escape und automatisch ab 801 px Breite
+- Mobil: Touch-Ziele 44 px, Eingabefelder 16 px (kein iOS-Zoom beim Fokussieren), Tabellen mit Touch-Scroll
+
 ### 2026-11-13 – Automatisches Nachholen griff nicht
 
 - Ursache: Das Nachholen lief nur im Cron; ohne eingerichteten Trigger passierte nichts, und der Nachhol-Timer im Browser war an den offenen Tab gebunden

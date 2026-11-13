@@ -178,7 +178,7 @@ input[type=range]{width:100%;accent-color:var(--accent,var(--fg))}input.n,textar
 
 [data-motion="off"] *, [data-motion="off"] *::before, [data-motion="off"] *::after { animation-duration:0s!important; animation-delay:0s!important; transition-duration:0s!important; transition-delay:0s!important; scroll-behavior:auto!important }
 
-@media(max-width:800px){nav{display:none;position:fixed;inset:57px 10px 10px 10px;width:auto;height:auto;background:var(--bg);z-index:4;margin:10px;padding:16px 8px}nav.o{display:block}main{padding:24px 16px 80px}header{padding:10px 14px}#mb{display:inline-block}}
+@media(max-width:800px){header{gap:8px;padding:10px 12px}header input{min-width:0}#mb{display:inline-flex;flex:0 0 auto;padding:8px 12px;min-height:40px}nav{display:none;position:fixed;top:calc(env(safe-area-inset-top,0px) + 62px);left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);width:auto;height:auto;margin:0;padding:10px 8px;background:var(--bg);border:var(--bw) solid var(--ln);border-radius:var(--r-md);box-shadow:0 24px 60px rgba(0,0,0,.6);overflow-y:auto;overscroll-behavior:contain;z-index:70}nav.o{display:block}nav a{padding:12px 14px;font-size:1rem}body.nav-open{overflow:hidden}body.nav-open::before{content:"";position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60}body.nav-open header{z-index:80}main{padding:22px 14px 90px}input,select,textarea{font-size:16px}.b{min-height:44px}.tw{-webkit-overflow-scrolling:touch}}
 @media(min-width:801px){#mb{display:none}}
 @media(max-width:500px){header{padding:8px 10px;gap:6px}header b{display:none}.bm-grid{grid-template-columns:1fr}.color-picker-popover{width:calc(100% - 16px)!important;left:8px!important;right:8px!important;top:auto!important;bottom:16px!important}.setting-row{flex-direction:column;align-items:flex-start}.setting-control{width:100%}}
 /* ============================================================
@@ -283,7 +283,7 @@ body:has(main.rb-wide) .app{max-width:1720px}
 </div>
 
 <header>
-    <button class="b" id="mb" aria-label="Menü">Menü</button>
+    <button class="b" id="mb" aria-label="Menü" aria-controls="nv" aria-expanded="false">Menü</button>
     <b>The-Fallen</b>
     <input id="q" type="search" placeholder="Im Guide suchen" aria-label="Suche">
     <button class="b" id="feedback-btn" aria-label="Feedback" title="Feedback"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></button>
@@ -1416,6 +1416,32 @@ const getText=(id)=>{ let text = P[id]().replace(/<[^>]+>/g,' ').replace(/\s+/g,
 const X=N_ALL.map(n=>[n[0],n[1],getText(n[0])]);
 const nv=$('#nv'),m=$('#m');
 
+/* Mobile: Menü-Button öffnet/schließt die Navigation */
+function setNav(open){
+    nv.classList.toggle('o', !!open);
+    document.body.classList.toggle('nav-open', !!open);
+    const mb=$('#mb');
+    if(mb){ mb.setAttribute('aria-expanded', open?'true':'false'); mb.classList.toggle('on', !!open); }
+}
+(function mobileNav(){
+    const mb=$('#mb');
+    if(mb) mb.addEventListener('click', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        setNav(!nv.classList.contains('o'));
+    });
+    document.addEventListener('click', e => {
+        if(!nv.classList.contains('o')) return;
+        const t = e.target;
+        if(!t || !t.closest) return;
+        if(t.closest('nav a')){ setNav(false); return; }
+        if(nv.contains(t) || t.closest('#mb')) return;
+        setNav(false);
+    });
+    document.addEventListener('keydown', e => { if(e.key === 'Escape') setNav(false); });
+    addEventListener('resize', () => { if(innerWidth > 800) setNav(false); });
+})();
+
 function renderSidebar() {
     let navHtml='';
     const subPages = ['buffs','disarray','glossar','castles','terris','outposts','open-world','regeln','lootsplit','vod','settings'];
@@ -1467,7 +1493,7 @@ function go(){
     
     const subPages = ['buffs','disarray','glossar','castles','terris','outposts','open-world','regeln','lootsplit','vod','settings'];
     A('nav a').forEach(a => { const targetId = subPages.includes(id) && id !== 'settings' ? 'erweitert' : id; a.classList.toggle('on', a.dataset.p == targetId); });
-    nv.classList.remove('o'); $('#q').value=''; scrollTo(0,0);
+    nv.classList.remove('o'); document.body.classList.remove('nav-open'); const mbEl=$('#mb'); if(mbEl){ mbEl.setAttribute('aria-expanded','false'); mbEl.classList.remove('on'); } $('#q').value=''; scrollTo(0,0);
 }
 
 $('#q').oninput=e=>{
