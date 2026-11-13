@@ -448,13 +448,13 @@ async function notifyMods(env, content) {
  * Anmeldungen mit 5-Minuten-Sperre und Doppel-Erkennung.
  * So kann weder ein zweiter Tab noch ein Reload dieselbe Meldung spammen.
  */
-async function sendWithCooldown(env, content, scope) {
+async function sendWithCooldown(env, content, scope, force) {
   const key = 'rb:notifylast:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':' + scope;
   const last = await kvGet(env, key);
   const now = Date.now();
   const hash = hashText(content);
 
-  if (last && last.at) {
+  if (!force && last && last.at) {
     if (last.hash === hash && now - last.at < NOTIFY_DUPLICATE_MS) {
       return { sent: 0, duplicate: true, throttled: true, retryInMs: 0 };
     }
@@ -544,7 +544,7 @@ async function handleNotify(request, env) {
   if (content.length > 1900) content = content.slice(0, 1870) + '\n... (gekuerzt)';
 
   const scope = (eventTitle || 'default').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'default';
-  const out = await sendWithCooldown(env, content, scope);
+  const out = await sendWithCooldown(env, content, scope, body.force === true);
 
   if (out.duplicate) return rosterJson({ ok: true, sent: 0, duplicate: true });
   if (out.throttled) {
