@@ -1,64 +1,46 @@
 /* ============================================================================
    ROSTER-BRAIN · Worker-Erweiterung
    ----------------------------------------------------------------------------
-   Einhängen in den bestehenden Worker – zwei Zeilen im fetch-Handler:
+   Zwei Routen, beide mit Mod-Key:
 
-     export default {
-       async fetch(request, env, ctx) {
-         const url = new URL(request.url);
-         if (url.pathname === '/roster') return handleRoster(request, env, url);   // <- neu
-         ... bestehender Code (Feedback, /content) ...
-       }
-     }
+     GET  /roster?event=<64-hex>&key=<mod-key>
+          -> { event, parties, players, playstyles, fetchedAt }
 
-   Voraussetzung: Bindung MOD_KEY existiert bereits (wird für Feedback genutzt).
-   Kein KV, kein Durable Object, keine weiteren Bindings nötig.
+     POST /notify   { key, event, changes:[{name,role}], link }
+          -> Discord-DM an DISCORD_USER_ID (mehrere per Komma)
 
-   Route:  GET /roster?event=<64-hex-token>&key=<mod-key>
-   Antwort: { event, parties, players, playstyles, fetchedAt }
+     POST /notify   { key, type:'pin', link }
+          -> postet den Link in DISCORD_CHANNEL_ID und pinnt ihn
+
+   Einhängen in den bestehenden Worker – im fetch-Handler:
+
+     const url = new URL(request.url);
+     if (url.pathname === '/roster') return handleRoster(request, env, url);
+     if (url.pathname === '/notify') return handleNotify(request, env, url);
+
+   Voraussetzungen:
+     - MOD_KEY            (vorhanden)
+     - DISCORD_TOKEN      (vorhanden)
+     - DISCORD_USER_ID    (vorhanden, Komma-getrennt erlaubt)
+     - DISCORD_CHANNEL_ID (optional, nur fürs Anpinnen)
+
+   Kein KV, kein Durable Object.
    ========================================================================== */
 
 const AZ_BASE = 'https://www.albionzvz.com';
-const META_TTL_MS = 5 * 60 * 1000;      // Event-Seite (Rollen + Comp) 5 Minuten cachen
-const ALLOWED_ORIGINS = [
-  'https://the-fallen-zvz.github.io',
-  'http://localhost:8080',
-  'http://127.0.0.1:8080',
-  'http://localhost:5500',
-  'http://127.0.0.1:5500'
-];
+const META_TTL_MS = 5 * 60 * 1000;          // Event-Seite 5 Minuten cachen
+const META_CACHE = new Map();               // token -> { at, data } (pro Isolate)
 
-const META_CACHE = new Map(); // token -> { at, data }  (pro Worker-Isolate)
+const ROSTER_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Content-Type': 'application/json'
+};
 
-function corsHeaders(origin) {
-  return {
-    'Access-Control-Allow-Origin': origin || ALLOWED_ORIGINS[0],
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Max-Age': '86400',
-    'Vary': 'Origin'
-  };
+function rosterJson(data, status = 200) {
+  return new Response(JSON.stringify(data), { status, headers: ROSTER_HEADERS });
 }
 
-function jsonResponse(data, status, origin) {
-  return new Response(JSON.stringify(data), {
-    status: status || 200,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'no-store',
-      ...corsHeaders(origin)
-    }
-  });
-}
-
-function resolveOrigin(request) {
-  const o = request.headers.get('Origin');
-  if (!o) return null;                       // curl / Server
-  if (o === 'null') return 'null';           // Datei direkt geöffnet
-  return ALLOWED_ORIGINS.includes(o) ? o : null;
-}
-
-/* ---------- HTML der Event-Seite in JSON zerlegen ------------------------- */
+/* ---------- Event-Seite parsen ------------------------------------------- */
 
 function extractRsc(html) {
   const chunks = [];
@@ -66,12 +48,11 @@ function extractRsc(html) {
   let m;
   while ((m = re.exec(html)) !== null) {
     try { chunks.push(JSON.parse('"' + m[1] + '"')); }
-    catch (e) { /* unvollständiger Chunk, überspringen */ }
+    catch (e) { /* unvollständiger Chunk */ }
   }
   return chunks.join('\n');
 }
 
-/** Schneidet ab `start` das zusammengehörige JSON-Objekt heraus. */
 function sliceBalanced(text, start) {
   let depth = 0, inStr = false, esc = false;
   for (let i = start; i < text.length; i++) {
@@ -96,7 +77,6 @@ function parseEventHtml(html) {
   const rsc = extractRsc(html);
   if (!rsc) return null;
 
-  // Rollen-Lexikon: id -> { name, playstyle }
   const roles = {};
   const roleRe = /"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})":\{"name":"([^"]+)","playstyle":"([^"]+)"\}/g;
   let m;
@@ -105,7 +85,6 @@ function parseEventHtml(html) {
   }
   if (!Object.keys(roles).length) return null;
 
-  // Event-Objekt mit parties/players
   const anchor = rsc.indexOf('"cosmeticsUiEnabled"');
   if (anchor < 0) return null;
   const raw = sliceBalanced(rsc, rsc.lastIndexOf('{', anchor));
@@ -125,17 +104,13 @@ function parseEventHtml(html) {
     title: pt.title || 'Party',
     slots: (pt.slots || []).map(s => {
       const weapons = (s.roleOptionIds || []).map(roleName).filter(Boolean);
-      return {
-        weapons,
-        player: s.assignedPlayerId ? playerName(s.assignedPlayerId) : null
-      };
+      return { weapons, player: s.assignedPlayerId ? playerName(s.assignedPlayerId) : null };
     })
   }));
 
   const playstyles = {};
-  Object.values(roles).forEach(r => { playstyles[r.name] = r.playstyle; });
-
   const roleNames = {};
+  Object.values(roles).forEach(r => { playstyles[r.name] = r.playstyle; });
   Object.entries(roles).forEach(([id, r]) => { roleNames[id] = r.name; });
 
   const ev = data.event || {};
@@ -153,7 +128,7 @@ function parseEventHtml(html) {
   };
 }
 
-async function loadMeta(token) {
+async function loadEventMeta(token) {
   const hit = META_CACHE.get(token);
   if (hit && Date.now() - hit.at < META_TTL_MS) return hit.data;
 
@@ -173,7 +148,7 @@ async function loadMeta(token) {
   return meta;
 }
 
-async function loadRoster(token) {
+async function loadEventRoster(token) {
   const res = await fetch(AZ_BASE + '/api/events/public/' + token + '/roster', {
     headers: { 'Accept': 'application/json' },
     cf: { cacheTtl: 0 }
@@ -182,42 +157,25 @@ async function loadRoster(token) {
   return res.json();
 }
 
-/* ---------- Route --------------------------------------------------------- */
+/* ---------- Routen -------------------------------------------------------- */
 
 async function handleRoster(request, env, url) {
-  const origin = resolveOrigin(request);
-
-  if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders(origin || ALLOWED_ORIGINS[0]) });
-  }
-  if (request.method !== 'GET') {
-    return jsonResponse({ error: 'method_not_allowed' }, 405, origin);
-  }
-  if (!origin) {
-    return jsonResponse({ error: 'origin_not_allowed' }, 403, null);
-  }
+  if (request.method !== 'GET') return rosterJson({ error: 'method_not_allowed' }, 405);
   if (!env.MOD_KEY || url.searchParams.get('key') !== env.MOD_KEY) {
-    return jsonResponse({ error: 'unauthorized' }, 401, origin);
+    return rosterJson({ error: 'unauthorized' }, 401);
   }
 
   const token = (url.searchParams.get('event') || '').trim().toLowerCase();
   if (!/^[0-9a-f]{64}$/.test(token)) {
-    return jsonResponse({ error: 'bad_event', hint: 'Token = die 64 Zeichen aus /e/…' }, 400, origin);
+    return rosterJson({ error: 'bad_event', hint: 'Token = die 64 Zeichen aus /e/...' }, 400);
   }
 
   let meta, roster;
-  try {
-    meta = await loadMeta(token);
-  } catch (e) {
-    return jsonResponse({ error: 'event_unreachable', detail: String(e && e.message || e) }, 502, origin);
-  }
-  try {
-    roster = await loadRoster(token);
-  } catch (e) {
-    return jsonResponse({ error: 'roster_unreachable', detail: String(e && e.message || e) }, 502, origin);
-  }
+  try { meta = await loadEventMeta(token); }
+  catch (e) { return rosterJson({ error: 'event_unreachable', detail: String(e && e.message || e) }, 502); }
+  try { roster = await loadEventRoster(token); }
+  catch (e) { return rosterJson({ error: 'roster_unreachable', detail: String(e && e.message || e) }, 502); }
 
-  // Spieler aus dem Live-Roster; Rollen-IDs -> Namen über das Lexikon der Seite.
   const players = (roster.players || [])
     .filter(p => p && p.signedUp)
     .map(p => ({
@@ -227,11 +185,101 @@ async function handleRoster(request, env, url) {
       note: p.comment || ''
     }));
 
-  return jsonResponse({
+  return rosterJson({
     event: meta.event,
     parties: meta.parties,
     playstyles: meta.playstyles,
     players,
     fetchedAt: new Date().toISOString()
-  }, 200, origin);
+  });
+}
+
+async function handleNotify(request, env) {
+  if (request.method !== 'POST') return rosterJson({ error: 'method_not_allowed' }, 405);
+
+  let body;
+  try { body = await request.json(); }
+  catch (e) { return rosterJson({ error: 'bad_json' }, 400); }
+
+  if (!env.MOD_KEY || body.key !== env.MOD_KEY) {
+    return rosterJson({ error: 'unauthorized' }, 401);
+  }
+
+  const link = (typeof body.link === 'string' && /^https:\/\//.test(body.link))
+    ? body.link
+    : 'https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster';
+
+  const auth = {
+    'Authorization': 'Bot ' + env.DISCORD_TOKEN,
+    'Content-Type': 'application/json'
+  };
+
+  /* Link in einen Kanal posten und anpinnen */
+  if (body.type === 'pin') {
+    if (!env.DISCORD_CHANNEL_ID) {
+      return rosterJson({ error: 'no_channel', hint: 'DISCORD_CHANNEL_ID fehlt (Variable im Worker anlegen)' }, 400);
+    }
+    const send = await fetch('https://discord.com/api/v10/channels/' + env.DISCORD_CHANNEL_ID + '/messages', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ content: '**Roster-Brain**\nManuelle Anpassung: ' + link })
+    });
+    if (!send.ok) {
+      return rosterJson({ error: 'discord_send_failed', detail: await send.text() }, 502);
+    }
+    const msg = await send.json();
+    if (!msg || !msg.id) {
+      return rosterJson({ error: 'no_message_id', detail: JSON.stringify(msg).slice(0, 200) }, 502);
+    }
+    const pin = await fetch('https://discord.com/api/v10/channels/' + env.DISCORD_CHANNEL_ID + '/pins/' + msg.id, {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bot ' + env.DISCORD_TOKEN }
+    });
+    if (!pin.ok) {
+      return rosterJson({ error: 'pin_failed', detail: await pin.text(), hint: 'Bot braucht MANAGE_MESSAGES' }, 502);
+    }
+    return rosterJson({ ok: true, pinned: true });
+  }
+
+  /* Änderungen als DM */
+  const changes = Array.isArray(body.changes) ? body.changes.slice(0, 25) : [];
+  if (!changes.length) return rosterJson({ error: 'no_changes' }, 400);
+
+  const eventTitle = String(body.event || '').slice(0, 80);
+  const lines = changes.map(c => {
+    const name = String(c.name || '').slice(0, 40);
+    const role = String(c.role || '').slice(0, 60);
+    return role === '—'
+      ? '**' + name + '** hat den Slot verlassen'
+      : 'Anmeldung von: **' + name + '** → ' + role;
+  });
+
+  let content = '**Roster-Update**' + (eventTitle ? ' · ' + eventTitle : '') + '\n'
+    + lines.join('\n')
+    + '\n\nManuell anpassen: ' + link;
+  if (content.length > 1900) content = content.slice(0, 1870) + '\n… (gekürzt)';
+
+  const ids = String(env.DISCORD_USER_ID || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (!ids.length) return rosterJson({ error: 'no_recipient', hint: 'DISCORD_USER_ID fehlt' }, 400);
+
+  let sent = 0;
+  for (const id of ids) {
+    try {
+      const dm = await fetch('https://discord.com/api/v10/users/@me/channels', {
+        method: 'POST',
+        headers: auth,
+        body: JSON.stringify({ recipient_id: id })
+      });
+      if (!dm.ok) continue;
+      const ch = await dm.json();
+      const msg = await fetch('https://discord.com/api/v10/channels/' + ch.id + '/messages', {
+        method: 'POST',
+        headers: auth,
+        body: JSON.stringify({ content })
+      });
+      if (msg.ok) sent++;
+    } catch (e) { /* nächster Empfänger */ }
+  }
+
+  return rosterJson({ ok: true, sent });
 }

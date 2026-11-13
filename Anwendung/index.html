@@ -277,6 +277,7 @@ const BRAINSTORM_SHEET_URL = 'https://docs.google.com/spreadsheets/d/15bIvKIilpQ
 const FEEDBACK_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev';
 const CUSTOM_CONTENT_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/content';
 const ROSTER_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/roster';
+const ROSTER_NOTIFY_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/notify';
 
 /* ============================================================
    SETTINGS
@@ -1487,6 +1488,8 @@ const RB = (function(){
   const LS_TOKEN = 'tf-rb-token';
   const LS_HIST  = 'tf-rb-hist';
   const LS_AUTO  = 'tf-rb-auto';
+  const LS_NOTIFY = 'tf-rb-notify';
+  const LS_NOTIFIED = 'tf-rb-notified';
   const AUTO_MS  = 5 * 60 * 1000;        // Auto-Zuweisung mindestens alle 5 Minuten
   const TIER_RESERVE_FROM = 2;          // Party 1+2 = Haupt, ab Party 3 Reserve
 
@@ -1528,7 +1531,8 @@ const RB = (function(){
   const S = {
     token:'', event:null, parties:[], players:[], playstyles:{}, hist:{},
     builtAt:null, log:null, live:null, last:null, status:'',
-    auto:false, lastAuto:0, changed:false
+    auto:false, lastAuto:0, changed:false,
+    notify:true, notified:{}
   };
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1829,6 +1833,14 @@ const RB = (function(){
     const assigned = {};
     res.forEach((r, i) => { if (r) assigned[r.player.name] = { slot: active[i], score: r.score, pick: r.pick }; });
 
+    // Rolle je Spieler für die Discord-Meldung
+    const roleMap = {};
+    res.forEach((r, i) => {
+      if (!r) return;
+      const s = active[i];
+      roleMap[r.player.name] = s.weapons.length > 1 ? (r.pick || s.weapons[0]) : s.weapons.join(' / ');
+    });
+
     const bench = players.filter(p => !assigned[p.name]);
     const open = active.filter((s, i) => !res[i]);
 
@@ -1906,6 +1918,7 @@ const RB = (function(){
       conflicts, notes
     };
     S.builtAt = Date.now();
+    notifyChanges(roleMap);
     render();
     flash(auto ? 'Automatisch zugewiesen' : 'Gruppe gebaut');
     if (auto) setAutoBtn();
@@ -1957,6 +1970,86 @@ const RB = (function(){
     flash('Auto aus – manuelle Zuweisung');
   }
 
+  /* ---------------- Discord ---------------- */
+
+  function rosterLink(){
+    return 'https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster';
+  }
+
+  function setNotifyBtn(){
+    const b = byId('rb-notify');
+    if (!b) return;
+    b.textContent = S.notify ? 'Discord: an' : 'Discord: aus';
+    b.classList.toggle('on', S.notify);
+  }
+
+  function toggleNotify(){
+    S.notify = !S.notify;
+    localStorage.setItem(LS_NOTIFY, S.notify ? '1' : '0');
+    setNotifyBtn();
+    flash(S.notify ? 'Discord-Benachrichtigung an' : 'Discord-Benachrichtigung aus');
+  }
+
+  function loadNotified(){
+    try { return JSON.parse(localStorage.getItem(LS_NOTIFIED) || '{}') || {}; } catch(e){ return {}; }
+  }
+  function saveNotified(){
+    try { localStorage.setItem(LS_NOTIFIED, JSON.stringify(S.notified)); } catch(e){}
+  }
+
+  /** Vergleicht die neue Zuweisung mit dem zuletzt gemeldeten Stand. */
+  function notifyChanges(roleMap){
+    if (!S.notify || !S.token) return;
+    const store = S.notified[S.token] || (S.notified[S.token] = {});
+    const changes = [];
+    Object.entries(roleMap).forEach(([name, role]) => {
+      if (store[name] !== role) changes.push({ name, role });
+    });
+    Object.keys(store).forEach(name => {
+      if (!(name in roleMap)) changes.push({ name, role: '—' });
+    });
+    if (!changes.length) return;
+    postNotify(changes);
+  }
+
+  async function postNotify(changes){
+    const key = sessionStorage.getItem('feedbackModKey');
+    if (!key) return;
+    const list = changes.slice(0, 20);
+    try{
+      const res = await fetch(ROSTER_NOTIFY_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key,
+          event: (S.event || {}).title || '',
+          changes: list,
+          link: rosterLink()
+        })
+      });
+      if (!res.ok) return;
+      const store = S.notified[S.token] || (S.notified[S.token] = {});
+      list.forEach(c => { if (c.role === '—') delete store[c.name]; else store[c.name] = c.role; });
+      saveNotified();
+      flash(list.length === 1 ? 'Discord: 1 Änderung gemeldet' : 'Discord: ' + list.length + ' Änderungen gemeldet');
+    }catch(e){ /* beim nächsten Build erneut versuchen */ }
+  }
+
+  async function pinLink(){
+    const key = sessionStorage.getItem('feedbackModKey');
+    if (!key) { flash('Nicht angemeldet'); return; }
+    try{
+      const res = await fetch(ROSTER_NOTIFY_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, type: 'pin', link: rosterLink() })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) flash('Roster-Link im Discord angepinnt');
+      else flash(data.hint || data.error || 'Anpinnen nicht möglich');
+    }catch(e){ flash('Netzwerkfehler'); }
+  }
+
   function state_players_find(name){
     const p = S.players.find(x => x.name === name);
     return p ? { hist: S.hist[p.name] || {} } : null;
@@ -1984,6 +2077,7 @@ const RB = (function(){
         <button class="b" onclick="RB.connect()">Verbinden</button>
         <button class="b" id="rb-live" onclick="RB.toggleLive()">Live: aus</button>
         <button class="b" onclick="RB.reloadComp()">Comp neu laden</button>
+        <button class="b" onclick="RB.pinLink()" title="Postet den Roster-Link in den Discord-Kanal und pinnt ihn">Link anpinnen</button>
         <span id="rb-status" class="mut" style="font-size:.8rem"></span>
       </div>
       <div class="rb-grid">
@@ -1998,6 +2092,7 @@ const RB = (function(){
             <button class="b" id="rb-auto" onclick="RB.toggleAuto()" title="Weist bei neuen Anmeldungen und alle 5 Minuten automatisch zu">Auto: aus</button>
             <button class="b" onclick="RB.copy()">Kopieren</button>
             <button class="b" onclick="RB.bump()" title="Aktuelle Zuweisung als einen gespielten Einsatz zählen">Historie +1</button>
+            <button class="b" id="rb-notify" onclick="RB.toggleNotify()" title="Discord-DM bei jeder neuen Zuweisung">Discord: an</button>
           </div>
           <div id="rb-stats" class="mut" style="padding:6px 10px;font-size:.73rem;border-bottom:var(--bw) solid var(--ln)"></div>
           <div class="rb-parties" id="rb-parties"><p class="rb-msg">Noch keine Comp geladen.</p></div>
@@ -2265,7 +2360,10 @@ const RB = (function(){
     try { S.hist = JSON.parse(localStorage.getItem(LS_HIST) || '{}') || {}; } catch(e){ S.hist = {}; }
 
     S.auto = localStorage.getItem(LS_AUTO) !== '0';   // Standard: an
+    S.notify = localStorage.getItem(LS_NOTIFY) !== '0'; // Standard: an
+    S.notified = loadNotified();
     setAutoBtn();
+    setNotifyBtn();
 
     const inp = byId('rb-token');
     if (inp && S.token) inp.value = S.token;
@@ -2278,7 +2376,7 @@ const RB = (function(){
     }
   }
 
-  return { page, init, connect, build, copy, bump, toggleLive, toggleAuto, reloadComp, closePick };
+  return { page, init, connect, build, copy, bump, toggleLive, toggleAuto, toggleNotify, pinLink, reloadComp, closePick };
 })();
 
 P['admin-roster'] = () => RB.page();

@@ -12,6 +12,16 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-13 – Discord-Benachrichtigung pro Zuweisung
+
+- Neue Worker-Route `POST /notify`: schickt Änderungen als DM an `DISCORD_USER_ID` (Komma-getrennt möglich) und kann den Roster-Link in `DISCORD_CHANNEL_ID` posten und pinnen
+- Client vergleicht nach jedem Build mit dem zuletzt gemeldeten Stand (`tf-rb-notified`, pro Event): nur neue oder geänderte Zuweisungen lösen eine Meldung aus, Abgänge als „hat den Slot verlassen"
+- Meldung enthält Name → Rolle und den Link zur Roster-Seite; max. 20 Zeilen pro DM
+- Schalter „Discord: an/aus" in der Comp-Leiste (Standard an), Button „Link anpinnen" in der Kopfzeile
+- Versand wird erst nach erfolgreicher Antwort als erledigt markiert (Retry beim nächsten Build)
+- `Worker/roster.js` um `handleNotify` ergänzt
+
+
 ### 2026-11-13 – Auto-Zuweisung und Live-Start
 
 - Live-Polling startet beim Öffnen der Seite automatisch (kein Refresh, kein Klick auf „Live")

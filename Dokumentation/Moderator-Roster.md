@@ -9,6 +9,7 @@ Stand: 13.11.2026 · **in `Anwendung/index.html` eingebaut** · Worker-Erweiteru
 | Ansicht `#admin-roster` | eingebaut, nur mit Mod-Key erreichbar |
 | AlbionZvZ | **bleibt verbindlich** – das Brain liefert nur den Vorschlag und eine Kopiervorlage |
 | Worker-Route `/roster` | Code fertig (`Worker/roster.js`), muss noch deployt werden |
+| Discord | DM bei jeder Änderung, optional angepinnter Roster-Link |
 | Historie | lokal im Browser (später optional KV) |
 | Live-Aktualisierung | Polling alle 5 s, startet beim Öffnen automatisch |
 | Auto-Zuweisung | standardmäßig an: bei Änderungen sofort, sonst alle 5 Minuten |
@@ -36,6 +37,30 @@ Der Schalter **Auto** sitzt neben „Build the Group" und merkt sich seinen Zust
 
 Damit ist der Ablauf: Moderatoren-Login → Seite öffnen (Live + Auto laufen) → Ergebnis in AlbionZvZ übertragen. Ohne offene Seite wird nichts zugewiesen – es gibt keinen Server-Job, der im Hintergrund arbeitet.
 
+## Discord-Benachrichtigungen
+
+Der Schalter **Discord** (neben „Historie +1") steuert, ob Meldungen rausgehen; Standard ist an.
+
+Ablauf: Nach jedem Build vergleicht die Seite die Zuweisung mit dem zuletzt gemeldeten Stand (`tf-rb-notified`, pro Event). Nur echte Änderungen erzeugen eine Nachricht:
+
+```
+**Roster-Update** · ZVZ-Builds ZVZ Test Event
+Anmeldung von: **Pinsel** → Locus
+Anmeldung von: **Boerse** → Tank Hallowfall
+
+Manuell anpassen: https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster
+```
+
+- **Ein Spieler = eine Zeile**, mehrere Änderungen gebündelt in einer DM (max. 20, Rest gekürzt).
+- **Wer den Slot verlässt**, wird als „hat den Slot verlassen" gemeldet.
+- **Kein Doppelversand:** gleicher Spieler + gleiche Rolle wird nicht erneut geschickt; erst eine neue Rolle löst wieder aus.
+- **Nur bei geänderten Daten** – ein Poll ohne Änderung schickt nichts.
+- **Fehler werden nicht als gesendet markiert**, der nächste Build versucht es erneut.
+
+**Link anpinnen:** Der Button „Link anpinnen" postet den Roster-Link in `DISCORD_CHANNEL_ID` und pinnt die Nachricht. Dafür braucht der Bot `MANAGE_MESSAGES` im Kanal. Ohne die Variable meldet die Seite „DISCORD_CHANNEL_ID fehlt".
+
+Hinweis: DMs selbst lassen sich in Discord nicht anpinnen – deshalb DM für Updates, Kanal-Pin für den Link.
+
 ## Worker: was du ändern musst
 
 Die Datei `Worker/roster.js` enthält eine eigenständige Funktion `handleRoster`. Kein KV, kein Durable Object, keine neuen Bindings.
@@ -49,6 +74,7 @@ Die Datei `Worker/roster.js` enthält eine eigenständige Funktion `handleRoster
      async fetch(request, env, ctx) {
        const url = new URL(request.url);
        if (url.pathname === '/roster') return handleRoster(request, env, url);   // <- neu
+       if (url.pathname === '/notify') return handleNotify(request, env, url);   // <- neu
        // ... bestehender Code (Feedback, /content)
      }
    }
@@ -67,7 +93,7 @@ Die Datei `Worker/roster.js` enthält eine eigenständige Funktion `handleRoster
    });
    ```
 
-4. Prüfen, dass die Bindung **`MOD_KEY`** existiert (nutzt du schon fürs Feedback).
+4. Prüfen, dass die Bindung **`MOD_KEY`** existiert (nutzt du schon fürs Feedback). Für den angepinnten Link optional **`DISCORD_CHANNEL_ID`** anlegen; `DISCORD_TOKEN` und `DISCORD_USER_ID` sind bereits da.
 5. Deployen.
 
 **Test nach dem Deploy:**
@@ -165,3 +191,4 @@ Die Engine arbeitet zweistufig (erst Party 1 + 2, dann Reserve), setzt den Calle
   - Navigation zu `#start` und zurück: Seite rendert erneut, `rb-wide` wird korrekt entfernt
 - Rahmen-Fix: leere Slots haben 1 px Rand, links 3 px Farbbalken.
 - Auto-Modus im Headless-Test: startet an, weist ohne Klick 12 Spieler zu, schaltet bei manuellem × ab, baut nach erneutem Einschalten sofort, erkennt im Poll einen 13. Spieler und baut automatisch nach.
+- Discord im Headless-Test: erste Meldung mit 12 Änderungen und Link, kein Doppelversand bei unverändertem Build, neuer Spieler löst genau eine Meldung mit einer Zeile aus, ausgeschalteter Schalter verhindert den Versand.
