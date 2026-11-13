@@ -77,8 +77,24 @@ Battle 13.11., 21:34 · Masse 21
 
 - Eine Nachricht pro Battle, sortiert nach Toden.
 - Merker `rb:alert:<guild>:<battleId>:<name>` im KV (30 Tage): jede Warnung kommt genau einmal, auch wenn Cron und manueller Aufruf parallel laufen.
-- Manuell testen: `GET /alerts?guild=<id>&key=<mod-key>` (nur prüfen: `&notify=0`, Cache erneuern: `&force=1`).
+- Battle-Daten werden erst 2 Stunden nach dem Battle-Ende aus dem 30-Tage-Cache bedient; während des Fights gespeicherte Zwischenstände können so nicht dauerhaft falsche Tode zeigen.
 - Gilden-ID für den Cron: `ALERT_GUILD`, Standard `p9uAFij9ReO0BhIhHlVa8g` (The-Fallen).
+
+**Testen:**
+
+```
+# 1. Format prüfen (Beispielnachricht, keine echten Daten, kein Merker)
+GET /alerts?demo=1&name=Takumoto04&deaths=5&key=<mod-key>
+
+# 2. Trockenlauf: was würde gemeldet, ohne zu senden
+GET /alerts?guild=<id>&key=<mod-key>&notify=0&force=1
+#    Antwort: details[] mit name, deaths, kills, battleId, time, mass
+
+# 3. Echter Test: Merker eines Spielers löschen und sofort neu melden
+GET /alerts?guild=<id>&key=<mod-key>&reset=1&name=<Spieler>
+```
+
+Die `details` stammen aus denselben `playerStats` wie die Battle-Ansicht auf AlbionZvZ – ein Abgleich der Todeszahlen dort ist der Beleg, dass das Tracking stimmt.
 
 ## Tode und Aktivität (Albion-API)
 

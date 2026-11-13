@@ -12,6 +12,13 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-13 – Todes-Erinnerung testbar gemacht
+
+- `GET /alerts?demo=1&name=…&deaths=…` schickt eine Beispielnachricht (klar als Test markiert, ohne Merker)
+- `GET /alerts?…&notify=0` ist ein Trockenlauf und liefert jetzt `details[]` (Name, Tode, Kills, Battle-ID, Zeit, Masse)
+- `GET /alerts?…&reset=1&name=…` löscht die Merker eines Spielers, damit ein echter Treffer erneut gemeldet wird
+- Battle-Daten werden erst 2 h nach Battle-Ende aus dem Cache bedient, damit während des Fights gespeicherte Zwischenstände nicht 30 Tage falsche Tode zeigen
+
 ### 2026-11-13 – Discord: Kanal-Meldungen und Todes-Erinnerung
 
 - Alle Meldungen gehen jetzt in einen Discord-Kanal (`DISCORD_CHANNEL_ID`), nicht mehr als DM; ohne Kanal-ID greift weiterhin die DM als Fallback

@@ -511,6 +511,7 @@ const ZVZ_AGG_MAX = 40;     // Subrequest-Limit der Free-Instanz (max. 50 pro Au
 const ALERT_MIN_DEATHS = 2; // ab 2 Toden in einem Battle -> Erinnerung
 const ALERT_BATTLES = 3;    // die letzten 3 ZvZ-Battles prüfen
 const ALERT_TTL = 30 * 86400; // Merker 30 Tage (Battles sind unveränderlich)
+const BATTLE_SETTLE_MS = 2 * 60 * 60 * 1000; // Battle-Daten erst 2 h nach Ende aus dem Cache
 const ALBION_UA = 'The-Fallen-Roster/1.0 (+https://the-fallen-zvz.github.io/)';
 
 /**
@@ -566,7 +567,12 @@ async function guildZvzBattles(env, guildId) {
 async function battleData(env, battleId) {
   const key = 'rb:battle2:' + battleId;
   const cached = await kvGet(env, key);
-  if (cached && cached.at) return cached;
+  if (cached) {
+    /* Frisch beendete Battles nicht aus dem Cache bedienen: sonst bleiben
+       unvollständige Zahlen (Battle lief noch) 30 Tage stehen. */
+    const ended = cached.end ? new Date(cached.end).getTime() : 0;
+    if (ended && Date.now() - ended > BATTLE_SETTLE_MS) return cached;
+  }
 
   const url = AZ_BASE + '/api/dev/battle-board/battle/events?server=europe&battleId=' + battleId;
   const res = await fetch(url, {
@@ -706,7 +712,21 @@ async function checkDeathAlerts(env, guild, opts = {}) {
     }
   }
 
-  return { battles, total: alerts.length, fresh: fresh.length, sent };
+  return { alerts, battles, total: alerts.length, fresh: fresh.length, sent };
+}
+
+/** Löscht die Merker (optional nur für einen Namen), damit ein echter Test erneut meldet. */
+async function resetAlertMarks(env, guild, name) {
+  const prefix = 'rb:alert:' + guild + ':';
+  const list = await env.FEEDBACK_TF.list({ prefix });
+  const needle = name ? ':' + name.toLowerCase() : '';
+  let removed = 0;
+  for (const k of list.keys) {
+    if (needle && !k.name.endsWith(needle)) continue;
+    await env.FEEDBACK_TF.delete(k.name);
+    removed++;
+  }
+  return removed;
 }
 
 /** Manueller/Client-Aufruf: /alerts?guild=…&key=…[&notify=0][&force=1] */
@@ -716,12 +736,38 @@ async function handleAlerts(request, env, url) {
     return rosterJson({ error: 'unauthorized' }, 401);
   }
 
+  const name = (url.searchParams.get('name') || '').trim();
+
+  /* Testnachricht: zeigt das Format, ohne echte Daten anzufassen */
+  if (url.searchParams.get('demo') === '1') {
+    const who = (name || 'Takumoto04').slice(0, 40);
+    const deaths = Math.max(2, Math.min(20, parseInt(url.searchParams.get('deaths') || '5', 10)));
+    const content = '**☠️ Todes-Erinnerung · ZvZ** _(Testnachricht)_\n'
+      + 'Battle 13.11., 21:34 · Masse 21\n'
+      + '• **' + who + '** — ' + deaths + ' Tode, 1 Kill\n'
+      + '\nSo sieht die echte Warnung aus. Kein echter Treffer, nichts gespeichert.';
+    const sent = await notifyMods(env, content);
+    return rosterJson({
+      demo: true,
+      sent,
+      channel: !!env.DISCORD_CHANNEL_ID,
+      name: who,
+      deaths
+    });
+  }
+
   const guild = (url.searchParams.get('guild') || '').trim();
   if (!/^[A-Za-z0-9_-]{10,30}$/.test(guild)) {
     return rosterJson({ error: 'bad_guild' }, 400);
   }
 
   if (url.searchParams.get('force') === '1') await kvDelete(env, 'rb:zvz:' + guild);
+
+  let reset = 0;
+  if (url.searchParams.get('reset') === '1') {
+    try { reset = await resetAlertMarks(env, guild, name); }
+    catch (e) { reset = 0; }
+  }
 
   let res;
   try { res = await checkDeathAlerts(env, guild, { notify: url.searchParams.get('notify') !== '0' }); }
@@ -734,6 +780,15 @@ async function handleAlerts(request, env, url) {
     total: res.total,
     fresh: res.fresh,
     sent: res.sent,
+    reset,
+    details: res.alerts.slice(0, 60).map(a => ({
+      name: a.name,
+      deaths: a.deaths,
+      kills: a.kills,
+      battleId: a.battleId,
+      time: new Date(a.t).toISOString(),
+      mass: a.mass
+    })),
     checkedAt: new Date().toISOString()
   });
 }
