@@ -140,6 +140,15 @@ Datenquelle: `/guild` (Mitglieder, 12 h im KV) und `/deaths/detail` (bis 40 Tode
 
 Grenzen: Die API kennt nur Tode/Kills, keine Heilung oder Assistenz; `KillArea` ist die einzige Ortsangabe. „Gesamt" umfasst die geladenen Einträge (max. 40 je Art), nicht die komplette Historie. Namen müssen exakt dem In-Game-Namen entsprechen – Twinks erscheinen nicht in der Gildenliste.
 
+## Statistik-Tab (`#admin-stats`)
+
+Zwei Ansichten, beide mit Textfilter und Tode-Filter (mind. 1/2/3/5):
+
+- **Übersicht** – alle Spieler aus der Players-Tabelle für 7/30/90/Alles: Battles, Kills, Tode, K/D, Fame, zuletzt gesehen. Klick auf den Spaltenkopf sortiert, standardmäßig Tode absteigend.
+- **Letzte 3 Tage** – Tode je Spieler aus den ZvZ-Battles der letzten 72 Stunden. Markierung: `erhöht` ab 2 Toden, `häufig gestorben` ab 4 Toden.
+
+Datenquelle: `/guildstats` (Players-Tabelle) und `/guildrecent` (Battle-Aggregation). Beides liegt 12 h im KV; „Daten aktualisieren" sendet `force=1` und holt sofort neu. Die 3-Tage-Auswertung verarbeitet höchstens 40 Battles pro Aufruf, um das Subrequest-Limit der Free-Instanz (50) nicht zu reißen; die Battle-Daten selbst bleiben 30 Tage im Cache.
+
 ## Worker: was du ändern musst
 
 **`Worker/worker.js` ist ab jetzt der komplette Worker** – Feedback, Editor, Roster, Discord und Tode in einer Datei. Zum Aktualisieren wird sie komplett kopiert, nichts mehr zusammengeklebt. `Worker/roster.js` bleibt nur als Modul-Referenz liegen.
@@ -153,9 +162,11 @@ Grenzen: Die API kennt nur Tode/Kills, keine Heilung oder Assistenz; `KillArea` 
    GET /roster?event=<64-hex>&key=<mod-key>      → JSON
    GET /guild?guild=<id>&key=<mod-key>           → Mitgliederliste
    GET /deaths/detail?guild=<id>&name=<name>&key=<mod-key>
+   GET /guildstats?guild=<id>&window=30d&key=<mod-key>   → alle Spieler
+   GET /guildrecent?guild=<id>&key=<mod-key>             → Tode der letzten 3 Tage
    ```
 
-   Ohne `key` muss überall `401 unauthorized` kommen.
+   Ohne `key` muss überall `401 unauthorized` kommen. `&force=1` umgeht den 12-h-Cache (Button „Daten aktualisieren" im Statistik-Tab).
 
 Kein neues KV, kein Durable Object, keine neuen Bindings (die Tode nutzen `FEEDBACK_TF` als Cache).
 

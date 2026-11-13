@@ -189,6 +189,8 @@ body:has(main.rb-wide) .app{max-width:1720px}
 .rb-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
 .rb-bar input{flex:1;min-width:240px;background:var(--cd);border:var(--bw) solid var(--ln);border-radius:var(--r-sm);padding:8px 10px;font:inherit;font-size:.85rem;outline:0}
 .rb-bar input:focus{border-color:var(--mut)}
+.rb-bar select{width:auto;flex:0 0 auto;min-height:34px;padding:6px 8px;font-size:.84rem}
+.b.small{padding:6px 10px;min-height:34px;font-size:.83rem}
 .rb-grid{display:grid;grid-template-columns:280px minmax(0,1fr) 330px;gap:12px;align-items:start}
 @media(max-width:1150px){.rb-grid{grid-template-columns:1fr}}
 .rb-panel{border:var(--bw) solid var(--ln);border-radius:var(--r-md);background:var(--cd);min-width:0}
@@ -295,6 +297,8 @@ const CUSTOM_CONTENT_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.
 const ROSTER_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/roster';
 const ROSTER_NOTIFY_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/notify';
 const ROSTER_DEATHS_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/deaths';
+const ROSTER_GUILD_STATS_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/guildstats';
+const ROSTER_GUILD_RECENT_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/guildrecent';
 const ROSTER_GUILD_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/guild';
 const ROSTER_DEATH_DETAIL_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/deaths/detail';
 const RB_GUILD_ID = 'p9uAFij9ReO0BhIhHlVa8g';   // The-Fallen (EU)
@@ -762,7 +766,7 @@ function initAdminEditor() {
             <label style="display:block; margin-bottom:8px; font-weight:600;">Welche Seite möchtest du bearbeiten?</label>
             <select id="editor-page-select" class="n" style="width:100%; padding:10px; margin-bottom:16px;">
                 <option value="">Bitte wählen...</option>
-                ${Object.keys(P).filter(k => k !== 'admin' && k !== 'settings' && k !== 'changelog' && k !== 'admin-feedback' && k !== 'admin-editor' && k !== 'admin-brainstorm' && k !== 'admin-roster' && k !== 'admin-guild').map(k => `<option value="${k}">${N.find(n=>n[0]===k)?.[1] || k}</option>`).join('')}
+                ${Object.keys(P).filter(k => k !== 'admin' && k !== 'settings' && k !== 'changelog' && k !== 'admin-feedback' && k !== 'admin-editor' && k !== 'admin-brainstorm' && k !== 'admin-roster' && k !== 'admin-guild' && k !== 'admin-stats').map(k => `<option value="${k}">${N.find(n=>n[0]===k)?.[1] || k}</option>`).join('')}
             </select>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
                 <button class="b" onclick="loadEditorContent('${modKey}')">Laden</button>
@@ -1421,6 +1425,7 @@ function renderSidebar() {
         navHtml += `<a href="#admin-feedback" data-p="admin-feedback" class="${location.hash === '#admin-feedback' ? 'on' : ''}">Feedback Übersicht</a>`;
         navHtml += `<a href="#admin-roster" data-p="admin-roster" class="${location.hash === '#admin-roster' ? 'on' : ''}">Roster-Brain</a>`;
         navHtml += `<a href="#admin-guild" data-p="admin-guild" class="${location.hash === '#admin-guild' ? 'on' : ''}">Gilde</a>`;
+        navHtml += `<a href="#admin-stats" data-p="admin-stats" class="${location.hash === '#admin-stats' ? 'on' : ''}">Statistik</a>`;
         navHtml += `<a href="#admin-brainstorm" data-p="admin-brainstorm" class="${location.hash === '#admin-brainstorm' ? 'on' : ''}">Brainstorm (Waffen & BMs)</a>`;
         navHtml += `<a href="#review" data-p="review" class="${location.hash === '#review' ? 'on' : ''}">Nachbesprechung</a>`;
         navHtml += `<a href="#changelog" data-p="changelog" class="${location.hash === '#changelog' ? 'on' : ''}">Changelog</a>`;
@@ -1453,7 +1458,7 @@ function go(){
     // CUSTOM CONTENT INJEKTION
     let pageHtml = customContent[id] || (P[id] ? P[id]() : '');
     m.innerHTML = pageHtml;
-    m.classList.toggle('rb-wide', id === 'admin-roster' || id === 'admin-guild');
+    m.classList.toggle('rb-wide', id === 'admin-roster' || id === 'admin-guild' || id === 'admin-stats');
     
     // Initialisierung (mit try/catch, falls durch den Editor Elemente fehlen)
     if (I[id]) {
@@ -2663,6 +2668,236 @@ const RG = (function(){
 
 P['admin-guild'] = () => RG.page();
 I['admin-guild'] = () => RG.init();
+
+/* ============================================================
+   STATISTIK (Admin-Tab): Gesamtübersicht + letzte 3 Tage
+   ============================================================ */
+const RS = (function(){
+  const S = {
+    tab: 'overview', window: '30d', stats: null, recent: null,
+    filter: '', minDeaths: 0, sort: 'deaths', dir: -1, loading: false, error: ''
+  };
+
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const byId = id => document.getElementById(id);
+  const nf = new Intl.NumberFormat('de-DE');
+
+  const short = v => {
+    if (v == null) return '–';
+    if (v >= 1e6) return (v / 1e6).toFixed(2).replace('.', ',') + 'M';
+    if (v >= 1e3) return (v / 1e3).toFixed(1).replace('.', ',') + 'K';
+    return nf.format(Math.round(v));
+  };
+  const ago = ms => {
+    if (!ms) return '–';
+    const d = Math.floor((Date.now() - ms) / 86400000);
+    if (d <= 0) return 'heute';
+    return d === 1 ? 'vor 1 T.' : 'vor ' + d + ' T.';
+  };
+  const kdClass = v => v == null ? '' : v >= 1.5 ? 'rb-green' : v >= 1 ? 'rb-orange' : 'rb-red';
+  const kdText = v => v == null ? '–' : String(v).replace('.', ',');
+
+  async function api(path) {
+    const key = (sessionStorage.getItem('feedbackModKey') || '').trim();
+    if (!key) throw new Error('Kein Moderatoren-Key gespeichert – bitte über den Moderatoren-Login neu anmelden.');
+    const res = await fetch(path + '&key=' + encodeURIComponent(key), { cache: 'no-store' });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) {
+      sessionStorage.removeItem('feedbackModKey');
+      sessionStorage.removeItem('isAdmin');
+      throw new Error('Key ungültig oder abgelaufen – bitte neu anmelden.');
+    }
+    if (!res.ok) throw new Error(data.hint || data.error || ('HTTP ' + res.status));
+    return data;
+  }
+
+  function page() {
+    return `<h1>Statistik</h1>
+      <p class="s">Gesamtübersicht aller Spieler und die Tode der letzten 3 Tage. Die Daten werden 12 Stunden zwischengespeichert; „Daten aktualisieren" holt sie sofort neu.</p>
+      <div class="rb-bar">
+        <span style="display:inline-flex;gap:4px">
+          <button class="b small" id="rs-t-overview" onclick="RS.setTab('overview')">Übersicht</button>
+          <button class="b small" id="rs-t-recent" onclick="RS.setTab('recent')">Letzte 3 Tage</button>
+        </span>
+        <select id="rs-window" onchange="RS.setWindow(this.value)">
+          <option value="7d">7 Tage</option>
+          <option value="30d" selected>30 Tage</option>
+          <option value="90d">90 Tage</option>
+          <option value="all">Gesamt</option>
+        </select>
+        <button class="b" onclick="RS.refresh()">Daten aktualisieren</button>
+        <span id="rs-status" class="mut" style="font-size:.8rem"></span>
+      </div>
+      <div class="rb-bar">
+        <input id="rs-search" placeholder="Spieler filtern" oninput="RS.setFilter(this.value)">
+        <select id="rs-deaths" onchange="RS.setMinDeaths(this.value)">
+          <option value="0">alle Tode</option>
+          <option value="1">mind. 1 Tod</option>
+          <option value="2">mind. 2 Tode</option>
+          <option value="3">mind. 3 Tode</option>
+          <option value="5">mind. 5 Tode</option>
+        </select>
+        <span class="mut" style="font-size:.78rem">Tipp: Spaltenkopf anklicken zum Sortieren.</span>
+      </div>
+      <div class="rb-panel">
+        <div id="rs-body" class="rb-body" style="max-height:none"><p class="rb-msg">Lade Daten…</p></div>
+      </div>`;
+  }
+
+  function render() {
+    const body = byId('rs-body');
+    if (!body) return;
+
+    const bo = byId('rs-t-overview'), br = byId('rs-t-recent');
+    if (bo) bo.classList.toggle('on', S.tab === 'overview');
+    if (br) br.classList.toggle('on', S.tab === 'recent');
+
+    const win = byId('rs-window');
+    if (win) win.style.display = S.tab === 'overview' ? '' : 'none';
+
+    body.innerHTML = S.error
+      ? '<p class="rb-msg rb-red">' + esc(S.error) + '</p>'
+      : S.tab === 'overview' ? overviewHtml() : recentHtml();
+
+    body.querySelectorAll('th[data-sort]').forEach(th => {
+      th.style.cursor = 'pointer';
+      th.addEventListener('click', () => sortBy(th.dataset.sort));
+    });
+  }
+
+  function filtered(list) {
+    const q = S.filter.trim().toLowerCase();
+    const min = Number(S.minDeaths) || 0;
+    return list.filter(p => (!q || p.name.toLowerCase().includes(q)) && (p.deaths || 0) >= min);
+  }
+
+  const WINDOW_LABEL = { '7d': '7 Tage', '30d': '30 Tage', '90d': '90 Tage', 'all': 'Gesamt' };
+
+  function overviewHtml() {
+    if (!S.stats) return '<p class="rb-msg">Lade Übersicht…</p>';
+    const all = filtered(S.stats.players || []);
+    const rows = all.slice().sort((a, b) => {
+      const av = S.sort === 'name' ? a.name.toLowerCase() : (a[S.sort] == null ? -1 : a[S.sort]);
+      const bv = S.sort === 'name' ? b.name.toLowerCase() : (b[S.sort] == null ? -1 : b[S.sort]);
+      if (av < bv) return -1 * S.dir;
+      if (av > bv) return 1 * S.dir;
+      return 0;
+    });
+
+    const head = ['name', 'Spieler'], b = ['battles', 'Battles'], k = ['kills', 'Kills'],
+          d = ['deaths', 'Tode'], kd = ['kd', 'K/D'], f = ['fame', 'Fame'];
+    const arrow = key => S.sort === key ? (S.dir < 0 ? ' ↓' : ' ↑') : '';
+
+    return `<p class="rb-msg">${esc(WINDOW_LABEL[S.stats.window] || S.stats.window)} · ${all.length} Spieler · Stand ${new Date(S.stats.fetchedAt).toLocaleString('de-DE')}</p>
+      <div class="tw"><table class="rg-table">
+        <tr>
+          <th data-sort="${head[0]}">${head[1]}${arrow('name')}</th>
+          <th data-sort="${b[0]}">${b[1]}${arrow('battles')}</th>
+          <th data-sort="${k[0]}">${k[1]}${arrow('kills')}</th>
+          <th data-sort="${d[0]}">${d[1]}${arrow('deaths')}</th>
+          <th data-sort="${kd[0]}">${kd[1]}${arrow('kd')}</th>
+          <th data-sort="${f[0]}">${f[1]}${arrow('fame')}</th>
+          <th>Zuletzt</th>
+        </tr>
+        ${rows.map(p => `<tr>
+          <td class="n">${esc(p.name)}</td>
+          <td class="n">${p.battles}</td>
+          <td class="n rb-green">${p.kills}</td>
+          <td class="n rb-red">${p.deaths}</td>
+          <td class="n ${kdClass(p.kd)}">${kdText(p.kd)}</td>
+          <td class="n">${short(p.fame)}</td>
+          <td class="n">${esc(ago(p.lastSeen))}</td>
+        </tr>`).join('')}
+      </table></div>
+      ${rows.length ? '' : '<p class="rb-msg">Kein Treffer.</p>'}`;
+  }
+
+  function recentHtml() {
+    if (!S.recent) return '<p class="rb-msg">Lade 3-Tage-Auswertung…</p>';
+    const all = filtered(S.recent.players || []);
+    const rows = all.slice().sort((a, b) => b.deaths - a.deaths || b.kills - a.kills);
+
+    const mark = p => p.risk === 'high'
+      ? '<span class="rb-red">⚠ häufig gestorben</span>'
+      : p.risk === 'mid'
+        ? '<span class="rb-orange">erhöht</span>'
+        : '<span class="mut">–</span>';
+
+    return `<p class="rb-msg">${S.recent.battles} ZvZ-Battles in 3 Tagen · ${all.length} Spieler · Stand ${new Date(S.recent.fetchedAt).toLocaleString('de-DE')}</p>
+      <p class="rb-msg mut" style="font-size:.78rem">Markierung: <span class="rb-orange">erhöht</span> = 2–3 Tode, <span class="rb-red">häufig gestorben</span> = mind. 4 Tode in 3 Tagen.</p>
+      <div class="tw"><table class="rg-table">
+        <tr><th>Spieler</th><th>Battles</th><th>Kills</th><th>Tode</th><th>K/D</th><th>zuletzt</th><th>Hinweis</th></tr>
+        ${rows.map(p => `<tr>
+          <td class="n">${esc(p.name)}</td>
+          <td class="n">${p.battles}</td>
+          <td class="n rb-green">${p.kills}</td>
+          <td class="n rb-red">${p.deaths}</td>
+          <td class="n ${kdClass(p.kd)}">${kdText(p.kd)}</td>
+          <td class="n">${esc(ago(p.lastSeen))}</td>
+          <td>${mark(p)}</td>
+        </tr>`).join('')}
+      </table></div>
+      ${rows.length ? '' : '<p class="rb-msg">Kein Treffer.</p>'}`;
+  }
+
+  async function load(tab, force) {
+    S.error = '';
+    const status = byId('rs-status');
+    if (status) status.textContent = force ? 'Aktualisiere…' : 'Lade…';
+    try {
+      if (tab === 'overview') {
+        const q = '?guild=' + encodeURIComponent(RB_GUILD_ID) + '&window=' + encodeURIComponent(S.window) + (force ? '&force=1' : '');
+        S.stats = await api(ROSTER_GUILD_STATS_ENDPOINT + q);
+        if (status) status.textContent = 'Stand ' + new Date(S.stats.fetchedAt).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+      } else {
+        const q = '?guild=' + encodeURIComponent(RB_GUILD_ID) + (force ? '&force=1' : '');
+        S.recent = await api(ROSTER_GUILD_RECENT_ENDPOINT + q);
+        if (status) status.textContent = 'Stand ' + new Date(S.recent.fetchedAt).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+      }
+    } catch (e) {
+      S.error = e.message;
+      if (status) status.textContent = 'Fehler';
+    }
+    render();
+  }
+
+  function setTab(t) {
+    S.tab = t;
+    render();
+    if (t === 'overview' && !S.stats) load('overview', false);
+    if (t === 'recent' && !S.recent) load('recent', false);
+  }
+  function setWindow(w) {
+    S.window = w;
+    S.stats = null;
+    load('overview', false);
+  }
+  function setFilter(v) { S.filter = v; render(); }
+  function setMinDeaths(v) { S.minDeaths = Number(v) || 0; render(); }
+  function sortBy(field) {
+    if (S.sort === field) S.dir = -S.dir;
+    else { S.sort = field; S.dir = field === 'name' ? 1 : -1; }
+    render();
+  }
+  function refresh() { load(S.tab, true); }
+
+  function syncControls() {
+    const q = byId('rs-search'); if (q) q.value = S.filter;
+    const d = byId('rs-deaths'); if (d) d.value = String(S.minDeaths);
+    const w = byId('rs-window'); if (w) w.value = S.window;
+  }
+
+  function init() {
+    syncControls();
+    render();
+    load(S.tab, false);
+  }
+
+  return { page, init, setTab, setWindow, setFilter, setMinDeaths, sortBy, refresh };
+})();
+
+P['admin-stats'] = () => RS.page();
+I['admin-stats'] = () => RS.init();
 
 // Initial Load
 loadCustomContent().then(() => {

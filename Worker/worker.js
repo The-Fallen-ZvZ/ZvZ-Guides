@@ -11,6 +11,8 @@
          POST /notify   { key, type:'pin', link }
          GET  /deaths?guild=<id>&names=A,B,C&days=30&key=<mod-key>
          GET  /guild?guild=<id>&key=<mod-key>
+         GET  /guildstats?guild=<id>&window=7d|30d|90d|all&force=1&key=<mod-key>
+         GET  /guildrecent?guild=<id>&force=1&key=<mod-key>
          GET  /deaths/detail?guild=<id>&name=<name>&key=<mod-key>
 
    Bindings:
@@ -180,11 +182,13 @@ function parseGuildPlayers(html) {
     }));
 }
 
-/** Spielerstatistik der Gilde für ein Zeitfenster (7d/30d/90d/all), 1 h gecacht. */
-async function guildPlayers(env, guildId, windowKey) {
+/** Spielerstatistik der Gilde für ein Zeitfenster (7d/30d/90d/all), 12 h gecacht. */
+async function guildPlayers(env, guildId, windowKey, force) {
   const key = 'rb:gp:' + guildId + ':' + windowKey;
-  const cached = await kvGet(env, key);
-  if (cached && cached.at && Date.now() - cached.at < 60 * 60 * 1000) return cached;
+  if (!force) {
+    const cached = await kvGet(env, key);
+    if (cached && cached.at && Date.now() - cached.at < 12 * 60 * 60 * 1000) return cached;
+  }
 
   const url = AZ_BASE + '/guilds/europe/' + encodeURIComponent(guildId)
     + '?view=players'
@@ -202,8 +206,109 @@ async function guildPlayers(env, guildId, windowKey) {
   if (!players) throw new Error('guild players not parseable');
 
   const out = { at: Date.now(), window: windowKey, players };
-  await kvPut(env, key, out, 3600);
+  await kvPut(env, key, out, 43200);
   return out;
+}
+
+/** Gesamtübersicht: alle Spieler eines Fensters. */
+async function handleGuildStats(request, env, url) {
+  if (request.method !== 'GET') return rosterJson({ error: 'method_not_allowed' }, 405);
+  if (!env.MOD_KEY || url.searchParams.get('key') !== env.MOD_KEY) {
+    return rosterJson({ error: 'unauthorized' }, 401);
+  }
+
+  const guild = (url.searchParams.get('guild') || '').trim();
+  if (!/^[A-Za-z0-9_-]{10,30}$/.test(guild)) {
+    return rosterJson({ error: 'bad_guild' }, 400);
+  }
+
+  const windowKey = (url.searchParams.get('window') || '30d').toLowerCase();
+  const force = url.searchParams.get('force') === '1';
+
+  let gp;
+  try { gp = await guildPlayers(env, guild, windowKey, force); }
+  catch (e) { return rosterJson({ error: 'guild_players_unreachable', detail: String(e && e.message || e) }, 502); }
+
+  const players = gp.players.map(p => ({
+    name: p.name,
+    battles: p.battles,
+    kills: p.kills,
+    deaths: p.deaths,
+    kd: p.deaths ? Math.round((p.kills / p.deaths) * 100) / 100 : null,
+    fame: p.fame,
+    lastSeen: p.lastSeen
+  }));
+
+  return rosterJson({
+    guild,
+    window: windowKey,
+    fetchedAt: new Date(gp.at).toISOString(),
+    players
+  });
+}
+
+/** 3-Tage-Auswertung aus den ZvZ-Battles, 12 h gecacht. */
+async function handleGuildRecent(request, env, url) {
+  if (request.method !== 'GET') return rosterJson({ error: 'method_not_allowed' }, 405);
+  if (!env.MOD_KEY || url.searchParams.get('key') !== env.MOD_KEY) {
+    return rosterJson({ error: 'unauthorized' }, 401);
+  }
+
+  const guild = (url.searchParams.get('guild') || '').trim();
+  if (!/^[A-Za-z0-9_-]{10,30}$/.test(guild)) {
+    return rosterJson({ error: 'bad_guild' }, 400);
+  }
+
+  const force = url.searchParams.get('force') === '1';
+  const key = 'rb:recent3:' + guild;
+
+  if (!force) {
+    const cached = await kvGet(env, key);
+    if (cached && cached.at && Date.now() - cached.at < 12 * 60 * 60 * 1000) return rosterJson(cached);
+  } else {
+    await kvDelete(env, 'rb:zvz:' + guild);
+  }
+
+  let battles = [];
+  try { battles = await zvzAggregate(env, guild, 3, ZVZ_AGG_MAX); }
+  catch (e) { return rosterJson({ error: 'battles_unreachable', detail: String(e && e.message || e) }, 502); }
+
+  const map = new Map();
+  battles.forEach(bt => {
+    (bt.players || []).forEach(p => {
+      if (p.guildId !== guild) return;
+      const row = map.get(p.name) || { name: p.name, battles: 0, kills: 0, deaths: 0, last: 0 };
+      row.battles++;
+      row.kills += p.kills || 0;
+      row.deaths += p.deaths || 0;
+      row.last = Math.max(row.last, bt.t);
+      map.set(p.name, row);
+    });
+  });
+
+  const players = [...map.values()]
+    .map(p => ({
+      name: p.name,
+      battles: p.battles,
+      kills: p.kills,
+      deaths: p.deaths,
+      kd: p.deaths ? Math.round((p.kills / p.deaths) * 100) / 100 : null,
+      lastSeen: p.last,
+      risk: p.deaths >= 4 ? 'high' : p.deaths >= 2 ? 'mid' : 'low'
+    }))
+    .sort((a, b) => b.deaths - a.deaths || b.kills - a.kills);
+
+  const out = {
+    at: Date.now(),
+    guild,
+    days: 3,
+    battles: battles.length,
+    truncated: battles.length >= ZVZ_AGG_MAX,
+    fetchedAt: new Date().toISOString(),
+    players
+  };
+  await kvPut(env, key, out, 43200);
+  return rosterJson(out);
 }
 
 async function loadEventMeta(token) {
@@ -371,6 +476,7 @@ const DEATH_TTL_MS = 12 * 60 * 60 * 1000;
 const ZVZ_MIN_GROUP = 10;   // Fallback, falls die Battle-Liste nicht erreichbar ist
 const ZVZ_MASS_MIN = 15;    // unsere typische ZvZ-Größe
 const ZVZ_MASS_MAX = 29;
+const ZVZ_AGG_MAX = 40;     // Subrequest-Limit der Free-Instanz (max. 50 pro Aufruf) schonen
 const ALBION_UA = 'The-Fallen-Roster/1.0 (+https://the-fallen-zvz.github.io/)';
 
 /**
@@ -461,10 +567,11 @@ async function battleData(env, battleId) {
 }
 
 /** Alle ZvZ-Battles der letzten Tage mit Spieler- und Killdaten. */
-async function zvzAggregate(env, guildId, days) {
+async function zvzAggregate(env, guildId, days, limit) {
   const b = await guildZvzBattles(env, guildId);
   const cutoff = Date.now() - days * 86400000;
-  const rows = (b.rows || []).filter(r => r.t >= cutoff);
+  let rows = (b.rows || []).filter(r => r.t >= cutoff).sort((a, b) => b.t - a.t);
+  if (limit && rows.length > limit) rows = rows.slice(0, limit);
 
   const battles = [];
   for (const r of rows) {
@@ -495,6 +602,9 @@ async function kvPut(env, key, value, ttl = 43200) {
   try {
     await env.FEEDBACK_TF.put(key, JSON.stringify(value), { expirationTtl: ttl });
   } catch (e) { /* Cache ist optional */ }
+}
+async function kvDelete(env, key) {
+  try { await env.FEEDBACK_TF.delete(key); } catch (e) { /* egal */ }
 }
 
 async function albionJson(url, tries = 3) {
@@ -836,6 +946,16 @@ export default {
     if (url.pathname === '/guild') {
       try { return await handleGuild(request, env, url); }
       catch (e) { return rosterJson({ error: 'guild_failed', detail: String(e && e.message || e) }, 500); }
+    }
+
+    if (url.pathname === '/guildstats') {
+      try { return await handleGuildStats(request, env, url); }
+      catch (e) { return rosterJson({ error: 'guildstats_failed', detail: String(e && e.message || e) }, 500); }
+    }
+
+    if (url.pathname === '/guildrecent') {
+      try { return await handleGuildRecent(request, env, url); }
+      catch (e) { return rosterJson({ error: 'guildrecent_failed', detail: String(e && e.message || e) }, 500); }
     }
 
     if (url.pathname === '/deaths/detail') {

@@ -12,6 +12,16 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-13 – Statistik-Tab: Gesamtübersicht, 3-Tage-Tode, 12-h-Cache
+
+- Neuer Admin-Tab **Statistik** (`#admin-stats`), erreichbar über die Seitenleiste unter „Gilde"
+- **Übersicht**: alle Spieler mit Battles, Kills, Toden, K/D, Fame und „zuletzt gesehen"; Fenster 7/30/90/Alles; Spaltenkopf klicken sortiert (Tode standardmäßig absteigend); Textfilter und Tode-Filter (mind. 1/2/3/5)
+- **Letzte 3 Tage**: Tode je Spieler aus den ZvZ-Battles der letzten 72 h, sortiert nach Toden; Markierung „erhöht" ab 2 Toden, „häufig gestorben" ab 4 Toden
+- **Datenaktualisierung**: Standard-Cache 12 h (`guildPlayers` von 1 h auf 12 h angehoben); Button „Daten aktualisieren" sendet `force=1` und umgeht den Cache, ohne den 12-h-Zyklus zu stören
+- Neue Worker-Routen `GET /guildstats?guild=&window=&force=&key=` und `GET /guildrecent?guild=&force=&key=`
+- `/guildrecent` nutzt die vorhandenen Battle-Caches (Battle-Daten 30 Tage, Liste 12 h) und begrenzt auf 40 Battles pro Aufruf (Subrequest-Limit der Free-Instanz)
+- Client zeigt bei leerem oder ungültigem Moderatoren-Key eine klare Meldung statt einer leeren Tabelle
+
 ### 2026-11-13 – ZvZ-Zahlen direkt aus der Players-Tabelle
 
 - Neue Quelle: `GET /guilds/europe/<id>?view=players&minMass=15&maxMass=29&window=30d` – die Tabelle steht serverseitig im HTML (`"players":[… `)
