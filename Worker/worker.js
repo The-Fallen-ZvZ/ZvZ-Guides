@@ -327,10 +327,80 @@ async function guildZvzBattles(env, guildId) {
   const data = await res.json();
   const rows = Array.isArray(data.rows) ? data.rows : [];
   const ids = rows.map(r => r.id).filter(Boolean);
+  const slim = rows.map(r => ({
+    id: r.id,
+    t: new Date(r.startTime).getTime(),
+    end: new Date(r.endTime).getTime(),
+    mass: r.mass,
+    kills: r.kills,
+    deaths: r.deaths,
+    participants: r.totalParticipants
+  }));
 
-  const out = { at: Date.now(), ids, count: ids.length };
+  const out = { at: Date.now(), ids, rows: slim, count: ids.length };
   await kvPut(env, key, out);
   return out;
+}
+
+/** Einzelnes Battle mit Spielerstatistik und Killfeed, 30 Tage gecacht (Battles sind unveränderlich). */
+async function battleData(env, battleId) {
+  const key = 'rb:battle2:' + battleId;
+  const cached = await kvGet(env, key);
+  if (cached && cached.at) return cached;
+
+  const url = AZ_BASE + '/api/dev/battle-board/battle/events?server=europe&battleId=' + battleId;
+  const res = await fetch(url, {
+    headers: { 'Accept': 'application/json', 'User-Agent': ALBION_UA }
+  });
+  if (!res.ok) throw new Error('battle HTTP ' + res.status);
+
+  const d = await res.json();
+  const players = (d.playerStats || []).map(p => ({
+    id: p.playerId,
+    name: p.name,
+    guildId: p.guildId,
+    kills: p.kills || 0,
+    deaths: p.deaths || 0
+  }));
+  const kills = (d.killFeed || []).map(k => ({
+    t: k.timeStamp,
+    killer: k.killer && k.killer.name ? k.killer.name : '',
+    killerId: k.killer && k.killer.id ? k.killer.id : '',
+    killerGuildId: k.killer && k.killer.guildId ? k.killer.guildId : '',
+    killerGuild: k.killer && k.killer.guildName ? k.killer.guildName : '',
+    victim: k.victim && k.victim.name ? k.victim.name : '',
+    victimId: k.victim && k.victim.id ? k.victim.id : '',
+    victimGuildId: k.victim && k.victim.guildId ? k.victim.guildId : '',
+    weapon: k.killer && k.killer.mainHand && k.killer.mainHand.itemId ? k.killer.mainHand.itemId : '',
+    ip: Math.round((k.killer && k.killer.averageItemPower) || 0)
+  }));
+
+  const out = { at: Date.now(), start: d.startTime, end: d.endTime, players, kills };
+  await kvPut(env, key, out, 2592000);
+  return out;
+}
+
+/** Alle ZvZ-Battles der letzten Tage mit Spieler- und Killdaten. */
+async function zvzAggregate(env, guildId, days) {
+  const b = await guildZvzBattles(env, guildId);
+  const cutoff = Date.now() - days * 86400000;
+  const rows = (b.rows || []).filter(r => r.t >= cutoff);
+
+  const battles = [];
+  for (const r of rows) {
+    try {
+      const bd = await battleData(env, r.id);
+      battles.push({
+        id: r.id,
+        t: new Date(bd.start).getTime(),
+        mass: r.mass,
+        players: bd.players,
+        kills: bd.kills
+      });
+    } catch (e) { /* Battle überspringen */ }
+    await sleep(250);
+  }
+  return battles;
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -341,9 +411,9 @@ async function kvGet(env, key) {
     return v ? JSON.parse(v) : null;
   } catch (e) { return null; }
 }
-async function kvPut(env, key, value) {
+async function kvPut(env, key, value, ttl = 43200) {
   try {
-    await env.FEEDBACK_TF.put(key, JSON.stringify(value), { expirationTtl: 43200 });
+    await env.FEEDBACK_TF.put(key, JSON.stringify(value), { expirationTtl: ttl });
   } catch (e) { /* Cache ist optional */ }
 }
 
@@ -415,53 +485,46 @@ async function handleDeaths(request, env, url) {
   const names = (url.searchParams.get('names') || '')
     .split(',').map(s => s.trim()).filter(Boolean).slice(0, 60);
 
-  let members;
-  try { members = await guildMembers(env, guild); }
-  catch (e) { return rosterJson({ error: 'guild_unreachable', detail: String(e && e.message || e) }, 502); }
+  let battles;
+  try { battles = await zvzAggregate(env, guild, days); }
+  catch (e) { return rosterJson({ error: 'zvz_unreachable', detail: String(e && e.message || e) }, 502); }
 
-  let zvzSet = null;
-  try {
-    const zvz = await guildZvzBattles(env, guild);
-    zvzSet = new Set(zvz.ids);
-  } catch (e) { zvzSet = null; }
+  const cutoffWeek = Date.now() - 7 * 86400000;
+  const byName = new Map();
 
-  const byName = new Map(members.map(m => [m.name.toLowerCase(), m]));
-  const targets = [];
-  const missing = [];
+  battles.forEach(bt => {
+    bt.players.forEach(p => {
+      if (p.guildId !== guild) return;
+      const key = p.name.toLowerCase();
+      const row = byName.get(key) || { name: p.name, deaths: 0, deaths7: 0, battles: 0, last: 0 };
+      row.deaths += p.deaths || 0;
+      if (bt.t >= cutoffWeek) row.deaths7 += p.deaths || 0;
+      row.battles += 1;
+      row.last = Math.max(row.last, bt.t);
+      byName.set(key, row);
+    });
+  });
 
-  if (names.length) {
-    for (const n of names) {
-      const m = byName.get(n.toLowerCase());
-      if (m) targets.push({ name: n, m });
-      else missing.push(n);
-    }
-  } else {
-    members.forEach(m => targets.push({ name: m.name, m }));
-  }
-
-  const cutoff = Date.now() - days * 86400000;
-  const cutoffWeek = Date.now() - Math.min(days, 7) * 86400000;
   const players = {};
+  const missing = [];
+  const wanted = names.length ? names : [...byName.values()].map(r => r.name);
 
-  for (const t of targets) {
-    try {
-      const d = await playerDeaths(env, t.m.id, zvzSet);
-      const recent = d.events.filter(x => x.t >= cutoff);
-      const week = d.events.filter(x => x.t >= cutoffWeek);
-      const last = d.events.length ? d.events[0].t : 0;
-
-      players[t.name] = {
-        deaths: recent.length,
-        zvz: recent.filter(x => x.z).length,
-        deaths7: week.length,
-        zvz7: week.filter(x => x.z).length,
-        lastDays: last ? Math.floor((Date.now() - last) / 86400000) : null,
-        partial: d.events.length >= 40 && !!last && last >= cutoff
+  for (const n of wanted) {
+    const row = byName.get(n.toLowerCase());
+    if (row) {
+      players[n] = {
+        deaths: row.deaths,
+        zvz: row.deaths,
+        deaths7: row.deaths7,
+        zvz7: row.deaths7,
+        battles: row.battles,
+        lastDays: row.last ? Math.floor((Date.now() - row.last) / 86400000) : null,
+        partial: false
       };
-    } catch (e) {
-      missing.push(t.name);
+    } else {
+      players[n] = { deaths: 0, zvz: 0, deaths7: 0, zvz7: 0, battles: 0, lastDays: null, partial: false };
+      if (names.length) missing.push(n);
     }
-    await sleep(700);
   }
 
   return rosterJson({
@@ -469,8 +532,9 @@ async function handleDeaths(request, env, url) {
     days,
     players,
     missing,
-    zvzBattles: zvzSet ? zvzSet.size : null,
-    zvzMass: [ZVZ_MASS_MIN, ZVZ_MASS_MAX]
+    zvzBattles: battles.length,
+    zvzMass: [ZVZ_MASS_MIN, ZVZ_MASS_MAX],
+    source: 'battles'
   });
 }
 
@@ -590,6 +654,34 @@ async function handleDeathDetail(request, env, url) {
   try { detail = await playerDeathDetail(env, member.id, zvzSet); }
   catch (e) { return rosterJson({ error: 'deaths_unreachable', detail: String(e && e.message || e) }, 502); }
 
+  /* ZvZ-Zahlen exakt aus den Battle-Daten (nur Battles unserer Gilde mit Masse 15–29) */
+  let battles = [];
+  try { battles = await zvzAggregate(env, guild, 90); } catch (e) { battles = []; }
+
+  const nameLc = member.name.toLowerCase();
+  const zvzDeaths = [];
+  const zvzKills = [];
+  let zvzBattles = 0;
+  let lastSeen = 0;
+
+  battles.forEach(bt => {
+    const stat = (bt.players || []).find(p => p.name.toLowerCase() === nameLc && p.guildId === guild);
+    if (!stat) return;
+    zvzBattles++;
+    lastSeen = Math.max(lastSeen, bt.t);
+    (bt.kills || []).forEach(k => {
+      if (k.victim && k.victim.toLowerCase() === nameLc && k.victimGuildId === guild) {
+        zvzDeaths.push({ t: k.t, area: 'BATTLE', killer: k.killer, killerGuild: k.killerGuild, weapon: k.weapon, ip: k.ip, zvz: 1, battleId: bt.id });
+      }
+      if (k.killer && k.killer.toLowerCase() === nameLc && k.killerGuildId === guild) {
+        zvzKills.push({ t: k.t, area: 'BATTLE', victim: k.victim, victimGuild: k.victimGuild, weapon: k.weapon, ip: k.ip, zvz: 1, battleId: bt.id });
+      }
+    });
+  });
+
+  zvzDeaths.sort((a, b) => new Date(b.t) - new Date(a.t));
+  zvzKills.sort((a, b) => new Date(b.t) - new Date(a.t));
+
   return rosterJson({
     guild,
     name: member.name,
@@ -597,7 +689,16 @@ async function handleDeathDetail(request, env, url) {
     zvzMin: ZVZ_MIN_GROUP,
     zvzMass: [ZVZ_MASS_MIN, ZVZ_MASS_MAX],
     zvzCount: zvzSet ? zvzSet.size : null,
-    zvzSource: zvzSet ? 'battles' : 'group',
+    zvzSource: 'battles',
+    zvz: {
+      battles: zvzBattles,
+      kills: zvzKills.length,
+      deaths: zvzDeaths.length,
+      kd: zvzDeaths.length ? Math.round((zvzKills.length / zvzDeaths.length) * 100) / 100 : null,
+      lastDays: lastSeen ? Math.floor((Date.now() - lastSeen) / 86400000) : null
+    },
+    zvzDeaths: zvzDeaths.slice(0, 60),
+    zvzKills: zvzKills.slice(0, 60),
     deaths: detail.deaths,
     kills: detail.kills,
     capped: {

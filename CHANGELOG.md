@@ -12,6 +12,16 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-13 – ZvZ-Zahlen exakt aus den Battle-Daten
+
+- Neue Quelle: `GET /api/dev/battle-board/battle/events?server=europe&battleId=…` liefert `playerStats` und `killFeed` je Battle (öffentlich)
+- ZvZ-Kills/-Tode und K/D stammen jetzt aus den Battles der Gilde (Masse 15–29) und stimmen mit der Players-Tabelle von AlbionZvZ überein (Relgok 10/0/1, PDragonyx 8/9/3, Amayana 7/0/1)
+- Battle-Daten 30 Tage im KV (unveränderlich), Battle-Liste 12 h; erster Aufruf ~5 s, danach Cache
+- `/deaths` (Roster) zählt nur noch ZvZ-Tode und Battles aus diesen Daten – keine Spieler-Endpunkte mehr, dadurch schneller und exakt
+- `/deaths/detail` liefert `zvz`, `zvzDeaths`, `zvzKills`; die Seite nutzt sie für ZvZ-Zeile und ZvZ-Tabelle, „Alle" bleibt der Spieler-Endpunkt
+- Badge zeigt `† 1 ZvZ · 10 Battles`
+
+
 ### 2026-11-13 – ZvZ exakt über Battle-IDs, Farben im Gilde-Tab
 
 - ZvZ wird nicht mehr über die Gruppengröße geschätzt: Der Worker lädt die ZvZ-Battles der Gilde (`/api/guild-profile/battles`, Masse 15–29, `massMode=guild`, 90 Tage, 12 h KV-Cache) und vergleicht die `BattleId` jedes Todes/Kills

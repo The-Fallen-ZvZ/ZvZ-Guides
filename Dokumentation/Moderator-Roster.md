@@ -77,11 +77,13 @@ Der Auto-Zuweiser liest die Todesdaten über die offizielle API, nicht über die
 | `lastDays` | Tage seit dem letzten Tod, `null` = keine Tode erfasst |
 | `missing` | Namen, die nicht in der Gilde gefunden wurden (z. B. Twinks) |
 
-**ZvZ-Erkennung (genau):** Der Worker holt die ZvZ-Battles der Gilde über `GET /api/guild-profile/battles` (AlbionZvZ, öffentlich) mit **Masse 15–29** und `massMode=guild`, 90 Tage, 12 h gecacht. Jeder Tod und Kill hat eine `BattleId`; ZvZ ist, was in dieser ID-Liste steht. Das ist keine Schätzung mehr, sondern die echte Battle-Zuordnung.
+**ZvZ-Erkennung (exakt):** Der Worker holt die ZvZ-Battles der Gilde über `GET /api/guild-profile/battles` (AlbionZvZ, öffentlich) mit **Masse 15–29** und `massMode=guild`. Für jede dieser Battles lädt er `GET /api/dev/battle-board/battle/events?server=europe&battleId=…` – dort stehen `playerStats` (Kills/Deaths je Spieler) und der komplette `killFeed` (Killer, Opfer, Waffe, IP, Zeit).
 
-**Fallback:** Ist die Battle-Liste nicht erreichbar, gilt wieder `groupMemberCount >= 10` oder `numberOfParticipants >= 10` (`ZVZ_MIN_GROUP`). Die Antwort kennzeichnet das mit `zvzSource: "group"` statt `"battles"`.
+Damit sind Kills, Tode und K/D **identisch mit der Players-Tabelle auf AlbionZvZ** (gleiche Quelle, gleicher Filter). Gegengeprüft: Relgok 10 Battles / 0 Kills / 1 Death, PDragonyx 8/9/3, Amayana 7/0/1 – exakte Übereinstimmung.
 
-Grenze der Methode: Fights, in denen unsere Gilde unter 15 oder über 29 Masse hatte, zählen nicht als ZvZ. Das ist gewollt („unsere typische Größe"), lässt sich aber über `ZVZ_MASS_MIN` / `ZVZ_MASS_MAX` im Worker ändern.
+**Cache:** Battles sind unveränderlich und werden 30 Tage im KV gehalten (`rb:battle2:<id>`), die Battle-Liste 12 h (`rb:zvz:<guild>`). Der erste Aufruf für 30 Tage lädt ~10 Battles (rund 5 s), danach kommt alles aus dem Cache.
+
+**„Alle"** (nicht-ZvZ) kommt weiterhin aus den Spieler-Endpunkten und ist dort auf die letzten ~40 Ereignisse begrenzt – deshalb der Hinweis unter der Tabelle.
 
 Gewichtung im Gehirn (max. ±10 Punkte, damit Wünsche dominieren):
 

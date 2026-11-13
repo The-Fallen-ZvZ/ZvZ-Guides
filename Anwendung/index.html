@@ -2205,7 +2205,7 @@ const RB = (function(){
           ? 'keine Tode erfasst'
           : 'zuletzt vor ' + d.lastDays + (d.lastDays === 1 ? ' Tag' : ' Tagen');
         const color = d.lastDays == null ? 'var(--mut)' : d.lastDays <= 7 ? '#5fd38a' : d.lastDays <= 30 ? '#ffa94d' : 'var(--mut)';
-        deathLine = `<div class="rb-hint"><span class="rb-red" title="ZvZ-Tode in 30 Tagen">† ${z}${d.partial ? '+' : ''} ZvZ</span> · <span style="color:${color}">${when}</span></div>`;
+        deathLine = `<div class="rb-hint"><span class="rb-red" title="ZvZ-Tode in 30 Tagen">† ${z}${d.partial ? '+' : ''} ZvZ</span>${d.battles != null ? ' · ' + d.battles + ' Battles' : ''} · <span style="color:${color}">${when}</span></div>`;
       }
       return `<div class="rb-card ${p.tentative ? 'tent' : ''}" draggable="true" data-name="${esc(p.name)}">
         <div class="top">
@@ -2568,13 +2568,15 @@ const RG = (function(){
 
     const deathsAll = S.detail.deaths || [];
     const killsAll = S.detail.kills || [];
+    const zDeathAll = S.detail.zvzDeaths || [];
+    const zKillAll = S.detail.zvzKills || [];
     const cutoff = S.range ? Date.now() - S.range * 86400000 : 0;
     const inRange = e => !cutoff || new Date(e.t).getTime() >= cutoff;
 
     const dAll = deathsAll.filter(inRange);
     const kAll = killsAll.filter(inRange);
-    const dZvz = dAll.filter(e => e.zvz);
-    const kZvz = kAll.filter(e => e.zvz);
+    const dZvz = zDeathAll.filter(inRange);
+    const kZvz = zKillAll.filter(inRange);
     const kd = (k, d) => d ? (k / d).toFixed(2).replace('.', ',') : '–';
     const kdClass = (k, d) => {
       if (!d) return '';
