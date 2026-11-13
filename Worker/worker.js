@@ -383,6 +383,7 @@ async function handleRoster(request, env, url) {
 /* ---------- Discord ------------------------------------------------------- */
 
 const DISCORD_API = 'https://discord.com/api/v10';
+const WORKER_VERSION = '2026-11-13-3';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
 const NOTIFY_COOLDOWN_MS = 5 * 60 * 1000;    // min. 5 Min zwischen zwei Anmeldungs-Nachrichten
 const NOTIFY_DUPLICATE_MS = 10 * 60 * 1000;  // identische Nachricht 10 Min nicht wiederholen
 
@@ -854,6 +855,62 @@ async function handleAlerts(request, env, url) {
   });
 }
 
+/* ---------- Diagnose ------------------------------------------------------ */
+
+/** Postet eine Testnachricht und gibt Discords Antwort im Klartext zurueck. */
+async function diagnoseDiscord(env) {
+  if (!env.DISCORD_TOKEN) return { ok: false, error: 'DISCORD_TOKEN fehlt' };
+  if (!env.DISCORD_CHANNEL_ID) return { ok: false, error: 'DISCORD_CHANNEL_ID fehlt' };
+  try {
+    const res = await fetch(DISCORD_API + '/channels/' + env.DISCORD_CHANNEL_ID + '/messages', {
+      method: 'POST',
+      headers: discordAuth(env),
+      body: JSON.stringify({ content: '**Diagnose** ' + new Date().toISOString() })
+    });
+    const text = await res.text();
+    return { ok: res.ok, status: res.status, body: text.slice(0, 400) };
+  } catch (e) {
+    return { ok: false, error: String(e && e.message || e) };
+  }
+}
+
+/** GET /health?key=…[&send=1] – Version, Bindings, Sperren und Discord-Test. */
+async function handleHealth(request, env, url) {
+  if (request.method !== 'GET') return rosterJson({ error: 'method_not_allowed' }, 405);
+  if (!env.MOD_KEY || url.searchParams.get('key') !== env.MOD_KEY) {
+    return rosterJson({ error: 'unauthorized' }, 401);
+  }
+
+  const out = {
+    version: WORKER_VERSION,
+    channel: env.DISCORD_CHANNEL_ID || null,
+    token: !!env.DISCORD_TOKEN,
+    alertGuild: env.ALERT_GUILD || 'p9uAFij9ReO0BhIhHlVa8g',
+    locks: [],
+    discord: null,
+    now: new Date().toISOString()
+  };
+
+  try {
+    const list = await env.FEEDBACK_TF.list({ prefix: 'rb:notifylast:' });
+    for (const k of list.keys) {
+      const v = await kvGet(env, k.name);
+      out.locks.push({
+        key: k.name,
+        at: v && v.at ? new Date(v.at).toISOString() : null,
+        ageSec: v && v.at ? Math.round((Date.now() - v.at) / 1000) : null,
+        hash: v && v.hash ? v.hash : null
+      });
+    }
+  } catch (e) {
+    out.locksError = String(e && e.message || e);
+  }
+
+  if (url.searchParams.get('send') === '1') out.discord = await diagnoseDiscord(env);
+
+  return rosterJson(out);
+}
+
 async function kvGet(env, key) {
   try {
     const v = await env.FEEDBACK_TF.get(key);
@@ -1223,6 +1280,11 @@ export default {
     if (url.pathname === '/alerts') {
       try { return await handleAlerts(request, env, url); }
       catch (e) { return rosterJson({ error: 'alerts_failed', detail: String(e && e.message || e) }, 500); }
+    }
+
+    if (url.pathname === '/health') {
+      try { return await handleHealth(request, env, url); }
+      catch (e) { return rosterJson({ error: 'health_failed', detail: String(e && e.message || e) }, 500); }
     }
 
     if (url.pathname === '/deaths/detail') {

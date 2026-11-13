@@ -2085,7 +2085,7 @@ const RB = (function(){
 
   async function postNotify(changes){
     const key = sessionStorage.getItem('feedbackModKey');
-    if (!key) return;
+    if (!key) { flash('Discord: nicht angemeldet'); return; }
     const list = changes.slice(0, 20);
     try{
       const res = await fetch(ROSTER_NOTIFY_ENDPOINT, {
