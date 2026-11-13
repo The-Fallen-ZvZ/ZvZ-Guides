@@ -2081,6 +2081,8 @@ const RB = (function(){
     postNotify(changes);
   }
 
+  let notifyRetryTimer = null;
+
   async function postNotify(changes){
     const key = sessionStorage.getItem('feedbackModKey');
     if (!key) return;
@@ -2096,12 +2098,28 @@ const RB = (function(){
           link: rosterLink()
         })
       });
-      if (!res.ok) return;
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 429) {
+        const secs = Math.ceil((data.retryInMs || 0) / 1000);
+        flash('Discord: 5-Minuten-Sperre aktiv' + (secs ? ' – nächste Meldung in ' + secs + ' s' : ''));
+        if (notifyRetryTimer) clearTimeout(notifyRetryTimer);
+        notifyRetryTimer = setTimeout(() => {
+          notifyRetryTimer = null;
+          postNotify(changes);
+        }, Math.max(2000, (data.retryInMs || 5000) + 1500));
+        return;
+      }
+      if (!res.ok) {
+        flash('Discord: ' + (data.hint || data.error || 'Versand fehlgeschlagen'));
+        return;
+      }
       const store = S.notified[S.token] || (S.notified[S.token] = {});
       list.forEach(c => { if (c.role === '—') delete store[c.name]; else store[c.name] = c.role; });
       saveNotified();
       S.newSignups = 0;
-      flash(list.length === 1 ? 'Discord: 1 Änderung gemeldet' : 'Discord: ' + list.length + ' Änderungen gemeldet');
+      flash(data.duplicate
+        ? 'Discord: unverändert, nicht erneut gesendet'
+        : (list.length === 1 ? 'Discord: 1 Änderung gemeldet' : 'Discord: ' + list.length + ' Änderungen gemeldet'));
     }catch(e){ /* beim nächsten Build erneut versuchen */ }
   }
 

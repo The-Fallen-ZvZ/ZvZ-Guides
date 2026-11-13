@@ -384,7 +384,7 @@ async function handleRoster(request, env, url) {
 
 const DISCORD_API = 'https://discord.com/api/v10';
 const NOTIFY_COOLDOWN_MS = 5 * 60 * 1000;    // min. 5 Min zwischen zwei Anmeldungs-Nachrichten
-const NOTIFY_DUPLICATE_MS = 60 * 60 * 1000;  // identische Nachricht 1 h lang nicht wiederholen
+const NOTIFY_DUPLICATE_MS = 10 * 60 * 1000;  // identische Nachricht 10 Min nicht wiederholen
 
 function hashText(text) {
   let h = 2166136261;
@@ -488,6 +488,14 @@ async function handleNotify(request, env) {
     : 'https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster';
 
   const auth = discordAuth(env);
+
+  /* Sperre manuell loeschen (zum Testen): { key, type:'reset' } */
+  if (body.type === 'reset') {
+    const key = 'rb:notifylast:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':';
+    const list = await env.FEEDBACK_TF.list({ prefix: key });
+    for (const k of list.keys) await env.FEEDBACK_TF.delete(k.name);
+    return rosterJson({ ok: true, reset: list.keys.length });
+  }
 
   /* Link in einen Kanal posten und anpinnen */
   if (body.type === 'pin') {

@@ -61,7 +61,9 @@ Manuell anpassen: https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster
 - **Kein Doppelversand:** gleicher Spieler + gleiche Rolle wird nicht erneut geschickt; erst eine neue Rolle löst wieder aus.
 - **Nur bei geänderten Daten** – ein Poll ohne Änderung schickt nichts.
 - **5-Minuten-Sperre:** Zwischen zwei Anmeldungs-Nachrichten desselben Events liegen mindestens 5 Minuten. Kommt innerhalb der Sperre etwas Neues, antwortet der Worker mit `429 cooldown`; die Seite markiert es nicht als gesendet und schickt es beim nächsten Durchlauf (nach Ablauf) erneut.
-- **Doppel-Erkennung:** Ist der Text identisch mit der letzten Nachricht, wird er 1 Stunde lang nicht wiederholt – das verhindert doppelte Meldungen aus zwei Tabs oder nach einem Reload.
+- **Doppel-Erkennung:** Ist der Text identisch mit der letzten Nachricht, wird er 10 Minuten lang nicht wiederholt – das verhindert doppelte Meldungen aus zwei Tabs oder nach einem Reload, blockt aber keine Tests über längere Zeit.
+- **Sichtbar in der App:** Bei Sperre zeigt die Seite „5-Minuten-Sperre aktiv – nächste Meldung in X s" und sendet automatisch nach Ablauf; bei unverändertem Text kommt „unverändert, nicht erneut gesendet".
+- **Sperre zurücksetzen:** `POST /notify` mit `{ "key": "…", "type": "reset" }` löscht alle Anmelde-Sperren (zum Testen).
 - **Fehler werden nicht als gesendet markiert**, der nächste Build versucht es erneut.
 
 **Link anpinnen:** Der Button „Link anpinnen" postet den Roster-Link in `DISCORD_CHANNEL_ID` und pinnt die Nachricht. Dafür braucht der Bot `MANAGE_MESSAGES` im Kanal. Ohne die Variable meldet die Seite „DISCORD_CHANNEL_ID fehlt".

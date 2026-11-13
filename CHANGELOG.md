@@ -17,8 +17,9 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 - Todeswarnung heißt jetzt **3-ZvZs-Todes-Warnungen**, ohne Battle-Zeile: „In den letzten 3-ZvZs gestorben:" plus eine Zeile je Spieler
 - Tode und Kills werden über die letzten 3 ZvZs summiert; gemeldet wird weiterhin nur, wer in einem Battle 2+ Tode hatte
 - Discord-Texte sind ASCII (keine Emojis/Sonderstriche), damit beim Kopieren nichts kaputtgehen kann
-- Anmeldungen: mindestens 5 Minuten Abstand pro Event (`rb:notifylast:<kanal>:<event>`), identischer Text wird 1 Stunde nicht wiederholt
-- Innerhalb der Sperre antwortet `/notify` mit `429 cooldown`; die Seite markiert nichts als gesendet und wiederholt es automatisch
+- Anmeldungen: mindestens 5 Minuten Abstand pro Event (`rb:notifylast:<kanal>:<event>`), identischer Text wird 10 Minuten nicht wiederholt
+- Innerhalb der Sperre antwortet `/notify` mit `429 cooldown`; die Seite zeigt die Restzeit und sendet nach Ablauf automatisch erneut
+- `POST /notify {type:'reset'}` löscht die Sperre (Test)
 
 ### 2026-11-13 – Todes-Erinnerung testbar gemacht
 
