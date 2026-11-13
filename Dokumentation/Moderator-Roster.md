@@ -77,13 +77,19 @@ Der Auto-Zuweiser liest die Todesdaten über die offizielle API, nicht über die
 | `lastDays` | Tage seit dem letzten Tod, `null` = keine Tode erfasst |
 | `missing` | Namen, die nicht in der Gilde gefunden wurden (z. B. Twinks) |
 
-**ZvZ-Erkennung (exakt):** Der Worker holt die ZvZ-Battles der Gilde über `GET /api/guild-profile/battles` (AlbionZvZ, öffentlich) mit **Masse 15–29** und `massMode=guild`. Für jede dieser Battles lädt er `GET /api/dev/battle-board/battle/events?server=europe&battleId=…` – dort stehen `playerStats` (Kills/Deaths je Spieler) und der komplette `killFeed` (Killer, Opfer, Waffe, IP, Zeit).
+**ZvZ-Zahlen (exakt):** Der Worker liest die Players-Tabelle direkt von der öffentlichen Gildenseite:
 
-Damit sind Kills, Tode und K/D **identisch mit der Players-Tabelle auf AlbionZvZ** (gleiche Quelle, gleicher Filter). Gegengeprüft: Relgok 10 Battles / 0 Kills / 1 Death, PDragonyx 8/9/3, Amayana 7/0/1 – exakte Übereinstimmung.
+```text
+GET /guilds/europe/<guildId>?view=players&minMass=15&maxMass=29&window=30d
+```
 
-**Cache:** Battles sind unveränderlich und werden 30 Tage im KV gehalten (`rb:battle2:<id>`), die Battle-Liste 12 h (`rb:zvz:<guild>`). Der erste Aufruf für 30 Tage lädt ~10 Battles (rund 5 s), danach kommt alles aus dem Cache.
+Die Tabelle steckt serverseitig im HTML (`"players":[{ name, battles, kills, deaths, killFame, lastSeenMs }]`) und wird per `parseGuildPlayers` ausgelesen. Damit sind Kills, Tode, Battles und K/D **identisch mit der Players-Seite** – gegengeprüft: Relgok 10/0/1, PDragonyx 8/9/3, Amayana 7/0/1.
 
-**„Alle"** (nicht-ZvZ) kommt weiterhin aus den Spieler-Endpunkten und ist dort auf die letzten ~40 Ereignisse begrenzt – deshalb der Hinweis unter der Tabelle.
+Fenster: `7d`, `30d`, `90d`, `all` – genau die Werte, die die Seite anbietet (daher 7/30/90/Alles statt 14 Tage).
+
+Die **Todesliste** (Killer, Waffe, IP) kommt aus den Battle-Killfeeds (`/api/dev/battle-board/battle/events`), gefiltert auf dasselbe Fenster.
+
+**Doppelte Ereignisse:** Die Spieler-Endpunkte liefern bei `offset` teils dieselben Einträge erneut. `fetchPlayerEvents` dedupliziert deshalb über `EventId` – sonst würden „Alle"-Zahlen mehrfach gezählt.
 
 Gewichtung im Gehirn (max. ±10 Punkte, damit Wünsche dominieren):
 
@@ -109,7 +115,7 @@ Oben im Detailbereich zwei Umschalter:
 | Schalter | Wirkung |
 | --- | --- |
 | **ZvZ / Gesamt** | filtert die Todesliste (ZvZ-Tode vs. alle Tode) |
-| **7 T / 14 T / 30 T / Gesamt** | Zeitraum für Liste und Auswertung |
+| **7 T / 30 T / 90 T / Alles** | Zeitraum für Liste und Auswertung |
 
 Darunter steht die Auswertung für den gewählten Zeitraum, immer für beide Welten:
 
@@ -268,6 +274,8 @@ Die Engine arbeitet zweistufig (erst Party 1 + 2, dann Reserve), setzt den Calle
 - Worker `handleGuild`/`handleDeathDetail`: 200 mit sortierter Liste, 404 bei unbekanntem Namen, KV-Cache ohne erneuten API-Request.
 - ZvZ: Worker zählt Tode mit `groupMemberCount >= 10` bzw. `numberOfParticipants >= 10`; Testdaten 4 Tode (2 ZvZ) → `zvz: 2`, `zvz7: 2`.
 - ZvZ über Battle-IDs: Stub mit Battles 111/222/333 und Toden 111, 999, 222, null, 333, 111 … → 6 von 10 als ZvZ, `zvzSource: battles`, `zvzBattles: 3`.
+- Players-Tabelle: `parseGuildPlayers` liest 48 Spieler aus der echten Seite; Relgok 10/0/1, PDragonyx 8/9/3, Amayana 7/0/1 – identisch mit der Seite.
+- Dedupe: Spieler-Endpunkt liefert dieselbe Seite bei jedem Offset → `fetchPlayerEvents` gibt 10 statt 40 Ereignisse zurück.
 - Farben im Gilde-Tab: Tode `rb-red`, Kills `rb-green`, K/D 0,50 rot, 1,00 orange, 3,00 grün; ZvZ-Hinweis „15–29 Masse".
 - Gilde-Tab: Umschalter ZvZ/Alle und 7/14/30/Gesamt, K/D 2/1 = 0,50 und 3/3 = 1,00, Gesamt 4/3 = 0,75.
 - Roster: nur ein Abruf in 8 s (5-Minuten-Intervall), beim Öffnen keine DM, nach einer neuen Anmeldung genau eine DM mit dem neuen Namen.

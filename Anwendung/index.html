@@ -2553,8 +2553,9 @@ const RG = (function(){
     const box = byId('rg-detail');
     if (title) title.textContent = name;
     if (box) box.innerHTML = '<p class="rb-msg">Lade Tode…</p>';
+    const win = S.range === 7 ? '7d' : S.range === 90 ? '90d' : S.range === 0 ? 'all' : '30d';
     try{
-      const data = await api(ROSTER_DEATH_DETAIL_ENDPOINT + '?guild=' + RB_GUILD_ID + '&name=' + encodeURIComponent(name));
+      const data = await api(ROSTER_DEATH_DETAIL_ENDPOINT + '?guild=' + RB_GUILD_ID + '&name=' + encodeURIComponent(name) + '&window=' + win);
       S.detail = data;
       renderDetail();
     }catch(e){
@@ -2570,13 +2571,16 @@ const RG = (function(){
     const killsAll = S.detail.kills || [];
     const zDeathAll = S.detail.zvzDeaths || [];
     const zKillAll = S.detail.zvzKills || [];
+    const zvzInfoData = S.detail.zvz || null;
     const cutoff = S.range ? Date.now() - S.range * 86400000 : 0;
     const inRange = e => !cutoff || new Date(e.t).getTime() >= cutoff;
 
     const dAll = deathsAll.filter(inRange);
     const kAll = killsAll.filter(inRange);
-    const dZvz = zDeathAll.filter(inRange);
-    const kZvz = zKillAll.filter(inRange);
+    const dZvz = zDeathAll;
+    const kZvz = zKillAll;
+    const zDeathsCount = zvzInfoData ? zvzInfoData.deaths : dZvz.length;
+    const zKillsCount = zvzInfoData ? zvzInfoData.kills : kZvz.length;
     const kd = (k, d) => d ? (k / d).toFixed(2).replace('.', ',') : '–';
     const kdClass = (k, d) => {
       if (!d) return '';
@@ -2593,14 +2597,14 @@ const RG = (function(){
           ${btn('Gesamt', S.mode === 'all', "RG.setMode('all')")}
         </span>
         <span style="display:inline-flex;gap:4px">
-          ${[7,14,30].map(r => btn(r + ' T', S.range === r, 'RG.setRange(' + r + ')')).join('')}
-          ${btn('Gesamt', S.range === 0, 'RG.setRange(0)')}
+          ${[7,30,90].map(r => btn(r + ' T', S.range === r, 'RG.setRange(' + r + ')')).join('')}
+          ${btn('Alles', S.range === 0, 'RG.setRange(0)')}
         </span>
       </div>`;
 
     const summary = `<div class="tw" style="margin:0 0 12px"><table class="rg-table">
         <tr><th>${S.range ? 'letzte ' + S.range + ' Tage' : 'alle geladenen Einträge'}</th><th>Tode</th><th>Kills</th><th>K/D</th></tr>
-        <tr><td>ZvZ</td><td class="rb-red">${dZvz.length}</td><td class="rb-green">${kZvz.length}</td><td class="${kdClass(kZvz.length, dZvz.length)}">${kd(kZvz.length, dZvz.length)}</td></tr>
+        <tr><td>ZvZ</td><td class="rb-red">${zDeathsCount}</td><td class="rb-green">${zKillsCount}</td><td class="${kdClass(zKillsCount, zDeathsCount)}">${kd(zKillsCount, zDeathsCount)}</td></tr>
         <tr><td>Alle</td><td class="rb-red">${dAll.length}</td><td class="rb-green">${kAll.length}</td><td class="${kdClass(kAll.length, dAll.length)}">${kd(kAll.length, dAll.length)}</td></tr>
       </table></div>`;
 
@@ -2634,7 +2638,7 @@ const RG = (function(){
   }
 
   function setMode(m){ S.mode = m; renderDetail(); }
-  function setRange(r){ S.range = r; renderDetail(); }
+  function setRange(r){ S.range = r; if (S.selected) selectPlayer(S.selected); else renderDetail(); }
 
   function filter(v){ S.filter = v; renderList(); }
 

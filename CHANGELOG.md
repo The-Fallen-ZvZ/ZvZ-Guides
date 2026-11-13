@@ -12,6 +12,16 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-13 – ZvZ-Zahlen direkt aus der Players-Tabelle
+
+- Neue Quelle: `GET /guilds/europe/<id>?view=players&minMass=15&maxMass=29&window=30d` – die Tabelle steht serverseitig im HTML (`"players":[… `)
+- `parseGuildPlayers` liest Name, Battles, Kills, Deaths, Fame und `lastSeenMs`; `/deaths` und `/deaths/detail` nutzen diese Werte (1 h KV-Cache)
+- Ergebnis deckt sich exakt mit der Seite: Relgok 10/0/1, PDragonyx 8/9/3, Amayana 7/0/1
+- Zeitfenster auf 7/30/90/Alles umgestellt (die Seite bietet kein 14 Tage)
+- Doppelzählung behoben: Spieler-Endpunkte wiederholen bei `offset` dieselben Einträge; `fetchPlayerEvents` dedupliziert über `EventId`
+- Todesliste im Detail weiter aus den Battle-Killfeeds, gefiltert aufs gewählte Fenster
+
+
 ### 2026-11-13 – ZvZ-Zahlen exakt aus den Battle-Daten
 
 - Neue Quelle: `GET /api/dev/battle-board/battle/events?server=europe&battleId=…` liefert `playerStats` und `killFeed` je Battle (öffentlich)
