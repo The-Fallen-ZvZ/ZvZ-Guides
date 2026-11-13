@@ -386,7 +386,8 @@ async function handleRoster(request, env, url) {
 /* ---------- Discord ------------------------------------------------------- */
 
 const DISCORD_API = 'https://discord.com/api/v10';
-const WORKER_VERSION = '2026-11-13-8';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
+let LAST_DISCORD = null;                     // letzter Discord-Fehler (nur Diagnose)
+const WORKER_VERSION = '2026-11-13-9';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
 const NOTIFY_COOLDOWN_MS = 5 * 60 * 1000;    // min. 5 Min zwischen zwei Anmeldungs-Nachrichten
 const NOTIFY_DUPLICATE_MS = 10 * 60 * 1000;  // identische Nachricht 10 Min nicht wiederholen
 const NOTIFY_QUEUE_TTL = 24 * 60 * 60;       // gemerkte Anmeldung max. 1 Tag aufheben
@@ -416,8 +417,16 @@ async function postChannel(env, channelId, content) {
       headers: discordAuth(env),
       body: JSON.stringify({ content: content.slice(0, 1900) })
     });
-    return res.ok ? 1 : 0;
+    if (res.ok) return 1;
+    LAST_DISCORD = {
+      at: new Date().toISOString(),
+      status: res.status,
+      body: (await res.text()).slice(0, 300),
+      channel: channelId
+    };
+    return 0;
   } catch (e) {
+    LAST_DISCORD = { at: new Date().toISOString(), status: 0, body: String(e && e.message || e), channel: channelId };
     return 0;
   }
 }
@@ -517,6 +526,8 @@ async function flushNotifyQueue(env, force) {
       await kvDelete(env, k.name);
       await logNotify(env, scope, { result: 'flushed', sent: ok });
       sent += ok;
+    } else {
+      await logNotify(env, scope, { result: 'flush-failed', discord: LAST_DISCORD });
     }
   }
 
@@ -990,9 +1001,23 @@ async function handleHealth(request, env, url) {
     }
     const qList = await env.FEEDBACK_TF.list({ prefix: 'rb:notifyq:' });
     out.queue = qList.keys.map(k => k.name);
+    out.queueDetails = [];
+    for (const name of out.queue) {
+      const q = await kvGet(env, name);
+      const scope = name.slice(('rb:notifyq:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':').length);
+      const lock = await kvGet(env, 'rb:notifylast:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':' + scope);
+      out.queueDetails.push({
+        scope,
+        queuedAgeSec: q && q.at ? Math.round((Date.now() - q.at) / 1000) : null,
+        lockAgeSec: lock && lock.at ? Math.round((Date.now() - lock.at) / 1000) : null,
+        preview: q && q.content ? q.content.slice(0, 140) : null
+      });
+    }
   } catch (e) {
     out.logsError = String(e && e.message || e);
   }
+
+  out.lastDiscord = LAST_DISCORD;
 
   try {
     const raw = await env.FEEDBACK_TF.get('rb:cron');
@@ -1517,7 +1542,16 @@ export default {
     catch (e) { /* egal */ }
     console.log('[cron] tick ' + new Date().toISOString());
 
+    ctx.waitUntil((async () => {
+      const flushed = await flushNotifyQueue(env).catch(() => 0);
+      let waiting = 0;
+      try {
+        const q = await env.FEEDBACK_TF.list({ prefix: 'rb:notifyq:' });
+        waiting = q.keys.length;
+      } catch (e) { /* egal */ }
+      await logNotify(env, 'cron', { result: 'cron', flushed, waiting });
+    })());
+
     ctx.waitUntil(checkDeathAlerts(env, guild).catch(() => {}));
-    ctx.waitUntil(flushNotifyQueue(env).catch(() => {}));
   }
 };
