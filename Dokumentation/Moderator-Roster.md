@@ -10,17 +10,31 @@ Stand: 13.11.2026 · **in `Anwendung/index.html` eingebaut** · Worker-Erweiteru
 | AlbionZvZ | **bleibt verbindlich** – das Brain liefert nur den Vorschlag und eine Kopiervorlage |
 | Worker-Route `/roster` | Code fertig (`Worker/roster.js`), muss noch deployt werden |
 | Historie | lokal im Browser (später optional KV) |
-| Live-Aktualisierung | Polling alle 5 s über den Worker |
+| Live-Aktualisierung | Polling alle 5 s, startet beim Öffnen automatisch |
+| Auto-Zuweisung | standardmäßig an: bei Änderungen sofort, sonst alle 5 Minuten |
 
 ## Ablauf im Betrieb
 
 1. Moderatoren-Login → **Roster-Brain** in der Seitenleiste.
 2. Event-Token aus dem AlbionZvZ-Link einfügen (`/e/…`) → **Verbinden**.
-3. **Live: an** – neue Anmeldungen erscheinen ohne Reload (≤ 5 s).
-4. **Build the Group** – Vorschlag mit Begründung, Konflikten, Bank und offenen Slots.
+3. **Live** startet automatisch – neue Anmeldungen erscheinen ohne Reload (≤ 5 s). Beim Zurückwechseln in den Tab wird sofort aktualisiert.
+4. **Auto** ist standardmäßig an: Das Gehirn weist bei jeder Änderung sofort und sonst alle 5 Minuten selbst zu. Wer selbst bauen will, schaltet Auto aus – oder greift einfach manuell ein, dann schaltet es sich ab.
+5. **Build the Group** – einmaliger Vorschlag mit Begründung, Konflikten, Bank und offenen Slots.
 5. Manuell korrigieren: Spieler auf einen Slot ziehen, freien Slot anklicken (nach Passung sortierte Liste), × zum Entfernen.
 6. **Kopieren** und das Ergebnis in AlbionZvZ übertragen – dort bleibt die verbindliche Zuweisung.
 7. **Historie +1** zählt die aktuelle Zuweisung als einen gespielten Einsatz; die Zahlen wachsen damit.
+
+## Auto-Modus
+
+Der Schalter **Auto** sitzt neben „Build the Group" und merkt sich seinen Zustand.
+
+| Zustand | Verhalten |
+| --- | --- |
+| **Auto: an** | Weist bei jeder erkannten Änderung sofort zu (neuer/abgemeldeter Spieler, geänderte Wünsche) und sonst spätestens alle 5 Minuten. Beim Öffnen der Seite wird sofort gebaut. |
+| **Auto: aus** | Nichts wird automatisch verändert. „Build the Group" bleibt als einmaliger Vorschlag verfügbar. |
+| **Manueller Eingriff** | Ziehen, × oder Picker setzt Auto automatisch auf aus und meldet „Auto aus – manuelle Zuweisung". So wird eine korrigierte Gruppe nicht beim nächsten Poll überschrieben. |
+
+Damit ist der Ablauf: Moderatoren-Login → Seite öffnen (Live + Auto laufen) → Ergebnis in AlbionZvZ übertragen. Ohne offene Seite wird nichts zugewiesen – es gibt keinen Server-Job, der im Hintergrund arbeitet.
 
 ## Worker: was du ändern musst
 
@@ -150,3 +164,4 @@ Die Engine arbeitet zweistufig (erst Party 1 + 2, dann Reserve), setzt den Calle
   - Live-Schalter an/aus
   - Navigation zu `#start` und zurück: Seite rendert erneut, `rb-wide` wird korrekt entfernt
 - Rahmen-Fix: leere Slots haben 1 px Rand, links 3 px Farbbalken.
+- Auto-Modus im Headless-Test: startet an, weist ohne Klick 12 Spieler zu, schaltet bei manuellem × ab, baut nach erneutem Einschalten sofort, erkennt im Poll einen 13. Spieler und baut automatisch nach.

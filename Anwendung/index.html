@@ -1486,6 +1486,8 @@ $('#settings-btn').onclick=()=>{ location.hash = '#settings'; };
 const RB = (function(){
   const LS_TOKEN = 'tf-rb-token';
   const LS_HIST  = 'tf-rb-hist';
+  const LS_AUTO  = 'tf-rb-auto';
+  const AUTO_MS  = 5 * 60 * 1000;        // Auto-Zuweisung mindestens alle 5 Minuten
   const TIER_RESERVE_FROM = 2;          // Party 1+2 = Haupt, ab Party 3 Reserve
 
   const ALIAS = {
@@ -1525,7 +1527,8 @@ const RB = (function(){
 
   const S = {
     token:'', event:null, parties:[], players:[], playstyles:{}, hist:{},
-    builtAt:null, log:null, live:null, last:null, status:''
+    builtAt:null, log:null, live:null, last:null, status:'',
+    auto:false, lastAuto:0, changed:false
   };
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1732,6 +1735,7 @@ const RB = (function(){
       applyData(data, first || !S.parties.length);
       S.stamp = 'Stand ' + new Date().toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
       setStatus(S.stamp);
+      maybeAuto(first ? 'first' : (S.changed ? 'change' : 'poll'));
     }catch(e){ setStatus('Netzwerkfehler – Worker erreichbar?'); }
     render();
   }
@@ -1762,9 +1766,16 @@ const RB = (function(){
 
     const known = new Map(S.players.map(p => [p.name.toLowerCase(), p]));
     const added = [];
+    let prefsChanged = false;
     incoming.forEach(p => {
       const old = known.get(p.name.toLowerCase());
-      if (old) { old.prefs = p.prefs; old.tentative = p.tentative; known.delete(p.name.toLowerCase()); }
+      if (old) {
+        const same = old.prefs.length === p.prefs.length && old.prefs.every((x, i) => x === p.prefs[i]);
+        if (!same) prefsChanged = true;
+        old.prefs = p.prefs;
+        old.tentative = p.tentative;
+        known.delete(p.name.toLowerCase());
+      }
       else { S.players.push(p); added.push(p.name); }
     });
 
@@ -1777,7 +1788,9 @@ const RB = (function(){
     }
 
     if (first || !S.parties.length) buildParties(data);
-    if (added.length || gone.length){ S.log = null; S.builtAt = null; }
+
+    S.changed = added.length > 0 || gone.length > 0 || prefsChanged;
+    if (S.changed){ S.log = null; S.builtAt = null; }
     if (!first && added.length) flash(added.length === 1 ? 'Neue Anmeldung: ' + added[0] : added.length + ' neue Anmeldungen');
   }
 
@@ -1792,8 +1805,9 @@ const RB = (function(){
 
   /* ---------------- Bauen ---------------- */
 
-  function build(){
-    if (!S.players.length) { flash('Keine Anmeldungen geladen'); return; }
+  function build(auto){
+    if (!S.players.length) { if (auto) return; flash('Keine Anmeldungen geladen'); return; }
+    if (!S.parties.length) { if (auto) return; flash('Noch keine Comp geladen'); return; }
     const players = S.players.map(p => ({
       name: p.name,
       caller: p.name === S.event.shotCaller,
@@ -1893,7 +1907,54 @@ const RB = (function(){
     };
     S.builtAt = Date.now();
     render();
-    flash('Gruppe gebaut');
+    flash(auto ? 'Automatisch zugewiesen' : 'Gruppe gebaut');
+    if (auto) setAutoBtn();
+  }
+
+  /* ---------------- Auto-Modus ---------------- */
+
+  function setAutoBtn(){
+    const b = byId('rb-auto');
+    if (!b) return;
+    b.textContent = S.auto ? 'Auto: an' : 'Auto: aus';
+    b.classList.toggle('on', S.auto);
+    b.title = S.auto
+      ? 'Weist bei neuen Anmeldungen und alle 5 Minuten automatisch zu. Manuelles Eingreifen schaltet Auto aus.'
+      : 'Auto-Zuweisung ist aus – du baust selbst.';
+  }
+
+  function setAuto(on){
+    S.auto = !!on;
+    localStorage.setItem(LS_AUTO, S.auto ? '1' : '0');
+    setAutoBtn();
+  }
+
+  function toggleAuto(){
+    setAuto(!S.auto);
+    if (S.auto){
+      S.lastAuto = 0;
+      maybeAuto('force');
+      flash('Auto an – Zuweisung läuft automatisch');
+    } else {
+      flash('Auto aus – du baust selbst');
+    }
+  }
+
+  /** Weist automatisch zu: sofort bei Änderungen, sonst höchstens alle 5 Minuten. */
+  function maybeAuto(reason){
+    if (!S.auto) return;
+    if (!S.players.length || !S.parties.length) return;
+    const now = Date.now();
+    if (reason === 'poll' && now - S.lastAuto < AUTO_MS) return;
+    S.lastAuto = now;
+    build(true);
+  }
+
+  /** Manueller Eingriff beendet den Auto-Modus, damit nichts überschrieben wird. */
+  function manual(){
+    if (!S.auto) return;
+    setAuto(false);
+    flash('Auto aus – manuelle Zuweisung');
   }
 
   function state_players_find(name){
@@ -1934,6 +1995,7 @@ const RB = (function(){
           <h3>Comp <span class="rb-count" id="rb-cnt-slots">0</span></h3>
           <div class="rb-bar" style="padding:8px 10px;margin:0;border-bottom:var(--bw) solid var(--ln)">
             <button class="b" onclick="RB.build()">Build the Group</button>
+            <button class="b" id="rb-auto" onclick="RB.toggleAuto()" title="Weist bei neuen Anmeldungen und alle 5 Minuten automatisch zu">Auto: aus</button>
             <button class="b" onclick="RB.copy()">Kopieren</button>
             <button class="b" onclick="RB.bump()" title="Aktuelle Zuweisung als einen gespielten Einsatz zählen">Historie +1</button>
           </div>
@@ -2036,6 +2098,7 @@ const RB = (function(){
       const x = el.querySelector('.x');
       if (x) x.addEventListener('click', e => {
         e.stopPropagation();
+        manual();
         const sl = S.parties[pi].slots[si]; sl.player = null; sl.pick = null;
         S.log = null; S.builtAt = null;
         render();
@@ -2054,7 +2117,8 @@ const RB = (function(){
     el.innerHTML = `<span><b>${main.filter(s => s.player).length}</b>/${main.length} Haupt</span> · `
       + `<span><b>${res.filter(s => s.player).length}</b>/${res.length} Reserve</span> · `
       + `<span><b>${main.filter(s => !s.player).length + res.filter(s => !s.player).length}</b> offen</span> · `
-      + `<span><b>${bench}</b> Bank</span> · <span><b>${S.players.length}</b> angemeldet</span>`;
+      + `<span><b>${bench}</b> Bank</span> · <span><b>${S.players.length}</b> angemeldet</span>`
+      + (S.auto ? ` · <span style="color:var(--accent,#c4a1ff)">Auto${S.lastAuto ? ' · ' + new Date(S.lastAuto).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' }) : ''}</span>` : '');
   }
 
   function renderBrain(){
@@ -2099,6 +2163,7 @@ const RB = (function(){
   function place(pi, si, name){
     const target = S.parties[pi].slots[si];
     if (!target.weapons.length || target.player === name) return;
+    manual();
     const from = findSlot(name);
     const prev = target.player;
     if (from){ from.player = prev || null; from.pick = null; }
@@ -2173,26 +2238,47 @@ const RB = (function(){
     b.classList.toggle('on', !!S.live);
   }
   function toggleLive(){
-    if (S.live){ clearInterval(S.live); S.live = null; setLiveBtn(); flash('Live gestoppt'); return; }
+    if (S.live){ stopLive(); flash('Live gestoppt'); return; }
     if (!S.token){ flash('Erst Event verbinden'); return; }
-    S.live = setInterval(() => fetchData(false), 5000);
-    setLiveBtn();
+    startLive();
     fetchData(false);
     flash('Live – Abfrage alle 5 s');
   }
 
+  function startLive(){
+    if (S.live || !S.token) return;
+    S.live = setInterval(() => fetchData(false), 5000);
+    setLiveBtn();
+  }
+  function stopLive(){
+    if (S.live){ clearInterval(S.live); S.live = null; }
+    setLiveBtn();
+  }
+
+  /* Beim Zurückkehren in den Tab sofort aktualisieren (Browser drosseln Intervalle im Hintergrund) */
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && S.live && S.token) fetchData(false);
+  });
+
   function init(){
     S.token = localStorage.getItem(LS_TOKEN) || S.token;
     try { S.hist = JSON.parse(localStorage.getItem(LS_HIST) || '{}') || {}; } catch(e){ S.hist = {}; }
+
+    S.auto = localStorage.getItem(LS_AUTO) !== '0';   // Standard: an
+    setAutoBtn();
+
     const inp = byId('rb-token');
     if (inp && S.token) inp.value = S.token;
     render();
     setLiveBtn();
-    if (S.token && S.players.length) render();
-    else if (S.token) fetchData(true);
+
+    if (S.token){
+      startLive();          // Live läuft ab dem Öffnen automatisch
+      fetchData(true);
+    }
   }
 
-  return { page, init, connect, build, copy, bump, toggleLive, reloadComp, closePick };
+  return { page, init, connect, build, copy, bump, toggleLive, toggleAuto, reloadComp, closePick };
 })();
 
 P['admin-roster'] = () => RB.page();

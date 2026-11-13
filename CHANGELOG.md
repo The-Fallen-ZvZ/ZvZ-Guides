@@ -12,6 +12,15 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-13 – Auto-Zuweisung und Live-Start
+
+- Live-Polling startet beim Öffnen der Seite automatisch (kein Refresh, kein Klick auf „Live")
+- Beim Zurückkehren in den Tab wird sofort aktualisiert (Browser drosseln Intervalle im Hintergrund)
+- Neuer Schalter **Auto**: weist bei Änderungen sofort und sonst alle 5 Minuten selbst zu; beim Öffnen wird direkt gebaut
+- Manueller Eingriff (Ziehen, ×, Picker) schaltet Auto ab, damit Korrekturen nicht überschrieben werden; Zustand in `tf-rb-auto`
+- Statistikzeile zeigt „Auto · HH:MM"; „Build the Group" bleibt als einmaliger Vorschlag
+
+
 ### 2026-11-13 – Roster-Brain in die Anwendung eingebaut
 
 - Neue Admin-Seite `#admin-roster` (nur mit Mod-Key): Anmeldungen, Comp, Gehirn-Panel, Live-Schalter, Historie
