@@ -484,15 +484,15 @@ async function handleNotify(request, env) {
   const lines = changes.map(c => {
     const name = String(c.name || '').slice(0, 40);
     const role = String(c.role || '').slice(0, 60);
-    return role === '—'
+    return role === '-'
       ? '**' + name + '** hat den Slot verlassen'
-      : 'Anmeldung von: **' + name + '** → ' + role;
+      : 'Anmeldung von: **' + name + '** -> ' + role;
   });
 
-  let content = '**📋 Neue Anmeldung**' + (eventTitle ? ' · ' + eventTitle : '') + '\n'
+  let content = '**Neue Anmeldung**' + (eventTitle ? ' - ' + eventTitle : '') + '\n'
     + lines.join('\n')
     + '\n\nManuell anpassen: ' + link;
-  if (content.length > 1900) content = content.slice(0, 1870) + '\n… (gekürzt)';
+  if (content.length > 1900) content = content.slice(0, 1870) + '\n... (gekuerzt)';
 
   const sent = await notifyMods(env, content);
   if (!sent) return rosterJson({ error: 'notify_failed', hint: 'DISCORD_CHANNEL_ID (Kanal) oder DISCORD_USER_ID (DM) prüfen' }, 502);
@@ -642,11 +642,19 @@ function alertKey(guild, a) {
 async function collectDeathAlerts(env, guild) {
   const battles = await zvzAggregate(env, guild, 90, ALERT_BATTLES);
   const alerts = [];
+  const totals = new Map();
 
   battles.forEach(bt => {
     (bt.players || []).forEach(p => {
       if (p.guildId !== guild) return;
+
+      const row = totals.get(p.name) || { name: p.name, deaths: 0, kills: 0, matches: 0 };
+      row.deaths += p.deaths || 0;
+      row.kills += p.kills || 0;
+      totals.set(p.name, row);
+
       if ((p.deaths || 0) < ALERT_MIN_DEATHS) return;
+      row.matches++;
       alerts.push({
         name: p.name,
         deaths: p.deaths,
@@ -658,37 +666,29 @@ async function collectDeathAlerts(env, guild) {
     });
   });
 
-  return { alerts, battles: battles.length };
+  return { alerts, totals, battles: battles.length };
 }
 
-function alertTime(ms) {
-  return new Date(ms).toLocaleString('de-DE', {
-    timeZone: 'Europe/Berlin',
-    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
-  });
-}
+/** Eine gemeinsame Nachricht fuer alle neuen Faelle (ASCII, damit nichts kaputtgeht). */
+async function sendDeathAlerts(env, fresh, totals) {
+  const seen = new Set();
+  const lines = [];
 
-/** Eine eigene Nachricht pro Battle, nur mit den neuen Fällen. */
-async function sendDeathAlerts(env, fresh) {
-  const byBattle = new Map();
-  fresh.forEach(a => {
-    if (!byBattle.has(a.battleId)) byBattle.set(a.battleId, { t: a.t, mass: a.mass, list: [] });
-    byBattle.get(a.battleId).list.push(a);
-  });
-
-  let sent = 0;
-  for (const [, b] of byBattle) {
-    const lines = b.list
-      .sort((x, y) => y.deaths - x.deaths || y.kills - x.kills)
-      .map(x => '• **' + x.name + '** — ' + x.deaths + ' Tode, ' + x.kills + ' Kills');
-
-    const content = '**☠️ Todes-Erinnerung · ZvZ**\n'
-      + 'Battle ' + alertTime(b.t) + ' · Masse ' + (b.mass || '?') + '\n'
-      + lines.join('\n');
-
-    sent += await notifyMods(env, content);
+  for (const a of fresh) {
+    if (seen.has(a.name)) continue;
+    seen.add(a.name);
+    const t = totals.get(a.name) || { deaths: a.deaths, kills: a.kills };
+    lines.push({ name: a.name, deaths: t.deaths, kills: t.kills });
   }
-  return sent;
+
+  if (!lines.length) return 0;
+  lines.sort((x, y) => y.deaths - x.deaths || y.kills - x.kills);
+
+  const content = '**3-ZvZs-Todes-Warnungen**\n'
+    + 'In den letzten 3-ZvZs gestorben:\n'
+    + lines.map(x => '- **' + x.name + '**: ' + x.deaths + ' Tode, ' + x.kills + ' Kills').join('\n');
+
+  return notifyMods(env, content);
 }
 
 /**
@@ -696,7 +696,7 @@ async function sendDeathAlerts(env, fresh) {
  * Merker pro Battle+Spieler verhindert Wiederholungen.
  */
 async function checkDeathAlerts(env, guild, opts = {}) {
-  const { alerts, battles } = await collectDeathAlerts(env, guild);
+  const { alerts, totals, battles } = await collectDeathAlerts(env, guild);
 
   const fresh = [];
   for (const a of alerts) {
@@ -706,7 +706,7 @@ async function checkDeathAlerts(env, guild, opts = {}) {
 
   let sent = 0;
   if (fresh.length && opts.notify !== false) {
-    sent = await sendDeathAlerts(env, fresh);
+    sent = await sendDeathAlerts(env, fresh, totals);
     if (sent > 0) {
       for (const a of fresh) await kvPut(env, alertKey(guild, a), 1, ALERT_TTL);
     }
@@ -742,9 +742,9 @@ async function handleAlerts(request, env, url) {
   if (url.searchParams.get('demo') === '1') {
     const who = (name || 'Takumoto04').slice(0, 40);
     const deaths = Math.max(2, Math.min(20, parseInt(url.searchParams.get('deaths') || '5', 10)));
-    const content = '**☠️ Todes-Erinnerung · ZvZ** _(Testnachricht)_\n'
-      + 'Battle 13.11., 21:34 · Masse 21\n'
-      + '• **' + who + '** — ' + deaths + ' Tode, 1 Kill\n'
+    const content = '**3-ZvZs-Todes-Warnungen** (Testnachricht)\n'
+      + 'In den letzten 3-ZvZs gestorben:\n'
+      + '- **' + who + '**: ' + deaths + ' Tode, 1 Kill\n'
       + '\nSo sieht die echte Warnung aus. Kein echter Treffer, nichts gespeichert.';
     const sent = await notifyMods(env, content);
     return rosterJson({
@@ -1193,7 +1193,7 @@ export default {
           }));
         }
 
-        const text = '**📝 Neues Feedback**\n'
+        const text = '**Neues Feedback**\n'
           + '**Bereich:** ' + body.category + ' > ' + body.subcategory + '\n'
           + '**Nachricht:**\n' + String(body.message).slice(0, 1500);
 
