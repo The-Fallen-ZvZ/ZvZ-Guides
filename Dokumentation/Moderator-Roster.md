@@ -128,50 +128,46 @@ Grenzen: Die API kennt nur Tode/Kills, keine Heilung oder Assistenz; `KillArea` 
 
 ## Worker: was du ändern musst
 
-Die Datei `Worker/roster.js` enthält eigenständige Funktionen für Roster, Discord, Tode und Gildenliste. Kein neues KV, kein Durable Object, keine neuen Bindings (die Tode nutzen `FEEDBACK_TF` als Cache).
+**`Worker/worker.js` ist ab jetzt der komplette Worker** – Feedback, Editor, Roster, Discord und Tode in einer Datei. Zum Aktualisieren wird sie komplett kopiert, nichts mehr zusammengeklebt. `Worker/roster.js` bleibt nur als Modul-Referenz liegen.
 
 1. Cloudflare Dashboard → dein Worker → **Edit code** (oder `wrangler`).
-2. Inhalt von `Worker/roster.js` an den bestehenden Code anhängen.
-3. Im `fetch`-Handler **eine** Zeile ergänzen:
+2. Alles markieren, löschen und den Inhalt von `Worker/worker.js` einfügen.
+3. **Deploy**.
+4. Prüfen:
 
-   ```js
-   export default {
-     async fetch(request, env, ctx) {
-       const url = new URL(request.url);
-       if (url.pathname === '/roster') return handleRoster(request, env, url);   // <- neu
-       if (url.pathname === '/notify') return handleNotify(request, env, url);   // <- neu
-       if (url.pathname === '/deaths') return handleDeaths(request, env, url);   // <- neu
-       if (url.pathname === '/guild') return handleGuild(request, env, url);     // <- neu
-       if (url.pathname === '/deaths/detail') return handleDeathDetail(request, env, url); // <- neu
-       // ... bestehender Code (Feedback, /content)
-     }
-   }
+   ```text
+   GET /roster?event=<64-hex>&key=<mod-key>      → JSON
+   GET /guild?guild=<id>&key=<mod-key>           → Mitgliederliste
+   GET /deaths/detail?guild=<id>&name=<name>&key=<mod-key>
    ```
 
-   **Ältere Service-Worker-Syntax?** Dann so einhängen:
+   Ohne `key` muss überall `401 unauthorized` kommen.
 
-   ```js
-   addEventListener('fetch', event => {
-     const url = new URL(event.request.url);
-     if (url.pathname === '/roster') {
-       event.respondWith(handleRoster(event.request, { MOD_KEY }, url));
-       return;
-     }
-     // ... bestehender Code
-   });
-   ```
+Kein neues KV, kein Durable Object, keine neuen Bindings (die Tode nutzen `FEEDBACK_TF` als Cache).
 
-4. Prüfen, dass die Bindung **`MOD_KEY`** existiert (nutzt du schon fürs Feedback). Für den angepinnten Link optional **`DISCORD_CHANNEL_ID`** anlegen; `DISCORD_TOKEN` und `DISCORD_USER_ID` sind bereits da. Die Tode-Route nutzt **`FEEDBACK_TF`** als Cache – die Bindung ist vorhanden, es kommt nichts Neues dazu.
-5. Deployen.
+<details><summary>Ältere Variante: nur die Routen ergänzen</summary>
 
-**Test nach dem Deploy:**
+Falls du doch nur die Funktionen übernehmen willst:
 
-```text
-https://<worker>/roster?event=<64-hex>&key=<mod-key>   -> JSON mit event, parties, players, playstyles
-https://<worker>/roster?event=<64-hex>                  -> 401 unauthorized
+```js
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    if (url.pathname === '/roster') return handleRoster(request, env, url);
+    if (url.pathname === '/notify') return handleNotify(request, env, url);
+    if (url.pathname === '/deaths') return handleDeaths(request, env, url);
+    if (url.pathname === '/guild') return handleGuild(request, env, url);
+    if (url.pathname === '/deaths/detail') return handleDeathDetail(request, env, url);
+    // ... bestehender Code (Feedback, /content)
+  }
+}
 ```
 
-**CORS:** Der Worker erlaubt `https://the-fallen-zvz.github.io`, `http://localhost:8080`, `http://127.0.0.1:8080`, `http://localhost:5500`, `http://127.0.0.1:5500` und `null` (Datei direkt geöffnet). Weitere Origin in `ALLOWED_ORIGINS` ergänzen.
+</details>
+
+**Bindings:** `MOD_KEY`, `DISCORD_TOKEN`, `DISCORD_USER_ID` sind vorhanden; optional `DISCORD_CHANNEL_ID` für den Pin. `FEEDBACK_TF` dient als Cache – es kommt nichts Neues dazu.
+
+**CORS:** Der Worker antwortet mit `Access-Control-Allow-Origin: *` wie der bisherige Code; der Mod-Key bleibt der Riegel. Dadurch funktioniert die Seite auch von `file://` und localhost.
 
 ## Warum Polling und kein Push
 

@@ -12,6 +12,14 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-13 – Worker als eine Datei
+
+- `Worker/worker.js` angelegt: der komplette Worker (Feedback, Live-Editor, Roster, Discord, Tode, Gildenliste) in einer Datei zum Kopieren
+- Ab jetzt wird nur noch diese Datei gepflegt; `Worker/roster.js` bleibt als Modul-Referenz liegen
+- Deploy-Anleitung in der Doku auf „Datei komplett einfügen" umgestellt
+- Syntax mit `node --check` geprüft (als ESM), alle fünf Routen vorhanden
+
+
 ### 2026-11-13 – ZvZ-Filter, K/D und sparsamere Abfragen
 
 - ZvZ-Erkennung über `groupMemberCount >= 10` bzw. `numberOfParticipants >= 10` (`ZVZ_MIN_GROUP`); Roster-Badge und Gewichtung nutzen nur noch ZvZ-Tode
