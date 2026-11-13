@@ -12,6 +12,14 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-13 – Anmeldungen: Warteschlange statt 429
+
+- Innerhalb der 5-Minuten-Sperre wird die Nachricht in `rb:notifyq:<kanal>:<event>` gemerkt und nach Ablauf automatisch gesendet
+- Abgearbeitet wird die Warteschlange durch den Cron (alle 5 Min) und bei jedem `/notify`-Aufruf – dafür muss keine Seite offen sein
+- Die Seite markiert gemerkte Änderungen als erledigt und zeigt „wird in ca. X Min automatisch gesendet"
+- `type:'reset'` löscht jetzt Sperren und Warteschlange
+- `/health` zeigt Version, Kanal, Sperren und kann mit `&send=1` eine Testnachricht posten
+
 ### 2026-11-13 – Todeswarnung: neues Format, Anmeldungen mit 5-Minuten-Sperre
 
 - Todeswarnung heißt jetzt **3-ZvZs-Todes-Warnungen**, ohne Battle-Zeile: „In den letzten 3-ZvZs gestorben:" plus eine Zeile je Spieler

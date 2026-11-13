@@ -383,9 +383,10 @@ async function handleRoster(request, env, url) {
 /* ---------- Discord ------------------------------------------------------- */
 
 const DISCORD_API = 'https://discord.com/api/v10';
-const WORKER_VERSION = '2026-11-13-3';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
+const WORKER_VERSION = '2026-11-13-4';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
 const NOTIFY_COOLDOWN_MS = 5 * 60 * 1000;    // min. 5 Min zwischen zwei Anmeldungs-Nachrichten
 const NOTIFY_DUPLICATE_MS = 10 * 60 * 1000;  // identische Nachricht 10 Min nicht wiederholen
+const NOTIFY_QUEUE_TTL = 24 * 60 * 60;       // gemerkte Anmeldung max. 1 Tag aufheben
 
 function hashText(text) {
   let h = 2166136261;
@@ -447,6 +448,7 @@ async function notifyMods(env, content) {
 /**
  * Anmeldungen mit 5-Minuten-Sperre und Doppel-Erkennung.
  * So kann weder ein zweiter Tab noch ein Reload dieselbe Meldung spammen.
+ * Innerhalb der Sperre wird der Text gemerkt und spaeter automatisch gesendet.
  */
 async function sendWithCooldown(env, content, scope, force) {
   const key = 'rb:notifylast:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':' + scope;
@@ -456,21 +458,54 @@ async function sendWithCooldown(env, content, scope, force) {
 
   if (!force && last && last.at) {
     if (last.hash === hash && now - last.at < NOTIFY_DUPLICATE_MS) {
-      return { sent: 0, duplicate: true, throttled: true, retryInMs: 0 };
+      return { sent: 0, duplicate: true, throttled: true, queued: false, retryInMs: 0 };
     }
     if (now - last.at < NOTIFY_COOLDOWN_MS) {
-      return {
-        sent: 0,
-        duplicate: false,
-        throttled: true,
-        retryInMs: NOTIFY_COOLDOWN_MS - (now - last.at)
-      };
+      const retryInMs = NOTIFY_COOLDOWN_MS - (now - last.at);
+      await kvPut(env, queueKey(env, scope), { at: now, content }, NOTIFY_QUEUE_TTL);
+      return { sent: 0, duplicate: false, throttled: true, queued: true, retryInMs };
     }
   }
 
   const sent = await notifyMods(env, content);
-  if (sent > 0) await kvPut(env, key, { at: now, hash }, 3600);
-  return { sent, duplicate: false, throttled: false, retryInMs: 0 };
+  if (sent > 0) {
+    await kvPut(env, key, { at: now, hash }, 3600);
+    await kvDelete(env, queueKey(env, scope));
+  }
+  return { sent, duplicate: false, throttled: false, queued: false, retryInMs: 0 };
+}
+
+function queueKey(env, scope) {
+  return 'rb:notifyq:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':' + scope;
+}
+
+/** Sendet gemerkte Anmeldungen, sobald ihre Sperre abgelaufen ist. */
+async function flushNotifyQueue(env) {
+  const prefix = 'rb:notifyq:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':';
+  let sent = 0;
+
+  let list;
+  try { list = await env.FEEDBACK_TF.list({ prefix }); }
+  catch (e) { return 0; }
+
+  for (const k of list.keys) {
+    const q = await kvGet(env, k.name);
+    if (!q || !q.content) { await kvDelete(env, k.name); continue; }
+
+    const scope = k.name.slice(prefix.length);
+    const lockKey = 'rb:notifylast:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':' + scope;
+    const last = await kvGet(env, lockKey);
+    if (last && last.at && Date.now() - last.at < NOTIFY_COOLDOWN_MS) continue;
+
+    const ok = await notifyMods(env, q.content);
+    if (ok > 0) {
+      await kvPut(env, lockKey, { at: Date.now(), hash: hashText(q.content) }, 3600);
+      await kvDelete(env, k.name);
+      sent += ok;
+    }
+  }
+
+  return sent;
 }
 
 async function handleNotify(request, env) {
@@ -492,10 +527,15 @@ async function handleNotify(request, env) {
 
   /* Sperre manuell loeschen (zum Testen): { key, type:'reset' } */
   if (body.type === 'reset') {
-    const key = 'rb:notifylast:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':';
-    const list = await env.FEEDBACK_TF.list({ prefix: key });
+    const prefix = 'rb:notifylast:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':';
+    const list = await env.FEEDBACK_TF.list({ prefix });
     for (const k of list.keys) await env.FEEDBACK_TF.delete(k.name);
-    return rosterJson({ ok: true, reset: list.keys.length });
+
+    const qPrefix = 'rb:notifyq:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':';
+    const qList = await env.FEEDBACK_TF.list({ prefix: qPrefix });
+    for (const k of qList.keys) await env.FEEDBACK_TF.delete(k.name);
+
+    return rosterJson({ ok: true, reset: list.keys.length, queued: qList.keys.length });
   }
 
   /* Link in einen Kanal posten und anpinnen */
@@ -544,9 +584,16 @@ async function handleNotify(request, env) {
   if (content.length > 1900) content = content.slice(0, 1870) + '\n... (gekuerzt)';
 
   const scope = (eventTitle || 'default').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'default';
+
+  /* Erst die Anmeldungen aus der Sperre nachholen, dann die neue behandeln. */
+  try { await flushNotifyQueue(env); } catch (e) { /* naechster Lauf */ }
+
   const out = await sendWithCooldown(env, content, scope, body.force === true);
 
   if (out.duplicate) return rosterJson({ ok: true, sent: 0, duplicate: true });
+  if (out.queued) {
+    return rosterJson({ ok: true, sent: 0, queued: true, retryInMs: out.retryInMs });
+  }
   if (out.throttled) {
     return rosterJson({
       error: 'cooldown',
@@ -1408,9 +1455,10 @@ export default {
     return new Response('Methode nicht erlaubt', { status: 405, headers: corsHeaders });
   },
 
-  /* Cron-Trigger (z. B. alle 5 Minuten): Todes-Erinnerungen prüfen */
+  /* Cron-Trigger (z. B. alle 5 Minuten): Todes-Erinnerungen und Anmelde-Warteschlange */
   async scheduled(event, env, ctx) {
     const guild = env.ALERT_GUILD || 'p9uAFij9ReO0BhIhHlVa8g';
     ctx.waitUntil(checkDeathAlerts(env, guild).catch(() => {}));
+    ctx.waitUntil(flushNotifyQueue(env).catch(() => {}));
   }
 };

@@ -2117,9 +2117,14 @@ const RB = (function(){
       list.forEach(c => { if (c.role === '—') delete store[c.name]; else store[c.name] = c.role; });
       saveNotified();
       S.newSignups = 0;
-      flash(data.duplicate
-        ? 'Discord: unverändert, nicht erneut gesendet'
-        : (list.length === 1 ? 'Discord: 1 Änderung gemeldet' : 'Discord: ' + list.length + ' Änderungen gemeldet'));
+      if (data.queued) {
+        const mins = Math.max(1, Math.ceil((data.retryInMs || 0) / 60000));
+        flash('Discord: Sperre aktiv – wird in ca. ' + mins + ' Min automatisch gesendet');
+      } else {
+        flash(data.duplicate
+          ? 'Discord: unverändert, nicht erneut gesendet'
+          : (list.length === 1 ? 'Discord: 1 Änderung gemeldet' : 'Discord: ' + list.length + ' Änderungen gemeldet'));
+      }
     }catch(e){ /* beim nächsten Build erneut versuchen */ }
   }
 
