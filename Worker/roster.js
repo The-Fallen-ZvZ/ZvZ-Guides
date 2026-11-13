@@ -12,6 +12,10 @@
      POST /notify   { key, type:'pin', link }
           -> postet den Link in DISCORD_CHANNEL_ID und pinnt ihn
 
+     GET  /deaths?guild=<id>&names=A,B,C&days=30&key=<mod-key>
+          -> { players: { Name: { deaths, deaths7, lastDays, partial } }, missing: [] }
+          Nutzt die offizielle Albion-API (EU) und den vorhandenen KV als Cache.
+
    Einhängen in den bestehenden Worker – im fetch-Handler:
 
      const url = new URL(request.url);
@@ -282,4 +286,141 @@ async function handleNotify(request, env) {
   }
 
   return rosterJson({ ok: true, sent });
+}
+
+/* ============================================================================
+   TODE / AKTIVITAET  (offizielle Albion-API, EU)
+   GET /deaths?guild=<id>&names=A,B,C&days=30&key=<mod-key>
+   ========================================================================== */
+
+const ALBION_BASE = 'https://gameinfo-ams.albiononline.com/api/gameinfo';
+const DEATH_TTL_MS = 12 * 60 * 60 * 1000;
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function kvGet(env, key) {
+  try {
+    const v = await env.FEEDBACK_TF.get(key);
+    return v ? JSON.parse(v) : null;
+  } catch (e) { return null; }
+}
+async function kvPut(env, key, value) {
+  try {
+    await env.FEEDBACK_TF.put(key, JSON.stringify(value), { expirationTtl: 43200 });
+  } catch (e) { /* Cache ist optional */ }
+}
+
+async function albionJson(url, tries = 3) {
+  for (let i = 0; i < tries; i++) {
+    const res = await fetch(url, {
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'The-Fallen-Roster/1.0 (+https://the-fallen-zvz.github.io/)'
+      }
+    });
+    if (res.status === 429) { await sleep(4000); continue; }
+    if (!res.ok) throw new Error('albion HTTP ' + res.status);
+    return res.json();
+  }
+  throw new Error('albion rate limited');
+}
+
+async function guildMembers(env, guildId) {
+  const key = 'rb:members:' + guildId;
+  const cached = await kvGet(env, key);
+  if (cached && Array.isArray(cached)) return cached;
+
+  const list = await albionJson(ALBION_BASE + '/guilds/' + guildId + '/members');
+  const slim = (list || [])
+    .filter(m => m && m.Id && m.Name)
+    .map(m => ({ id: m.Id, name: m.Name }));
+
+  await kvPut(env, key, slim);
+  return slim;
+}
+
+/** Todes-Zeitstempel eines Spielers, 12 h gecacht. */
+async function playerDeaths(env, id) {
+  const key = 'rb:deaths:' + id;
+  const cached = await kvGet(env, key);
+  if (cached && cached.at && Date.now() - cached.at < DEATH_TTL_MS) return cached;
+
+  const cutoff = Date.now() - 35 * 86400000;
+  const stamps = [];
+
+  // maximal zwei Seiten (20 Tode); reicht fuer 30-Tage-Zaehlung in der Praxis
+  for (let offset = 0; offset < 20; offset += 10) {
+    const page = await albionJson(ALBION_BASE + '/players/' + id + '/deaths?limit=10&offset=' + offset);
+    if (!Array.isArray(page) || !page.length) break;
+    page.forEach(d => {
+      const t = new Date(d.TimeStamp).getTime();
+      if (t) stamps.push(t);
+    });
+    if (page.length < 10) break;
+    if (stamps.length && Math.min.apply(null, stamps) < cutoff) break;
+    await sleep(600);
+  }
+
+  const data = { at: Date.now(), stamps: stamps.slice().sort((a, b) => b - a) };
+  await kvPut(env, key, data);
+  return data;
+}
+
+async function handleDeaths(request, env, url) {
+  if (request.method !== 'GET') return rosterJson({ error: 'method_not_allowed' }, 405);
+  if (!env.MOD_KEY || url.searchParams.get('key') !== env.MOD_KEY) {
+    return rosterJson({ error: 'unauthorized' }, 401);
+  }
+
+  const guild = (url.searchParams.get('guild') || '').trim();
+  if (!/^[A-Za-z0-9_-]{10,30}$/.test(guild)) {
+    return rosterJson({ error: 'bad_guild' }, 400);
+  }
+
+  const days = Math.min(90, Math.max(1, parseInt(url.searchParams.get('days') || '30', 10)));
+  const names = (url.searchParams.get('names') || '')
+    .split(',').map(s => s.trim()).filter(Boolean).slice(0, 60);
+
+  let members;
+  try { members = await guildMembers(env, guild); }
+  catch (e) { return rosterJson({ error: 'guild_unreachable', detail: String(e && e.message || e) }, 502); }
+
+  const byName = new Map(members.map(m => [m.name.toLowerCase(), m]));
+  const targets = [];
+  const missing = [];
+
+  if (names.length) {
+    for (const n of names) {
+      const m = byName.get(n.toLowerCase());
+      if (m) targets.push({ name: n, m });
+      else missing.push(n);
+    }
+  } else {
+    members.forEach(m => targets.push({ name: m.name, m }));
+  }
+
+  const cutoff = Date.now() - days * 86400000;
+  const cutoffWeek = Date.now() - Math.min(days, 7) * 86400000;
+  const players = {};
+
+  for (const t of targets) {
+    try {
+      const d = await playerDeaths(env, t.m.id);
+      const recent = d.stamps.filter(x => x >= cutoff);
+      const week = d.stamps.filter(x => x >= cutoffWeek);
+      const last = d.stamps.length ? d.stamps[0] : 0;
+
+      players[t.name] = {
+        deaths: recent.length,
+        deaths7: week.length,
+        lastDays: last ? Math.floor((Date.now() - last) / 86400000) : null,
+        partial: d.stamps.length >= 10 && (!last || (Date.now() - last) < cutoff)
+      };
+    } catch (e) {
+      missing.push(t.name);
+    }
+    await sleep(700); // API drosselt; 700 ms ist getestet
+  }
+
+  return rosterJson({ guild, days, players, missing });
 }

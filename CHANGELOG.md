@@ -12,6 +12,16 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-13 – Tode und Aktivität aus der Albion-API
+
+- Neue Worker-Route `GET /deaths?guild=<id>&names=…&days=30&key=…`: Mitglieder auflösen, Tode je Spieler zählen (30 Tage, 7 Tage, letzter Tod), Cache 12 h im vorhandenen KV
+- Drosselung: sequenziell mit 700 ms Abstand, 429-Retry, maximal 60 Namen pro Aufruf; nur angemeldete Spieler werden abgefragt
+- Roster-Ansicht zeigt `† 10 · zuletzt vor 3 Tagen` je Spieler (grün ≤ 7 Tage, orange ≤ 30, grau danach)
+- Gewichtung im Gehirn: +6 / +3 bei Aktivität in 7/14 Tagen, −5 bei > 30 Tagen, −0,5 pro Tod (max. −6), Gesamtdeckel ±10
+- Gilde als `RB_GUILD_ID` hinterlegt (`p9uAFij9ReO0BhIhHlVa8g`, The-Fallen EU)
+- Geprüft: 401/400, Zählung, Pagination, Cache (zweiter Aufruf ohne API-Requests), Badges im Headless-Test
+
+
 ### 2026-11-13 – Discord-Benachrichtigung pro Zuweisung
 
 - Neue Worker-Route `POST /notify`: schickt Änderungen als DM an `DISCORD_USER_ID` (Komma-getrennt möglich) und kann den Roster-Link in `DISCORD_CHANNEL_ID` posten und pinnen

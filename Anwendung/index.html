@@ -278,6 +278,8 @@ const FEEDBACK_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev';
 const CUSTOM_CONTENT_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/content';
 const ROSTER_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/roster';
 const ROSTER_NOTIFY_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/notify';
+const ROSTER_DEATHS_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/deaths';
+const RB_GUILD_ID = 'p9uAFij9ReO0BhIhHlVa8g';   // The-Fallen (EU)
 
 /* ============================================================
    SETTINGS
@@ -1532,7 +1534,7 @@ const RB = (function(){
     token:'', event:null, parties:[], players:[], playstyles:{}, hist:{},
     builtAt:null, log:null, live:null, last:null, status:'',
     auto:false, lastAuto:0, changed:false,
-    notify:true, notified:{}
+    notify:true, notified:{}, deaths:{}, deathsAt:0
   };
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1585,7 +1587,22 @@ const RB = (function(){
     if (p.tentative) s -= 22;
     if (callerSlot) s += p.caller ? 45 : -25;
     if (total === 0) s -= 5;
+    s += deathScore(p);
     return s;
+  }
+
+  /** Aktivität aus der Albion-API: kürzlich gestorben = aktiv, viele Tode = leichte Abwertung. */
+  function deathScore(p){
+    const d = p.deaths;
+    if (!d) return 0;
+    let s = 0;
+    if (d.lastDays != null) {
+      if (d.lastDays <= 7) s += 6;
+      else if (d.lastDays <= 14) s += 3;
+      else if (d.lastDays > 30) s -= 5;
+    }
+    s -= Math.min(d.deaths || 0, 12) * 0.5;
+    return Math.max(-10, Math.min(10, s));
   }
 
   const NO_MATCH = -1e6;
@@ -1740,8 +1757,33 @@ const RB = (function(){
       S.stamp = 'Stand ' + new Date().toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
       setStatus(S.stamp);
       maybeAuto(first ? 'first' : (S.changed ? 'change' : 'poll'));
+      if (S.changed) S.deathsAt = 0;
+      loadDeaths();
     }catch(e){ setStatus('Netzwerkfehler – Worker erreichbar?'); }
     render();
+  }
+
+  /** Tode/Aktivität aus der offiziellen Albion-API (über den Worker, 12 h gecacht). */
+  async function loadDeaths(){
+    if (!S.players.length) return;
+    if (Date.now() - S.deathsAt < 15 * 60 * 1000) return;
+    const key = sessionStorage.getItem('feedbackModKey');
+    if (!key) return;
+    S.deathsAt = Date.now();
+    const names = S.players.slice(0, 60).map(p => p.name).join(',');
+    try{
+      const res = await fetch(ROSTER_DEATHS_ENDPOINT
+        + '?guild=' + RB_GUILD_ID
+        + '&days=30&names=' + encodeURIComponent(names)
+        + '&key=' + encodeURIComponent(key), { cache: 'no-store' });
+      if (!res.ok) { if (res.status >= 500 || res.status === 429) S.deathsAt = 0; return; }
+      const data = await res.json();
+      if (data && data.players){
+        S.deaths = data.players;
+        render();
+        if (S.auto) maybeAuto('change');
+      }
+    }catch(e){ S.deathsAt = 0; }
   }
 
   function buildParties(data){
@@ -1817,7 +1859,8 @@ const RB = (function(){
       caller: p.name === S.event.shotCaller,
       prefs: p.prefs,
       hist: S.hist[p.name] || {},
-      tentative: p.tentative
+      tentative: p.tentative,
+      deaths: S.deaths[p.name]
     }));
 
     const flat = [];
@@ -2132,6 +2175,15 @@ const RB = (function(){
         return `<span class="rb-chip" style="border-left-color:${ROLE_COLOR[roleOf(w)] || '#888'}" title="${esc(roleOf(w))} · ${n} Einsätze">${esc(w)}${n ? `<b>${n}</b>` : ''}</span>`;
       }).join('');
       const total = Object.values(hist).reduce((a,b) => a+b, 0);
+      const d = S.deaths[p.name];
+      let deathLine = '';
+      if (d) {
+        const when = d.lastDays == null
+          ? 'keine Tode erfasst'
+          : 'zuletzt vor ' + d.lastDays + (d.lastDays === 1 ? ' Tag' : ' Tagen');
+        const color = d.lastDays == null ? 'var(--mut)' : d.lastDays <= 7 ? '#5fd38a' : d.lastDays <= 30 ? '#ffa94d' : 'var(--mut)';
+        deathLine = `<div class="rb-hint"><span style="color:${color}" title="Tode in 30 Tagen">† ${d.deaths}${d.partial ? '+' : ''}</span> · ${when}</div>`;
+      }
       return `<div class="rb-card ${p.tentative ? 'tent' : ''}" draggable="true" data-name="${esc(p.name)}">
         <div class="top">
           <span class="rb-nm">${esc(p.name)}</span>
@@ -2140,6 +2192,7 @@ const RB = (function(){
         </div>
         <div class="rb-prefs">${chips || '<span class="rb-hint">keine Rollen gewählt</span>'}</div>
         ${total ? `<div class="rb-hint">Historie: ${total} Einsätze</div>` : ''}
+        ${deathLine}
       </div>`;
     }).join('');
 

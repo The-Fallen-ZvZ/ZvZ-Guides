@@ -61,6 +61,32 @@ Manuell anpassen: https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster
 
 Hinweis: DMs selbst lassen sich in Discord nicht anpinnen – deshalb DM für Updates, Kanal-Pin für den Link.
 
+## Tode und Aktivität (Albion-API)
+
+Der Auto-Zuweiser liest die Todesdaten über die offizielle API, nicht über die Battleboard-Seite (die ist login-geschützt).
+
+| Feld | Bedeutung |
+| --- | --- |
+| `deaths` | Tode in den letzten 30 Tagen (max. 20 gezählt, `partial` markiert die Obergrenze) |
+| `deaths7` | Tode in den letzten 7 Tagen |
+| `lastDays` | Tage seit dem letzten Tod, `null` = keine Tode erfasst |
+| `missing` | Namen, die nicht in der Gilde gefunden wurden (z. B. Twinks) |
+
+Gewichtung im Gehirn (max. ±10 Punkte, damit Wünsche dominieren):
+
+| Signal | Punkte |
+| --- | --- |
+| letzter Tod ≤ 7 Tage | +6 |
+| ≤ 14 Tage | +3 |
+| älter als 30 Tage | −5 |
+| je Tod in 30 Tagen | −0,5 (max. −6) |
+
+Das ist bewusst **Aktivität plus leichte Vorsicht**, keine Bestrafung: Tanks sterben systembedingt häufiger als Longbows. Angezeigt wird die Zahl als `† 10 · zuletzt vor 3 Tagen`, grün bis 7 Tage, orange bis 30, grau danach.
+
+**Cache und Drosselung:** Der Worker hält Mitglieder 12 h und Tode pro Spieler 12 h im vorhandenen KV (`FEEDBACK_TF`). Beim ersten Abruf fragt er die API sequenziell mit 700 ms Abstand (die API antwortet sonst mit 429), danach kommt alles aus dem Cache. Nur die angemeldeten Spieler werden abgefragt, maximal 60 pro Aufruf.
+
+**Gilde:** `p9uAFij9ReO0BhIhHlVa8g` (The-Fallen, EU), hinterlegt als `RB_GUILD_ID` in `index.html`.
+
 ## Worker: was du ändern musst
 
 Die Datei `Worker/roster.js` enthält eine eigenständige Funktion `handleRoster`. Kein KV, kein Durable Object, keine neuen Bindings.
@@ -75,6 +101,7 @@ Die Datei `Worker/roster.js` enthält eine eigenständige Funktion `handleRoster
        const url = new URL(request.url);
        if (url.pathname === '/roster') return handleRoster(request, env, url);   // <- neu
        if (url.pathname === '/notify') return handleNotify(request, env, url);   // <- neu
+       if (url.pathname === '/deaths') return handleDeaths(request, env, url);   // <- neu
        // ... bestehender Code (Feedback, /content)
      }
    }
@@ -93,7 +120,7 @@ Die Datei `Worker/roster.js` enthält eine eigenständige Funktion `handleRoster
    });
    ```
 
-4. Prüfen, dass die Bindung **`MOD_KEY`** existiert (nutzt du schon fürs Feedback). Für den angepinnten Link optional **`DISCORD_CHANNEL_ID`** anlegen; `DISCORD_TOKEN` und `DISCORD_USER_ID` sind bereits da.
+4. Prüfen, dass die Bindung **`MOD_KEY`** existiert (nutzt du schon fürs Feedback). Für den angepinnten Link optional **`DISCORD_CHANNEL_ID`** anlegen; `DISCORD_TOKEN` und `DISCORD_USER_ID` sind bereits da. Die Tode-Route nutzt **`FEEDBACK_TF`** als Cache – die Bindung ist vorhanden, es kommt nichts Neues dazu.
 5. Deployen.
 
 **Test nach dem Deploy:**
