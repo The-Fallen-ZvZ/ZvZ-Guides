@@ -12,6 +12,13 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-13 – Automatisches Nachholen griff nicht
+
+- Ursache: Das Nachholen lief nur im Cron; ohne eingerichteten Trigger passierte nichts, und der Nachhol-Timer im Browser war an den offenen Tab gebunden
+- Jetzt wird die Warteschlange zusätzlich bei jedem `/roster`-Abruf (Seite pollt alle 5 Min) und bei jeder `/health`-Abfrage abgearbeitet
+- `/health` zeigt `cron` mit `ageSec` – `null` bedeutet, es ist kein Cron-Trigger eingerichtet
+- Version `2026-11-13-7`
+
 ### 2026-11-13 – Button „Wartende senden"
 
 - Neuer Knopf im Roster-Brain schickt die während der 5-Minuten-Sperre gemerkten An-/Abmeldungen sofort

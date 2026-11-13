@@ -356,6 +356,9 @@ async function handleRoster(request, env, url) {
     return rosterJson({ error: 'bad_event', hint: 'Token = die 64 Zeichen aus /e/...' }, 400);
   }
 
+  /* Nebenbei wartende Anmeldungen nachholen (die Seite fragt ohnehin alle 5 Min ab) */
+  try { await flushNotifyQueue(env); } catch (e) { /* naechster Lauf */ }
+
   let meta, roster;
   try { meta = await loadEventMeta(token); }
   catch (e) { return rosterJson({ error: 'event_unreachable', detail: String(e && e.message || e) }, 502); }
@@ -383,7 +386,7 @@ async function handleRoster(request, env, url) {
 /* ---------- Discord ------------------------------------------------------- */
 
 const DISCORD_API = 'https://discord.com/api/v10';
-const WORKER_VERSION = '2026-11-13-6';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
+const WORKER_VERSION = '2026-11-13-7';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
 const NOTIFY_COOLDOWN_MS = 5 * 60 * 1000;    // min. 5 Min zwischen zwei Anmeldungs-Nachrichten
 const NOTIFY_DUPLICATE_MS = 10 * 60 * 1000;  // identische Nachricht 10 Min nicht wiederholen
 const NOTIFY_QUEUE_TTL = 24 * 60 * 60;       // gemerkte Anmeldung max. 1 Tag aufheben
@@ -991,6 +994,16 @@ async function handleHealth(request, env, url) {
     out.logsError = String(e && e.message || e);
   }
 
+  try {
+    const c = await kvGet(env, 'rb:cron');
+    out.cron = c && c.at
+      ? { at: new Date(c.at).toISOString(), ageSec: Math.round((Date.now() - c.at) / 1000) }
+      : null;
+  } catch (e) { out.cron = null; }
+
+  try { out.flushedNow = await flushNotifyQueue(env); }
+  catch (e) { out.flushedNow = 0; }
+
   if (url.searchParams.get('send') === '1') out.discord = await diagnoseDiscord(env);
 
   return rosterJson(out);
@@ -1496,6 +1509,7 @@ export default {
   /* Cron-Trigger (z. B. alle 5 Minuten): Todes-Erinnerungen und Anmelde-Warteschlange */
   async scheduled(event, env, ctx) {
     const guild = env.ALERT_GUILD || 'p9uAFij9ReO0BhIhHlVa8g';
+    ctx.waitUntil(kvPut(env, 'rb:cron', { at: Date.now() }, 172800));
     ctx.waitUntil(checkDeathAlerts(env, guild).catch(() => {}));
     ctx.waitUntil(flushNotifyQueue(env).catch(() => {}));
   }

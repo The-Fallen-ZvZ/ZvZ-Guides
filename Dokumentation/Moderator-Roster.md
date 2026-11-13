@@ -65,6 +65,7 @@ Manuell anpassen: https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster
 - **Sichtbar in der App:** Bei Sperre zeigt die Seite „Sperre aktiv – wird in ca. X Min automatisch gesendet", bei unverändertem Text „unverändert, nicht erneut gesendet".
 - **Sperre zurücksetzen:** `POST /notify` mit `{ "key": "…", "type": "reset" }` löscht Sperren und Warteschlange (zum Testen).
 - **Wartende sofort senden:** Der Button „Wartende senden" im Roster schickt alle während der Sperre gemerkten An-/Abmeldungen sofort (`POST /notify` mit `{ "key": "…", "type": "flush" }`). Der Discord-Test-Knopf bleibt separat und schickt nur eine Beispielnachricht.
+- **Automatisch nachholen** passiert an drei Stellen: Cron (`*/5 * * * *`), jeder `/notify`-Aufruf und jeder `/roster`-Abruf (die Seite fragt alle 5 Minuten). `/health` zeigt unter `cron.ageSec`, wann der Cron zuletzt lief – `"cron":null` heißt: kein Cron-Trigger eingerichtet.
 - **Fehler werden nicht als gesendet markiert**, der nächste Build versucht es erneut.
 
 **Link anpinnen:** Der Button „Link anpinnen" postet den Roster-Link in `DISCORD_CHANNEL_ID` und pinnt die Nachricht. Dafür braucht der Bot `MANAGE_MESSAGES` im Kanal. Ohne die Variable meldet die Seite „DISCORD_CHANNEL_ID fehlt".
