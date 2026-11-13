@@ -476,7 +476,7 @@ async function handleNotify(request, env) {
     return rosterJson({ ok: true, pinned: true });
   }
 
-  /* Änderungen als DM */
+  /* Änderungen in den Kanal */
   const changes = Array.isArray(body.changes) ? body.changes.slice(0, 25) : [];
   if (!changes.length) return rosterJson({ error: 'no_changes' }, 400);
 
