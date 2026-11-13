@@ -16,6 +16,12 @@
           -> { players: { Name: { deaths, deaths7, lastDays, partial } }, missing: [] }
           Nutzt die offizielle Albion-API (EU) und den vorhandenen KV als Cache.
 
+     GET  /guild?guild=<id>&key=<mod-key>
+          -> { members: [{ name, id }], count }
+
+     GET  /deaths/detail?guild=<id>&name=<name>&key=<mod-key>
+          -> { name, deaths: [{ t, area, killer, killerGuild, weapon, ip, fame, battleId }] }
+
    Einhängen in den bestehenden Worker – im fetch-Handler:
 
      const url = new URL(request.url);
@@ -423,4 +429,96 @@ async function handleDeaths(request, env, url) {
   }
 
   return rosterJson({ guild, days, players, missing });
+}
+
+/* ---------- Gildenliste und Todesdetails ---------------------------------- */
+
+async function handleGuild(request, env, url) {
+  if (request.method !== 'GET') return rosterJson({ error: 'method_not_allowed' }, 405);
+  if (!env.MOD_KEY || url.searchParams.get('key') !== env.MOD_KEY) {
+    return rosterJson({ error: 'unauthorized' }, 401);
+  }
+
+  const guild = (url.searchParams.get('guild') || '').trim();
+  if (!/^[A-Za-z0-9_-]{10,30}$/.test(guild)) {
+    return rosterJson({ error: 'bad_guild' }, 400);
+  }
+
+  let members;
+  try { members = await guildMembers(env, guild); }
+  catch (e) { return rosterJson({ error: 'guild_unreachable', detail: String(e && e.message || e) }, 502); }
+
+  const sorted = members.slice().sort((a, b) => a.name.localeCompare(b.name));
+  return rosterJson({ guild, count: sorted.length, members: sorted });
+}
+
+/** Letzte Tode eines Spielers mit Details, 12 h gecacht. */
+async function playerDeathDetail(env, id) {
+  const key = 'rb:detail:' + id;
+  const cached = await kvGet(env, key);
+  if (cached && cached.at && Date.now() - cached.at < DEATH_TTL_MS) return cached;
+
+  const events = [];
+  for (let offset = 0; offset < 30; offset += 10) {
+    const page = await albionJson(ALBION_BASE + '/players/' + id + '/deaths?limit=10&offset=' + offset);
+    if (!Array.isArray(page) || !page.length) break;
+
+    page.forEach(d => {
+      events.push({
+        t: d.TimeStamp,
+        area: d.KillArea || '',
+        killer: d.Killer && d.Killer.Name ? d.Killer.Name : '',
+        killerGuild: d.Killer && d.Killer.GuildName ? d.Killer.GuildName : '',
+        killerAlliance: d.Killer && d.Killer.AllianceName ? d.Killer.AllianceName : '',
+        weapon: d.Victim && d.Victim.Equipment && d.Victim.Equipment.MainHand
+          ? d.Victim.Equipment.MainHand.Type : '',
+        ip: Math.round((d.Victim && d.Victim.AverageItemPower) || 0),
+        fame: d.TotalVictimKillFame || 0,
+        battleId: d.BattleId || null
+      });
+    });
+
+    if (page.length < 10) break;
+    await sleep(600);
+  }
+
+  const data = { at: Date.now(), events };
+  await kvPut(env, key, data);
+  return data;
+}
+
+async function handleDeathDetail(request, env, url) {
+  if (request.method !== 'GET') return rosterJson({ error: 'method_not_allowed' }, 405);
+  if (!env.MOD_KEY || url.searchParams.get('key') !== env.MOD_KEY) {
+    return rosterJson({ error: 'unauthorized' }, 401);
+  }
+
+  const guild = (url.searchParams.get('guild') || '').trim();
+  if (!/^[A-Za-z0-9_-]{10,30}$/.test(guild)) {
+    return rosterJson({ error: 'bad_guild' }, 400);
+  }
+
+  const name = (url.searchParams.get('name') || '').trim();
+  if (!name) return rosterJson({ error: 'bad_name' }, 400);
+
+  let members;
+  try { members = await guildMembers(env, guild); }
+  catch (e) { return rosterJson({ error: 'guild_unreachable', detail: String(e && e.message || e) }, 502); }
+
+  const member = members.find(m => m.name.toLowerCase() === name.toLowerCase());
+  if (!member) {
+    return rosterJson({ error: 'unknown_player', hint: 'Name nicht in der Gildenliste' }, 404);
+  }
+
+  let detail;
+  try { detail = await playerDeathDetail(env, member.id); }
+  catch (e) { return rosterJson({ error: 'deaths_unreachable', detail: String(e && e.message || e) }, 502); }
+
+  return rosterJson({
+    guild,
+    name: member.name,
+    id: member.id,
+    deaths: detail.events,
+    fetchedAt: new Date(detail.at).toISOString()
+  });
 }

@@ -12,6 +12,16 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-13 – Gilde-Tab mit Todesdetails
+
+- Neue Admin-Seite `#admin-guild`: alle Mitglieder alphabetisch, Suchfeld, Klick auf einen Namen zeigt die letzten Tode
+- Tabelle mit Datum, relativem Zeitpunkt, Gebiet, Gegner (Name + Gilde), Waffe und Item Power; Zusammenfassung 30/7 Tage und „zuletzt"
+- Worker-Routen `GET /guild` (Mitglieder, 12 h KV-Cache) und `GET /deaths/detail` (bis 30 Tode je Spieler, 12 h Cache)
+- Waffennamen werden lesbar gemacht (`T8_MAIN_MACE` → `MACE`)
+- Sidebar-Link „Gilde", breites Layout, Editor-Seitenliste ausgenommen
+- Geprüft: Worker (200/404/Cache), Seite im Headless-Browser (Liste, Details, Filter, keine Fehler)
+
+
 ### 2026-11-13 – Tode und Aktivität aus der Albion-API
 
 - Neue Worker-Route `GET /deaths?guild=<id>&names=…&days=30&key=…`: Mitglieder auflösen, Tode je Spieler zählen (30 Tage, 7 Tage, letzter Tod), Cache 12 h im vorhandenen KV

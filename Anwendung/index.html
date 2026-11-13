@@ -234,6 +234,21 @@ body:has(main.rb-wide) .app{max-width:1720px}
 .rb-pick:hover{border-color:var(--mut)}
 .rb-pick .sc{margin-left:auto;color:var(--mut);font-size:.72rem}
 .rb-msg{color:var(--mut);font-size:.85rem;padding:6px 0}
+
+/* Gilden-Tab */
+.rg-grid{display:grid;grid-template-columns:320px minmax(0,1fr);gap:12px;align-items:start}
+@media(max-width:900px){.rg-grid{grid-template-columns:1fr}}
+.rg-row{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:6px;cursor:pointer;font-size:.86rem}
+.rg-row:hover{background:var(--hv)}
+.rg-row.on{background:var(--hv);font-weight:600}
+.rg-row .n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rg-row .a{color:var(--mut)}
+.rg-sum{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 12px;font-size:.8rem;color:var(--mut)}
+.rg-sum b{color:var(--fg)}
+.rg-table{width:100%;border-collapse:collapse;font-size:.79rem}
+.rg-table th,.rg-table td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--ln);vertical-align:top}
+.rg-table th{color:var(--mut);font-weight:500}
+.rg-table td.n{white-space:nowrap}
 </style></head><body>
 <div id="splash"><div id="splash-box"><h1>THE-FALLEN</h1><h2>ZVZ GUIDE</h2><button class="b" onclick="closeSplash()" style="font-size:1.2rem;padding:12px 30px;">Fortfahren</button></div></div>
 
@@ -279,6 +294,8 @@ const CUSTOM_CONTENT_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.
 const ROSTER_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/roster';
 const ROSTER_NOTIFY_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/notify';
 const ROSTER_DEATHS_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/deaths';
+const ROSTER_GUILD_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/guild';
+const ROSTER_DEATH_DETAIL_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/deaths/detail';
 const RB_GUILD_ID = 'p9uAFij9ReO0BhIhHlVa8g';   // The-Fallen (EU)
 
 /* ============================================================
@@ -744,7 +761,7 @@ function initAdminEditor() {
             <label style="display:block; margin-bottom:8px; font-weight:600;">Welche Seite möchtest du bearbeiten?</label>
             <select id="editor-page-select" class="n" style="width:100%; padding:10px; margin-bottom:16px;">
                 <option value="">Bitte wählen...</option>
-                ${Object.keys(P).filter(k => k !== 'admin' && k !== 'settings' && k !== 'changelog' && k !== 'admin-feedback' && k !== 'admin-editor' && k !== 'admin-brainstorm' && k !== 'admin-roster').map(k => `<option value="${k}">${N.find(n=>n[0]===k)?.[1] || k}</option>`).join('')}
+                ${Object.keys(P).filter(k => k !== 'admin' && k !== 'settings' && k !== 'changelog' && k !== 'admin-feedback' && k !== 'admin-editor' && k !== 'admin-brainstorm' && k !== 'admin-roster' && k !== 'admin-guild').map(k => `<option value="${k}">${N.find(n=>n[0]===k)?.[1] || k}</option>`).join('')}
             </select>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
                 <button class="b" onclick="loadEditorContent('${modKey}')">Laden</button>
@@ -1402,6 +1419,7 @@ function renderSidebar() {
         navHtml += `<a href="#admin-editor" data-p="admin-editor" class="${location.hash === '#admin-editor' ? 'on' : ''}">Live-Editor</a>`;
         navHtml += `<a href="#admin-feedback" data-p="admin-feedback" class="${location.hash === '#admin-feedback' ? 'on' : ''}">Feedback Übersicht</a>`;
         navHtml += `<a href="#admin-roster" data-p="admin-roster" class="${location.hash === '#admin-roster' ? 'on' : ''}">Roster-Brain</a>`;
+        navHtml += `<a href="#admin-guild" data-p="admin-guild" class="${location.hash === '#admin-guild' ? 'on' : ''}">Gilde</a>`;
         navHtml += `<a href="#admin-brainstorm" data-p="admin-brainstorm" class="${location.hash === '#admin-brainstorm' ? 'on' : ''}">Brainstorm (Waffen & BMs)</a>`;
         navHtml += `<a href="#review" data-p="review" class="${location.hash === '#review' ? 'on' : ''}">Nachbesprechung</a>`;
         navHtml += `<a href="#changelog" data-p="changelog" class="${location.hash === '#changelog' ? 'on' : ''}">Changelog</a>`;
@@ -1434,7 +1452,7 @@ function go(){
     // CUSTOM CONTENT INJEKTION
     let pageHtml = customContent[id] || (P[id] ? P[id]() : '');
     m.innerHTML = pageHtml;
-    m.classList.toggle('rb-wide', id === 'admin-roster');
+    m.classList.toggle('rb-wide', id === 'admin-roster' || id === 'admin-guild');
     
     // Initialisierung (mit try/catch, falls durch den Editor Elemente fehlen)
     if (I[id]) {
@@ -2434,6 +2452,168 @@ const RB = (function(){
 
 P['admin-roster'] = () => RB.page();
 I['admin-roster'] = () => RB.init();
+
+/* ============================================================
+   GILDE (Admin-Tab): Mitglieder + letzte Tode
+   ============================================================ */
+const RG = (function(){
+  const S = { members: [], selected: null, detail: null, filter: '', at: 0 };
+
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const byId = id => document.getElementById(id);
+
+  function weapon(t){
+    if (!t) return '—';
+    return t.replace(/^T\d+_/, '').replace(/^(MAIN_|2H_|OFF_)/, '').replace(/@\d+$/, '').replace(/_/g, ' ');
+  }
+  function date(t){
+    if (!t) return '—';
+    const d = new Date(t);
+    return d.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'2-digit' }) + ' ' +
+           d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+  }
+  function daysAgo(t){
+    const d = Math.floor((Date.now() - new Date(t).getTime()) / 86400000);
+    if (d <= 0) return 'heute';
+    return d === 1 ? 'vor 1 Tag' : 'vor ' + d + ' Tagen';
+  }
+
+  async function api(path){
+    const key = sessionStorage.getItem('feedbackModKey');
+    if (!key) throw new Error('Nicht angemeldet');
+    const res = await fetch(path + (path.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(key), { cache:'no-store' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.hint || data.error || ('HTTP ' + res.status));
+    return data;
+  }
+
+  function page(){
+    return `<h1>Gilde</h1>
+      <p class="s">Alle Mitglieder auf einen Blick. Klick auf einen Namen zeigt die letzten Tode mit Gebiet, Gegner und Waffe.</p>
+      <div class="rb-bar">
+        <input id="rg-search" placeholder="Spieler suchen" oninput="RG.filter(this.value)">
+        <button class="b" onclick="RG.reload()">Neu laden</button>
+        <span id="rg-status" class="mut" style="font-size:.8rem"></span>
+      </div>
+      <div class="rg-grid">
+        <section class="rb-panel">
+          <h3>Mitglieder <span class="rb-count" id="rg-count">0</span></h3>
+          <div class="rb-body" id="rg-list"><p class="rb-msg">Lade Gilde…</p></div>
+        </section>
+        <section class="rb-panel">
+          <h3 id="rg-title">Details</h3>
+          <div class="rb-body" id="rg-detail"><p class="rb-msg">Wähle links einen Spieler.</p></div>
+        </section>
+      </div>`;
+  }
+
+  function renderList(){
+    const el = byId('rg-list');
+    if (!el) return;
+    const q = S.filter.trim().toLowerCase();
+    const rows = S.members.filter(m => !q || m.name.toLowerCase().includes(q));
+    byId('rg-count').textContent = S.members.length;
+    if (!S.members.length){ el.innerHTML = '<p class="rb-msg">Keine Mitglieder geladen.</p>'; return; }
+    el.innerHTML = rows.map(m =>
+      `<div class="rg-row ${S.selected === m.name ? 'on' : ''}" data-name="${esc(m.name)}">
+        <span class="n">${esc(m.name)}</span><span class="a">›</span>
+      </div>`).join('') || '<p class="rb-msg">Kein Treffer.</p>';
+
+    el.querySelectorAll('.rg-row').forEach(row => {
+      row.addEventListener('click', () => selectPlayer(row.dataset.name));
+    });
+  }
+
+  async function load(force){
+    if (!force && S.members.length && Date.now() - S.at < 10 * 60 * 1000){ renderList(); return; }
+    const status = byId('rg-status');
+    if (status) status.textContent = 'Lade Gilde…';
+    try{
+      const data = await api(ROSTER_GUILD_ENDPOINT + '?guild=' + RB_GUILD_ID);
+      S.members = data.members || [];
+      S.at = Date.now();
+      if (status) status.textContent = S.members.length + ' Mitglieder';
+      renderList();
+    }catch(e){
+      if (status) status.textContent = 'Fehler: ' + e.message;
+      const el = byId('rg-list');
+      if (el) el.innerHTML = '<p class="rb-msg">Gilde konnte nicht geladen werden.</p>';
+    }
+  }
+
+  async function selectPlayer(name){
+    S.selected = name;
+    renderList();
+    const title = byId('rg-title');
+    const box = byId('rg-detail');
+    if (title) title.textContent = name;
+    if (box) box.innerHTML = '<p class="rb-msg">Lade Tode…</p>';
+    try{
+      const data = await api(ROSTER_DEATH_DETAIL_ENDPOINT + '?guild=' + RB_GUILD_ID + '&name=' + encodeURIComponent(name));
+      S.detail = data;
+      renderDetail();
+    }catch(e){
+      if (box) box.innerHTML = '<p class="rb-msg">' + esc(e.message) + '</p>';
+    }
+  }
+
+  function renderDetail(){
+    const box = byId('rg-detail');
+    if (!box || !S.detail) return;
+    const events = S.detail.deaths || [];
+    if (!events.length){
+      box.innerHTML = '<p class="rb-msg">Keine Tode in der API erfasst.</p>';
+      return;
+    }
+    const now = Date.now();
+    const d30 = events.filter(e => now - new Date(e.t).getTime() < 30 * 86400000).length;
+    const d7 = events.filter(e => now - new Date(e.t).getTime() < 7 * 86400000).length;
+
+    const rows = events.slice(0, 20).map(e =>
+      `<tr>
+        <td class="n">${esc(date(e.t))}</td>
+        <td>${esc(daysAgo(e.t))}</td>
+        <td>${esc(e.area || '—')}</td>
+        <td>${esc(e.killer || '—')}${e.killerGuild ? ' <span class="rb-count">' + esc(e.killerGuild) + '</span>' : ''}</td>
+        <td>${esc(weapon(e.weapon))}</td>
+        <td class="n">${e.ip ? e.ip : '—'}</td>
+      </tr>`).join('');
+
+    box.innerHTML = `<div class="rg-sum">
+        <span>Tode 30 T: <b>${d30}</b></span>
+        <span>Tode 7 T: <b>${d7}</b></span>
+        <span>zuletzt: <b>${esc(daysAgo(events[0].t))}</b></span>
+      </div>
+      <div class="tw"><table class="rg-table">
+        <tr><th>Datum</th><th>wann</th><th>Gebiet</th><th>getötet von</th><th>Waffe</th><th>IP</th></tr>
+        ${rows}
+      </table></div>
+      ${events.length > 20 ? '<p class="rb-msg">… und ' + (events.length - 20) + ' weitere</p>' : ''}`;
+  }
+
+  function filter(v){ S.filter = v; renderList(); }
+
+  function reload(){
+    S.selected = null; S.detail = null; S.at = 0;
+    const t = byId('rg-title'); if (t) t.textContent = 'Details';
+    const d = byId('rg-detail'); if (d) d.innerHTML = '<p class="rb-msg">Wähle links einen Spieler.</p>';
+    load(true);
+  }
+
+  function init(){
+    renderList();
+    if (!S.members.length) load(false);
+    if (S.selected && S.detail){
+      const t = byId('rg-title'); if (t) t.textContent = S.selected;
+      renderDetail();
+    }
+  }
+
+  return { page, init, filter, reload };
+})();
+
+P['admin-guild'] = () => RG.page();
+I['admin-guild'] = () => RG.init();
 
 // Initial Load
 loadCustomContent().then(() => {

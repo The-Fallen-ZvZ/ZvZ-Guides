@@ -7,6 +7,7 @@ Stand: 13.11.2026 · **in `Anwendung/index.html` eingebaut** · Worker-Erweiteru
 | Teil | Zustand |
 | --- | --- |
 | Ansicht `#admin-roster` | eingebaut, nur mit Mod-Key erreichbar |
+| Gilde-Tab `#admin-guild` | eingebaut: alle Mitglieder, Klick zeigt die letzten Tode |
 | AlbionZvZ | **bleibt verbindlich** – das Brain liefert nur den Vorschlag und eine Kopiervorlage |
 | Worker-Route `/roster` | Code fertig (`Worker/roster.js`), muss noch deployt werden |
 | Discord | DM bei jeder Änderung, optional angepinnter Roster-Link |
@@ -87,9 +88,26 @@ Das ist bewusst **Aktivität plus leichte Vorsicht**, keine Bestrafung: Tanks st
 
 **Gilde:** `p9uAFij9ReO0BhIhHlVa8g` (The-Fallen, EU), hinterlegt als `RB_GUILD_ID` in `index.html`.
 
+## Gilde-Tab
+
+`#admin-guild` listet alle Mitglieder alphabetisch (mit Suchfeld). Ein Klick auf einen Namen lädt die letzten Tode:
+
+| Spalte | Inhalt |
+| --- | --- |
+| Datum | Zeitpunkt des Todes |
+| wann | relativ („heute", „vor 3 Tagen") |
+| Gebiet | `OPEN_WORLD`, … |
+| getötet von | Spielername + Gilde |
+| Waffe | Waffe des Opfers aus `Equipment.MainHand` |
+| IP | durchschnittliche Item Power |
+
+Datenquelle: `/guild` (Mitglieder, 12 h im KV) und `/deaths/detail` (bis 30 Tode, 12 h Cache). Beim ersten Aufruf pro Spieler 1–3 API-Seiten, danach sofort.
+
+Grenzen: Die API kennt nur Tode, keine Heilung oder Assistenz; `KillArea` ist die einzige Ortsangabe. Namen müssen exakt dem In-Game-Namen entsprechen – Twinks erscheinen nicht in der Gildenliste.
+
 ## Worker: was du ändern musst
 
-Die Datei `Worker/roster.js` enthält eine eigenständige Funktion `handleRoster`. Kein KV, kein Durable Object, keine neuen Bindings.
+Die Datei `Worker/roster.js` enthält eigenständige Funktionen für Roster, Discord, Tode und Gildenliste. Kein neues KV, kein Durable Object, keine neuen Bindings (die Tode nutzen `FEEDBACK_TF` als Cache).
 
 1. Cloudflare Dashboard → dein Worker → **Edit code** (oder `wrangler`).
 2. Inhalt von `Worker/roster.js` an den bestehenden Code anhängen.
@@ -102,6 +120,8 @@ Die Datei `Worker/roster.js` enthält eine eigenständige Funktion `handleRoster
        if (url.pathname === '/roster') return handleRoster(request, env, url);   // <- neu
        if (url.pathname === '/notify') return handleNotify(request, env, url);   // <- neu
        if (url.pathname === '/deaths') return handleDeaths(request, env, url);   // <- neu
+       if (url.pathname === '/guild') return handleGuild(request, env, url);     // <- neu
+       if (url.pathname === '/deaths/detail') return handleDeathDetail(request, env, url); // <- neu
        // ... bestehender Code (Feedback, /content)
      }
    }
@@ -219,3 +239,5 @@ Die Engine arbeitet zweistufig (erst Party 1 + 2, dann Reserve), setzt den Calle
 - Rahmen-Fix: leere Slots haben 1 px Rand, links 3 px Farbbalken.
 - Auto-Modus im Headless-Test: startet an, weist ohne Klick 12 Spieler zu, schaltet bei manuellem × ab, baut nach erneutem Einschalten sofort, erkennt im Poll einen 13. Spieler und baut automatisch nach.
 - Discord im Headless-Test: erste Meldung mit 12 Änderungen und Link, kein Doppelversand bei unverändertem Build, neuer Spieler löst genau eine Meldung mit einer Zeile aus, ausgeschalteter Schalter verhindert den Versand.
+- Gilde-Tab im Headless-Test: Mitgliederliste, Klick lädt Details, 5 Tode als Tabelle, Waffe lesbar (T8_MAIN_MACE → MACE), Suche filtert, keine JS-Fehler.
+- Worker `handleGuild`/`handleDeathDetail`: 200 mit sortierter Liste, 404 bei unbekanntem Namen, KV-Cache ohne erneuten API-Request.
