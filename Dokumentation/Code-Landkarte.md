@@ -4,6 +4,22 @@ Index der Anwendung `Anwendung/index.html`, damit Änderungen ohne komplettes Du
 
 > Nach größeren Änderungen verschieben sich die Zeilen. Die Karte wird dann neu erzeugt.
 
+## Roster-Brain (neu, 13.11.2026)
+
+Die Datei ist dadurch auf **2.205 Zeilen** gewachsen. Die Zeilenangaben in den Tabellen unten stammen aus v1.71.02 und verschieben sich entsprechend.
+
+| Zeile | Element |
+| --- | --- |
+| 185–275 | CSS `.rb-*`, `main.rb-wide`, breites Layout |
+| 279 | `ROSTER_ENDPOINT` |
+| 744 | Editor-Seitenliste ohne `admin-roster` |
+| 1401 | Sidebar-Link „Roster-Brain" |
+| 1434 | `go()`: `main` bekommt `rb-wide` auf dieser Seite |
+| 1486–2196 | Modul `RB` (Engine, Picker, Live-Polling, Historie) |
+| 2198 | `P['admin-roster']`, `I['admin-roster']` |
+
+Worker: `Worker/roster.js` (Route `/roster`, siehe [[02_Projekte/HTML-App/Dokumentation/Moderator-Roster|Moderator-Roster]]).
+
 ## Grobe Gliederung
 
 | Bereich | Zeilen | Inhalt |

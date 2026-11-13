@@ -34,6 +34,7 @@
 - **Brainstorm (Waffen & BMs)** – Arbeitsfläche, u. a. mit eingebettetem Google Sheet
 - **Changelog & Ideen** – Verwaltung der Einträge
 - **Feedback-Übersicht** – eingegangenes Feedback (Login geschützt)
+- **Roster-Brain** – *geplant, Prototyp vorhanden*: Live-Anmeldungen zuweisen, „Build the Group" nach Wunsch und Historie. Siehe [[02_Projekte/HTML-App/Dokumentation/Moderator-Roster|Moderator-Roster]]
 
 ## Technischer Rahmen
 

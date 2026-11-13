@@ -12,6 +12,58 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-13 – Roster-Brain in die Anwendung eingebaut
+
+- Neue Admin-Seite `#admin-roster` (nur mit Mod-Key): Anmeldungen, Comp, Gehirn-Panel, Live-Schalter, Historie
+- AlbionZvZ bleibt verbindlich – die Seite liefert nur den Vorschlag und eine Kopiervorlage, kein Zurückschreiben
+- Engine zweistufig (Haupt-Comp, dann Reserve), Caller fest gesetzt, Doppel-Slots mit Waffenwahl, Rollenfamilien über `playstyle`
+- Live: Polling alle 5 s über `ROSTER_ENDPOINT`; Historie lokal (`tf-rb-hist`), Token in `tf-rb-token`
+- Page wird breiter (`main.rb-wide`), Editor-Seitenliste und Sidebar angepasst
+- `Worker/roster.js` angelegt: Route `GET /roster?event=<token>&key=<mod-key>`, CORS, 5-Minuten-Cache für die Event-Seite, kein KV/DO
+- Worker lokal geprüft: 401/403/200, 12 Spieler, 51 aktive Slots, Prefs aufgelöst
+- `index.html` geprüft: `node --check`, Headless-Chromium mit gestubbter Antwort (Build, Historie, Live, Navigation hin/zurück)
+
+
+### 2026-11-13 – Rollen-Zähler und Live-Pfad
+
+- Rollen-Zähler als Badge am Chip eingebaut (wie in AlbionZvZ), Summe je Spieler in der Karte
+- Geprüft: die Zahlen sind **nicht** öffentlich abrufbar (`/roster` ohne Zähler, Mastery nur mit Session) → eigene Historie `hist[rolle]`, `+1` pro bestätigtem Einsatz, Button „Historie +1" im Prototyp
+- Realtime geprüft: `GET /api/events/public/<token>/assignments/ops?sinceSeq=` liefert öffentlich ein Delta (427 Bytes) mit `signup_added`/`signup_removed`; `/roster` liefert den Vollstand
+- Kein CORS-Header und kein Push-Kanal → Live-Aktualisierung nur über Worker-Polling (5 s) + WebSocket an die Moderator-Seite
+- Prototyp: Live-Schalter mit klarer Meldung, solange `LIVE_ENDPOINT` leer ist; Polling-Logik vorbereitet
+- Doku um beide Abschnitte ergänzt
+
+
+### 2026-11-13 – Test-Event importiert, automatischer Import bestätigt
+
+- Öffentlichen Event-Link (`albionzvz.com/e/75f6722e…`) geprüft: Spieler, Wünsche, Zuweisungen und das Rollen-Lexikon (160 Einträge) stehen im HTML, kein Login nötig
+- Parser geschrieben: React-Flight-Chunks lesen, JSON-Objekt mit `event`/`parties`/`players` extrahieren, IDs über das Lexikon auflösen
+- Test-Datensatz in den Prototyp eingebaut (Umschalter „Test-Event" / „Demo"): 13 Anmeldungen, 60 Slots, 51 aktiv, 12 Vorbelegungen
+- Rollen außerhalb der Comp (Occult, Heron, Hoj, Lifecursed, Infernal Staff, Riftglaive, Fill — Healer) über `playstyle` auf Rollenfamilien abgebildet, sonst hätten 5 von 13 keinen Slot
+- Caller wird vor der Optimierung fest gesetzt und löst keine Konflikte mehr aus
+- Fehler behoben: „gesetzt/ausgewichen"-Meldung zählte Spieler als ausgewichen, die dieselbe Rolle bekamen; offene Slots werden auf 10 Einträge gekappt
+- Doku um Import-Abschnitt, Rollen-Abbildung und Abgrenzung zu AlbionZvZ ergänzt
+
+
+### 2026-11-13 – Echte Comp übernommen (2 × 20 + Reserve)
+
+- Comp-Stand aus dem Live-Event eingebaut: Party 1 (20 Slots), Party 2 (20 Slots), „Alternative Rollen und BMs" (11 aktiv von 20)
+- Doppel-Slots „Longbow / Demonfang": ein Platz mit zwei erlaubten Waffen, pro Zuweisung wird die Waffe des Spielers gespeichert (`pick`)
+- Zuweisung auf **zweistufiges Verfahren** umgestellt (erst Haupt-Comp, dann Reserve aus den Übrigen) – ein einstufiger Optimierer leerte Haupt-Slots, um mehr Reserve-Slots zu besetzen
+- Reserve: Schwelle 60 Punkte und nur bei echtem Wunsch oder Historie; Dummy-Spalten erlauben leere Slots
+- Rollenfarben und Kürzel der echten Comp (Locus, Spiked Gauntlets, Permafrost, Rootbound MeleeClap, Grovekeeper, Venom/Chariot) inklusive Kurzformen-Erkennung beim Import
+- Demo mit 50 Anmeldungen: 40/40 Haupt-Slots, 7/11 Reserve, 3 auf der Bank
+- Gildenseite `albionzvz.com/g/the-fallen` als login-geschützt geprüft (kein öffentlicher Abruf); Doku um Comp-Tabelle und Regeln ergänzt
+
+
+### 2026-11-13 – Moderator-Roster: Konzept und Prototyp
+
+- `Dokumentation/Moderator-Roster.md` angelegt: Machbarkeit, Architektur (Cloudflare Worker + Durable Object, WebSocket), Datenmodell, Zuweisungsregeln, vier Wege für die Signup-Daten, Einbaustellen, offene Fragen
+- `Prototyp/Roster-Brain.html` angelegt: eigenständige Moderator-Ansicht mit Comp-Grid, Signup-Liste, Ziehen/Zuweisen, „Build the Group", Konflikt- und Bank-Anzeige, Import-Parser, Tab-Sync via `BroadcastChannel`
+- Prototyp liegt **außerhalb** von `Anwendung/` – wird durch den Pages-Workflow nicht veröffentlicht; `Anwendung/index.html` bleibt unverändert
+- Zuweisungs-Engine getestet: Ungarische Methode gegen Brute-Force (0 Abweichungen), Randfälle 0–40 Anmeldungen, 16 Funktionstests in Headless-Chromium bestanden
+- Ergebnis Demo-Comp 24: 24/24 Slots besetzt, 2 auf der Bank, Überschneidungen (Spiked, 1H Hammer, Exalted) nach Historie aufgelöst
+
 ### 2026-11-12 – Erklärvideos: zweites Video, Platzhalter reduziert
 
 - Neues Video als zweite Karte: „84s (Luke Melee Clap) vs Contigent (CG) 150 Kills“ (`gyDtY8G9tz8`), eingebettet über `youtube-nocookie` plus YouTube-Link

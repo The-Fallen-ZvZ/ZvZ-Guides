@@ -181,6 +181,59 @@ input[type=range]{width:100%;accent-color:var(--accent,var(--fg))}input.n,textar
 @media(max-width:800px){nav{display:none;position:fixed;inset:57px 10px 10px 10px;width:auto;height:auto;background:var(--bg);z-index:4;margin:10px;padding:16px 8px}nav.o{display:block}main{padding:24px 16px 80px}header{padding:10px 14px}#mb{display:inline-block}}
 @media(min-width:801px){#mb{display:none}}
 @media(max-width:500px){header{padding:8px 10px;gap:6px}header b{display:none}.bm-grid{grid-template-columns:1fr}.color-picker-popover{width:calc(100% - 16px)!important;left:8px!important;right:8px!important;top:auto!important;bottom:16px!important}.setting-row{flex-direction:column;align-items:flex-start}.setting-control{width:100%}}
+/* ============================================================
+   ROSTER-BRAIN (Moderatoren-Ansicht)
+   ============================================================ */
+main.rb-wide{max-width:none}
+body:has(main.rb-wide) .app{max-width:1720px}
+.rb-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+.rb-bar input{flex:1;min-width:240px;background:var(--cd);border:var(--bw) solid var(--ln);border-radius:var(--r-sm);padding:8px 10px;font:inherit;font-size:.85rem;outline:0}
+.rb-bar input:focus{border-color:var(--mut)}
+.rb-grid{display:grid;grid-template-columns:280px minmax(0,1fr) 330px;gap:12px;align-items:start}
+@media(max-width:1150px){.rb-grid{grid-template-columns:1fr}}
+.rb-panel{border:var(--bw) solid var(--ln);border-radius:var(--r-md);background:var(--cd);min-width:0}
+.rb-panel>h3{margin:0;padding:10px 12px;border-bottom:var(--bw) solid var(--ln);font-size:.76rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);display:flex;align-items:center;gap:8px;font-weight:600}
+.rb-count{margin-left:auto;background:var(--hv);border-radius:20px;padding:0 8px;color:var(--fg);font-size:.72rem}
+.rb-body{padding:8px 10px;max-height:calc(100vh - 230px);overflow:auto}
+.rb-card{border:var(--bw) solid var(--ln);border-radius:var(--r-sm);padding:7px 9px;margin-bottom:7px;background:var(--bg);cursor:grab}
+.rb-card:hover{border-color:var(--mut)}
+.rb-card.tent{border-style:dashed}
+.rb-card .top{display:flex;align-items:center;gap:6px}
+.rb-nm{font-weight:600;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rb-seat{margin-left:auto;font-size:.66rem;color:var(--ok);border:1px solid var(--ok);border-radius:20px;padding:0 6px;white-space:nowrap}
+.rb-seat.bench{color:var(--warn);border-color:var(--warn)}
+.rb-prefs{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.rb-chip{font-size:.68rem;line-height:1.5;border-radius:4px;padding:1px 5px;background:var(--hv);border-left:2px solid var(--mut);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.rb-chip b{background:var(--cd);border:var(--bw) solid var(--ln);border-radius:20px;padding:0 4px;margin-left:4px;font-size:.62rem;font-weight:600}
+.rb-hint{font-size:.66rem;color:var(--mut);margin-top:3px}
+.rb-parties{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;padding:10px}
+.rb-party{border:var(--bw) solid var(--ln);border-radius:var(--r-sm);background:var(--bg);overflow:hidden}
+.rb-party h4{margin:0;padding:7px 9px;border-bottom:var(--bw) solid var(--ln);font-size:.74rem;color:var(--mut);display:flex;align-items:center;gap:6px;font-weight:600}
+.rb-party h4 span{margin-left:auto;color:var(--fg)}
+.rb-slot{display:flex;align-items:center;gap:6px;padding:5px 7px;margin:3px;border-radius:6px;background:var(--cd);border:var(--bw) solid transparent;border-left:3px solid var(--mut);cursor:pointer;min-height:38px}
+.rb-slot:hover{background:var(--hv)}
+.rb-slot.empty{border-style:dashed;border-left-style:solid;border-color:var(--ln);color:var(--mut);background:transparent}
+.rb-slot.over{outline:2px dashed var(--accent,var(--fg));outline-offset:1px}
+.rb-slot .w{font-size:.64rem;color:var(--mut);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rb-slot .p{font-size:.8rem;font-weight:600;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rb-slot .why{font-size:.6rem;color:var(--mut);margin-left:auto;white-space:nowrap}
+.rb-slot .x{border:0;background:transparent;color:var(--mut);cursor:pointer;font-size:.85rem;padding:0 2px;opacity:0}
+.rb-slot:hover .x{opacity:1}
+.rb-slot .x:hover{color:#ff6b6b}
+.rb-log{font-size:.79rem;line-height:1.45}
+.rb-log .item{border-left:3px solid var(--ln);padding:5px 0 5px 8px;margin-bottom:7px}
+.rb-log .ok{border-color:#5fd38a}.rb-log .warn{border-color:#ffa94d}
+.rb-log .bad{border-color:#ff6b6b}.rb-log .info{border-color:var(--accent,#c4a1ff)}
+.rb-log .sec{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:12px 0 6px}
+.rb-log .sec:first-child{margin-top:0}
+.rb-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;padding:16px;z-index:60}
+.rb-overlay.open{display:flex}
+.rb-modal{background:var(--bg);border:var(--bw) solid var(--ln);border-radius:var(--r-md);max-width:640px;width:100%;max-height:88vh;overflow:auto;padding:16px}
+.rb-modal h3{margin:0 0 6px;font-size:1rem}
+.rb-pick{display:flex;align-items:center;gap:8px;border:var(--bw) solid var(--ln);border-radius:8px;padding:7px 9px;margin-top:6px;cursor:pointer;background:var(--cd)}
+.rb-pick:hover{border-color:var(--mut)}
+.rb-pick .sc{margin-left:auto;color:var(--mut);font-size:.72rem}
+.rb-msg{color:var(--mut);font-size:.85rem;padding:6px 0}
 </style></head><body>
 <div id="splash"><div id="splash-box"><h1>THE-FALLEN</h1><h2>ZVZ GUIDE</h2><button class="b" onclick="closeSplash()" style="font-size:1.2rem;padding:12px 30px;">Fortfahren</button></div></div>
 
@@ -223,6 +276,7 @@ input[type=range]{width:100%;accent-color:var(--accent,var(--fg))}input.n,textar
 const BRAINSTORM_SHEET_URL = 'https://docs.google.com/spreadsheets/d/15bIvKIilpQZ8gCeoDKQvLAUTdTOk1y8v/edit?gid=1327692528#gid=1327692528';
 const FEEDBACK_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev';
 const CUSTOM_CONTENT_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/content';
+const ROSTER_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/roster';
 
 /* ============================================================
    SETTINGS
@@ -687,7 +741,7 @@ function initAdminEditor() {
             <label style="display:block; margin-bottom:8px; font-weight:600;">Welche Seite möchtest du bearbeiten?</label>
             <select id="editor-page-select" class="n" style="width:100%; padding:10px; margin-bottom:16px;">
                 <option value="">Bitte wählen...</option>
-                ${Object.keys(P).filter(k => k !== 'admin' && k !== 'settings' && k !== 'changelog' && k !== 'admin-feedback' && k !== 'admin-editor' && k !== 'admin-brainstorm').map(k => `<option value="${k}">${N.find(n=>n[0]===k)?.[1] || k}</option>`).join('')}
+                ${Object.keys(P).filter(k => k !== 'admin' && k !== 'settings' && k !== 'changelog' && k !== 'admin-feedback' && k !== 'admin-editor' && k !== 'admin-brainstorm' && k !== 'admin-roster').map(k => `<option value="${k}">${N.find(n=>n[0]===k)?.[1] || k}</option>`).join('')}
             </select>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
                 <button class="b" onclick="loadEditorContent('${modKey}')">Laden</button>
@@ -1344,6 +1398,7 @@ function renderSidebar() {
         navHtml += `<a href="#admin" data-p="admin" class="${location.hash === '#admin' ? 'on' : ''}" style="color:#ff6b6b; font-weight:bold;">Admin Panel</a>`;
         navHtml += `<a href="#admin-editor" data-p="admin-editor" class="${location.hash === '#admin-editor' ? 'on' : ''}">Live-Editor</a>`;
         navHtml += `<a href="#admin-feedback" data-p="admin-feedback" class="${location.hash === '#admin-feedback' ? 'on' : ''}">Feedback Übersicht</a>`;
+        navHtml += `<a href="#admin-roster" data-p="admin-roster" class="${location.hash === '#admin-roster' ? 'on' : ''}">Roster-Brain</a>`;
         navHtml += `<a href="#admin-brainstorm" data-p="admin-brainstorm" class="${location.hash === '#admin-brainstorm' ? 'on' : ''}">Brainstorm (Waffen & BMs)</a>`;
         navHtml += `<a href="#review" data-p="review" class="${location.hash === '#review' ? 'on' : ''}">Nachbesprechung</a>`;
         navHtml += `<a href="#changelog" data-p="changelog" class="${location.hash === '#changelog' ? 'on' : ''}">Changelog</a>`;
@@ -1376,6 +1431,7 @@ function go(){
     // CUSTOM CONTENT INJEKTION
     let pageHtml = customContent[id] || (P[id] ? P[id]() : '');
     m.innerHTML = pageHtml;
+    m.classList.toggle('rb-wide', id === 'admin-roster');
     
     // Initialisierung (mit try/catch, falls durch den Editor Elemente fehlen)
     if (I[id]) {
@@ -1422,6 +1478,725 @@ $('#fb-cat').addEventListener('change', function() {
     }
 });
 $('#settings-btn').onclick=()=>{ location.hash = '#settings'; };
+
+/* ============================================================
+   ROSTER-BRAIN (Moderatoren-Ansicht)
+   AlbionZvZ bleibt verbindlich – hier entsteht nur der Vorschlag.
+   ============================================================ */
+const RB = (function(){
+  const LS_TOKEN = 'tf-rb-token';
+  const LS_HIST  = 'tf-rb-hist';
+  const TIER_RESERVE_FROM = 2;          // Party 1+2 = Haupt, ab Party 3 Reserve
+
+  const ALIAS = {
+    'Spiked':'Spiked Gauntlets','Perma':'Permafrost',
+    'Locus Defensive':'Locus','Locus Offensive':'Locus','Rootbound':'Rootbound MeleeClap',
+    '1H Arcane (Tank)':'1H Arcane','1H Arcane (Support)':'1H Arcane',
+    'Stillgaze (Setup)':'Stillgaze','Icicle':'Icicle (MeleeClap)',
+    'Venom Basilisk':'Venom','Tower Chariot':'Chariot',
+    'Hallowfall':'Tank Hallowfall','Great Arcane':'Great Arcane (Beam)',
+    'Longbow (MeleeClap)':'Longbow','Demonfang (ANTIBRAWL)':'Demonfang'
+  };
+  const ROLE_OF = {
+    '1H Mace':'Tank','1H Hammer (Setup)':'Tank','Great Arcane (Beam)':'Tank','1H Arcane':'Tank',
+    'Earthrune':'Tank','Dreadstorm':'Tank','Staff of Balance':'Tank','1H Mace Control':'Tank',
+    'Stillgaze':'Tank','HeavyMace':'Tank','Icicle (MeleeClap)':'Tank',
+    '1H Mace Support':'Support','Locus':'Support','Rootbound MeleeClap':'Support',
+    'Oathkeepers':'Support','Grovekeeper':'Support',
+    'Carving':'Support DPS','Damnation':'Support DPS','Shadowcaller':'Support DPS',
+    'Incubus':'Support DPS','Realmbreaker':'Support DPS',
+    'Spiked Gauntlets':'Clap DD','Longbow':'Clap DD','Demonfang':'Clap DD',
+    'Permafrost':'Clap DD','Dawnsong':'Clap DD',
+    'Galatine Pair (Offtimer)':'Brawl DD',
+    'Exalted':'Healer','Exalted (Plate)':'Healer','Tank Hallowfall Royal':'Healer',
+    'Tank Hallowfall':'Healer','1H Nature':'Healer','1H Holy':'Healer',
+    'Venom':'Battlemount','Chariot':'Battlemount','Fill — Battlemount':'Battlemount',
+    'Fill — Healer':'Healer',
+    'Occult (Beam Spiked)':'Support','Occult (Cleanse)':'Support',
+    'Heron (Kidnap)':'Tank','Hoj':'Tank','Infernal Staff':'Tank',
+    'Lifecursed':'Clap DD','Riftglaive':'Clap DD'
+  };
+  const PLAYSTYLE_ROLE = { caller:'Tank', offtank:'Tank', dtank:'Tank', tank:'Tank',
+    support:'Support', dps:'Clap DD', healer:'Healer', battlemount:'Battlemount' };
+  const ROLE_COLOR = { 'Tank':'#6cb2ff','Support':'#ffa94d','Support DPS':'#b07d5a','Clap DD':'#ff6b6b',
+    'Brawl DD':'#ff6b6b','Healer':'#5fd38a','Battlemount':'#9ca3af','Unbekannt':'#888' };
+  const PREF_W = [105,84,66,50,36,24];
+  const THRESHOLD = { main:18, reserve:60 };
+
+  const S = {
+    token:'', event:null, parties:[], players:[], playstyles:{}, hist:{},
+    builtAt:null, log:null, live:null, last:null, status:''
+  };
+
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const byId = id => document.getElementById(id);
+
+  function canon(w){ const s = String(w || '').trim(); return ALIAS[s] || s; }
+  function roleOf(w){
+    const c = canon(w);
+    if (ROLE_OF[c]) return ROLE_OF[c];
+    const ps = S.playstyles[c] || S.playstyles[w];
+    return PLAYSTYLE_ROLE[ps] || 'Unbekannt';
+  }
+  function sumHist(p){ return Object.values(p.hist || {}).reduce((a,b) => a+b, 0); }
+  function familyHist(p, w){
+    const r = roleOf(w);
+    return Object.entries(p.hist || {}).filter(([k]) => roleOf(k) === r).reduce((a,[,v]) => a+v, 0);
+  }
+  function topHist(p){
+    const v = Object.values(p.hist || {});
+    return v.length ? Math.max(...v) : 0;
+  }
+
+  function scoreWeapon(p, w, callerSlot){
+    const hist = p.hist || {};
+    const prefs = (p.prefs || []).map(canon);
+    const idx = prefs.indexOf(canon(w));
+
+    let base = 0;
+    if (idx >= 0) base = PREF_W[Math.min(idx, PREF_W.length - 1)];
+    else {
+      const r = roleOf(w);
+      (p.prefs || []).forEach((pw, i) => {
+        if (roleOf(pw) === r) base = Math.max(base, [48,38,28,20,14][Math.min(i,4)]);
+      });
+    }
+
+    const hw = hist[canon(w)] || 0;
+    const hc = familyHist(p, w);
+    const total = sumHist(p);
+    const share = total ? hw / total : 0;
+
+    let s;
+    if (base > 0) {
+      s = base + Math.min(hw,12)*2.4 + Math.min(hc,25)*0.8 + share*26
+        + (total > 0 && hw > 0 && hw === topHist(p) ? 8 : 0);
+    } else {
+      s = (Math.min(hw,12)*2.4 + Math.min(hc,25)*0.8 + share*26) * 0.45;
+    }
+
+    if (p.tentative) s -= 22;
+    if (callerSlot) s += p.caller ? 45 : -25;
+    if (total === 0) s -= 5;
+    return s;
+  }
+
+  const NO_MATCH = -1e6;
+  function bestPick(p, slot){
+    const ws = slot.weapons || [];
+    if (!ws.length) return { score: NO_MATCH, pick: null };
+    const prefs = (p.prefs || []).map(canon);
+    let best = NO_MATCH, pick = null;
+    ws.forEach(w => {
+      let s = scoreWeapon(p, w, slot.caller);
+      if (slot.tier === 'reserve') {
+        const wants = prefs.includes(canon(w)) || ((p.hist || {})[canon(w)] || 0) > 0;
+        if (!wants) return;
+        s *= 0.75;
+      }
+      if (s > best) { best = s; pick = w; }
+    });
+    if (pick === null) return { score: NO_MATCH, pick: null };
+    return { score: Math.round(best*10)/10, pick };
+  }
+
+  function reasonFor(p, slot, pick){
+    const w = pick || (slot.weapons || [])[0];
+    const prefs = (p.prefs || []).map(canon);
+    const idx = prefs.indexOf(canon(w));
+    const hw = (p.hist || {})[canon(w)] || 0;
+    const total = sumHist(p);
+    let head;
+    if (slot.caller && p.caller) head = 'Caller';
+    else if (idx === 0) head = '1. Wahl';
+    else if (idx > 0) head = (idx+1)+'. Wahl';
+    else if (prefs.some(pw => roleOf(pw) === roleOf(w))) head = 'gleiche Rolle';
+    else head = 'Quereinstieg';
+    const bits = [head];
+    if (hw) bits.push(hw+'× gespielt');
+    else if (total && familyHist(p,w)) bits.push(familyHist(p,w)+'× Rolle');
+    if (slot.tier === 'reserve') bits.push('Reserve');
+    return { text: bits.join(' · '), head };
+  }
+
+  /* Ungarische Methode (Minimierung), n Zeilen <= m Spalten */
+  function hungarian(cost){
+    const n = cost.length, m = cost[0].length, INF = 1e15;
+    const u = new Array(n+1).fill(0), v = new Array(m+1).fill(0);
+    const p = new Array(m+1).fill(0), way = new Array(m+1).fill(0);
+    for (let i = 1; i <= n; i++){
+      p[0] = i;
+      let j0 = 0;
+      const minv = new Array(m+1).fill(INF), used = new Array(m+1).fill(false);
+      do{
+        used[j0] = true;
+        const i0 = p[j0];
+        let delta = INF, j1 = 0;
+        for (let j = 1; j <= m; j++) if (!used[j]){
+          const cur = cost[i0-1][j-1] - u[i0] - v[j];
+          if (cur < minv[j]) { minv[j] = cur; way[j] = j0; }
+          if (minv[j] < delta) { delta = minv[j]; j1 = j; }
+        }
+        for (let j = 0; j <= m; j++){
+          if (used[j]) { u[p[j]] += delta; v[j] -= delta; }
+          else minv[j] -= delta;
+        }
+        j0 = j1;
+      } while (p[j0] !== 0);
+      do { const j1 = way[j0]; p[j0] = p[j1]; j0 = j1; } while (j0);
+    }
+    const rows = new Array(n).fill(null);
+    for (let j = 1; j <= m; j++) if (p[j] !== 0) rows[p[j]-1] = j-1;
+    return rows;
+  }
+
+  function solveTier(players, entries){
+    if (!entries.length || !players.length) return entries.map(() => null);
+    const picks = entries.map(e => players.map(p => bestPick(p, e.slot)));
+    const score = picks.map(row => row.map(x => x.score));
+    const cols = players.length + entries.length;
+    const cost = score.map(row => {
+      const r = row.map(x => -x);
+      while (r.length < cols) r.push(0);
+      return r;
+    });
+    const rows = hungarian(cost);
+    return rows.map((pi, i) => {
+      if (pi === null || pi >= players.length) return null;
+      if (score[i][pi] < THRESHOLD[entries[i].slot.tier]) return null;
+      return { player: players[pi], score: score[i][pi], pick: picks[i][pi].pick };
+    });
+  }
+
+  function solveAssignment(players, slots){
+    const out = slots.map(() => null);
+    if (!slots.length || !players.length) return out;
+
+    let pool = players.slice();
+    const cSlot = slots.findIndex(s => s.caller);
+    const cPlayer = pool.find(p => p.caller);
+    if (cSlot >= 0 && cPlayer){
+      const bp = bestPick(cPlayer, slots[cSlot]);
+      out[cSlot] = { player: cPlayer, score: bp.score, pick: bp.pick };
+      pool = pool.filter(p => p !== cPlayer);
+    }
+
+    const free = slots.map((s,i) => i).filter(i => out[i] === null);
+    const mainIdx = free.filter(i => slots[i].tier !== 'reserve');
+    const resIdx  = free.filter(i => slots[i].tier === 'reserve');
+
+    const r1 = solveTier(pool, mainIdx.map(i => ({ idx:i, slot:slots[i] })));
+    mainIdx.forEach((idx,k) => { out[idx] = r1[k]; });
+
+    const seated = new Set(r1.filter(Boolean).map(r => r.player.name));
+    const rest = pool.filter(p => !seated.has(p.name));
+    const r2 = solveTier(rest, resIdx.map(i => ({ idx:i, slot:slots[i] })));
+    resIdx.forEach((idx,k) => { out[idx] = r2[k]; });
+    return out;
+  }
+
+  /* ---------------- Daten ---------------- */
+
+  function setStatus(t){ S.status = t; const el = byId('rb-status'); if (el) el.textContent = t; }
+  function flash(msg){
+    setStatus(msg);
+    clearTimeout(flash._t);
+    flash._t = setTimeout(() => { const el = byId('rb-status'); if (el) el.textContent = S.stamp || ''; }, 3500);
+  }
+
+  function tokenFrom(str){
+    const m = String(str || '').match(/[0-9a-f]{64}/i);
+    return m ? m[0].toLowerCase() : '';
+  }
+
+  function connect(){
+    const raw = (byId('rb-token') || {}).value || '';
+    const tok = tokenFrom(raw);
+    if (!tok) { flash('Kein gültiger Token (64 Zeichen aus /e/…)'); return; }
+    S.token = tok;
+    S.parties = []; S.players = []; S.log = null; S.builtAt = null;
+    localStorage.setItem(LS_TOKEN, tok);
+    fetchData(true);
+  }
+
+  async function fetchData(first){
+    const key = sessionStorage.getItem('feedbackModKey');
+    if (!key) { flash('Bitte neu als Moderator anmelden.'); return; }
+    setStatus('Lade Event…');
+    try{
+      const res = await fetch(ROSTER_ENDPOINT + '?event=' + S.token + '&key=' + encodeURIComponent(key), { cache:'no-store' });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) { setStatus('Mod-Key ungültig – neu anmelden.'); return; }
+      if (!res.ok) { setStatus(data.hint || data.detail || ('Fehler ' + res.status)); return; }
+      S.last = data;
+      applyData(data, first || !S.parties.length);
+      S.stamp = 'Stand ' + new Date().toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+      setStatus(S.stamp);
+    }catch(e){ setStatus('Netzwerkfehler – Worker erreichbar?'); }
+    render();
+  }
+
+  function buildParties(data){
+    S.parties = (data.parties || []).map((pt, pi) => ({
+      name: pt.title || ('Party ' + (pi+1)),
+      tier: pi >= TIER_RESERVE_FROM ? 'reserve' : 'main',
+      slots: (pt.slots || []).map(s => {
+        const weapons = (s.weapons || []).map(canon);
+        return {
+          weapons,
+          caller: pi === 0 && weapons.includes('1H Mace'),
+          player: s.player || null,
+          pick: weapons.length ? weapons[0] : null
+        };
+      })
+    }));
+  }
+
+  function applyData(data, first){
+    S.event = data.event || {};
+    S.playstyles = data.playstyles || {};
+
+    const incoming = (data.players || []).map(p => ({
+      name: p.name, prefs: (p.prefs || []).map(canon), tentative: !!p.tentative
+    }));
+
+    const known = new Map(S.players.map(p => [p.name.toLowerCase(), p]));
+    const added = [];
+    incoming.forEach(p => {
+      const old = known.get(p.name.toLowerCase());
+      if (old) { old.prefs = p.prefs; old.tentative = p.tentative; known.delete(p.name.toLowerCase()); }
+      else { S.players.push(p); added.push(p.name); }
+    });
+
+    const gone = [...known.values()].map(p => p.name);
+    if (gone.length){
+      S.players = S.players.filter(p => !gone.includes(p.name));
+      S.parties.forEach(pt => pt.slots.forEach(sl => {
+        if (gone.includes(sl.player)) { sl.player = null; sl.pick = null; }
+      }));
+    }
+
+    if (first || !S.parties.length) buildParties(data);
+    if (added.length || gone.length){ S.log = null; S.builtAt = null; }
+    if (!first && added.length) flash(added.length === 1 ? 'Neue Anmeldung: ' + added[0] : added.length + ' neue Anmeldungen');
+  }
+
+  function reloadComp(){
+    if (!S.last) { flash('Noch keine Daten'); return; }
+    if (!confirm('Comp neu laden? Lokale Zuweisungen gehen verloren.')) return;
+    buildParties(S.last);
+    S.log = null; S.builtAt = null;
+    render();
+    flash('Comp neu geladen');
+  }
+
+  /* ---------------- Bauen ---------------- */
+
+  function build(){
+    if (!S.players.length) { flash('Keine Anmeldungen geladen'); return; }
+    const players = S.players.map(p => ({
+      name: p.name,
+      caller: p.name === S.event.shotCaller,
+      prefs: p.prefs,
+      hist: S.hist[p.name] || {},
+      tentative: p.tentative
+    }));
+
+    const flat = [];
+    S.parties.forEach((pt, pi) => pt.slots.forEach((sl, si) => flat.push({
+      pi, si, tier: pt.tier, weapons: sl.weapons, caller: sl.caller, ref: sl
+    })));
+    const active = flat.filter(s => s.weapons.length);
+    const res = solveAssignment(players, active.map(s => ({ weapons:s.weapons, caller:s.caller, tier:s.tier })));
+
+    S.parties.forEach(pt => pt.slots.forEach(sl => { sl.player = null; sl.pick = null; }));
+    res.forEach((r, i) => { if (r) { active[i].ref.player = r.player.name; active[i].ref.pick = r.pick; } });
+
+    const assigned = {};
+    res.forEach((r, i) => { if (r) assigned[r.player.name] = { slot: active[i], score: r.score, pick: r.pick }; });
+
+    const bench = players.filter(p => !assigned[p.name]);
+    const open = active.filter((s, i) => !res[i]);
+
+    const conflicts = [];
+    players.forEach(p => {
+      const a = assigned[p.name];
+      if (!a || p.caller) return;
+      let best = { score: a.score, slot: a.slot, pick: a.pick };
+      active.forEach(s => {
+        const bp = bestPick(p, { weapons:s.weapons, caller:s.caller, tier:s.tier });
+        if (bp.score > best.score + 0.01) best = { score: bp.score, slot: s, pick: bp.pick };
+      });
+      if (best.slot !== a.slot){
+        const tierRank = t => (t === 'reserve' ? 1 : 0);
+        if (tierRank(best.slot.tier) > tierRank(a.slot.tier)) return;
+        const occ = best.slot.ref.player;
+        const occP = state_players_find(occ);
+        conflicts.push(esc(p.name) + ': ' + esc(best.slot.weapons.join(' / ')) + ' (' + ((p.hist||{})[canon(best.pick)]||0) + '×) war stärker, ging an ' +
+          '<b>' + esc(occ || '–') + '</b> (' + ((occP && (occP.hist||{})[canon(best.pick)]) || 0) + '×) → ' + esc(a.slot.weapons.join(' / ')));
+      }
+    });
+
+    const byWeapon = {};
+    players.forEach(p => {
+      const firstPref = (p.prefs || [])[0];
+      if (firstPref) (byWeapon[canon(firstPref)] = byWeapon[canon(firstPref)] || []).push(p);
+    });
+    Object.entries(byWeapon).forEach(([w, list]) => {
+      if (list.length < 2) return;
+      const winner = list.find(p => assigned[p.name] && canon(assigned[p.name].pick) === w);
+      if (!winner) return;
+      const losers = list.filter(p => p !== winner)
+        .filter(p => !(assigned[p.name] && canon(assigned[p.name].pick) === w))
+        .map(p => esc(p.name) + ' (' + ((p.hist||{})[w]||0) + '×)');
+      if (!losers.length) return;
+      const msg = '<b>' + esc(w) + '</b>: ' + esc(winner.name) + ' (' + ((winner.hist||{})[w]||0) + '×) gesetzt, ' + losers.join(', ') + ' ausgewichen.';
+      if (!conflicts.some(c => c.includes(esc(w)))) conflicts.push(msg);
+    });
+
+    const benchItems = bench.map(p => {
+      const cands = active.map(s => ({ s, bp: bestPick(p, { weapons:s.weapons, caller:s.caller, tier:s.tier }) }))
+        .sort((a,b) => b.bp.score - a.bp.score).slice(0,2).filter(x => x.bp.score > 0);
+      const hint = cands.length
+        ? ' · möglich: ' + cands.map(c => esc(c.s.weapons.join(' / '))).join(', ') + ' (' + Math.round(cands[0].bp.score) + ' Pkt)'
+        : ' · keine passende Rolle';
+      return '<b>' + esc(p.name) + '</b>' + (p.tentative ? ' (tentative)' : '') + hint;
+    });
+
+    const notes = [];
+    S.parties.filter(pt => pt.tier === 'main').forEach(pt => {
+      const h = pt.slots.filter(s => s.player && roleOf(s.pick || s.weapons[0]) === 'Healer').length;
+      if (h < 2) notes.push(esc(pt.name) + ' hat ' + h + ' Heiler.');
+    });
+    const noHist = players.filter(p => sumHist(p) === 0 && assigned[p.name]);
+    if (players.length && noHist.length === players.length) notes.push('Historie noch leer – die Zuweisung stützt sich nur auf die Wünsche.');
+    else if (noHist.length) notes.push('Ohne Historie gesetzt: ' + noHist.map(p => esc(p.name)).join(', ') + '.');
+    const fam = players.filter(p => {
+      const a = assigned[p.name];
+      if (!a || a.slot.tier === 'reserve') return false;
+      return !(p.prefs || []).map(canon).includes(canon(a.pick));
+    });
+    if (fam.length) notes.push('Ohne exakten Wunsch auf Haupt-Slots: ' + fam.map(p => esc(p.name) + ' (' + esc(assigned[p.name].pick) + ')').join(', ') + ' – nur über die Rollenfamilie.');
+    const tent = players.filter(p => p.tentative && assigned[p.name]);
+    if (tent.length) notes.push('Tentative eingeplant: ' + tent.map(p => esc(p.name)).join(', ') + '.');
+    const reserve = players.filter(p => assigned[p.name] && assigned[p.name].slot.tier === 'reserve');
+    if (reserve.length) notes.push('Auf Reserve-Slots: ' + reserve.map(p => esc(p.name)).join(', ') + '.');
+
+    const main = active.filter(s => s.tier === 'main');
+    const resv = active.filter(s => s.tier === 'reserve');
+    S.log = {
+      filledMain: main.filter(s => s.ref.player).length, totalMain: main.length,
+      filledRes: resv.filter(s => s.ref.player).length, totalRes: resv.length,
+      bench: benchItems,
+      open: open.map(s => '<b>' + esc(s.weapons.join(' / ')) + '</b> (' + esc(S.parties[s.pi].name) + ') – niemand mit passendem Wunsch'),
+      conflicts, notes
+    };
+    S.builtAt = Date.now();
+    render();
+    flash('Gruppe gebaut');
+  }
+
+  function state_players_find(name){
+    const p = S.players.find(x => x.name === name);
+    return p ? { hist: S.hist[p.name] || {} } : null;
+  }
+
+  /* ---------------- Anzeige ---------------- */
+
+  function flatSlots(){
+    const out = [];
+    S.parties.forEach((pt, pi) => pt.slots.forEach((sl, si) => out.push({
+      pi, si, tier: pt.tier, weapons: sl.weapons, caller: sl.caller, player: sl.player, pick: sl.pick, ref: sl
+    })));
+    return out;
+  }
+  function findSlot(name){
+    for (const pt of S.parties) for (const sl of pt.slots) if (sl.player === name) return sl;
+    return null;
+  }
+
+  function page(){
+    return `<h1>Roster-Brain</h1>
+      <p class="s">Vorschlag zur Zuweisung aus den AlbionZvZ-Anmeldungen. <b>AlbionZvZ bleibt verbindlich</b> – hier entsteht nur die Empfehlung, die du dort überträgst.</p>
+      <div class="rb-bar">
+        <input id="rb-token" placeholder="Event-Token oder kompletter Link (/e/…)">
+        <button class="b" onclick="RB.connect()">Verbinden</button>
+        <button class="b" id="rb-live" onclick="RB.toggleLive()">Live: aus</button>
+        <button class="b" onclick="RB.reloadComp()">Comp neu laden</button>
+        <span id="rb-status" class="mut" style="font-size:.8rem"></span>
+      </div>
+      <div class="rb-grid">
+        <section class="rb-panel">
+          <h3>Angemeldet <span class="rb-count" id="rb-cnt-players">0</span></h3>
+          <div class="rb-body" id="rb-players"><p class="rb-msg">Noch kein Event verbunden.</p></div>
+        </section>
+        <section class="rb-panel">
+          <h3>Comp <span class="rb-count" id="rb-cnt-slots">0</span></h3>
+          <div class="rb-bar" style="padding:8px 10px;margin:0;border-bottom:var(--bw) solid var(--ln)">
+            <button class="b" onclick="RB.build()">Build the Group</button>
+            <button class="b" onclick="RB.copy()">Kopieren</button>
+            <button class="b" onclick="RB.bump()" title="Aktuelle Zuweisung als einen gespielten Einsatz zählen">Historie +1</button>
+          </div>
+          <div id="rb-stats" class="mut" style="padding:6px 10px;font-size:.73rem;border-bottom:var(--bw) solid var(--ln)"></div>
+          <div class="rb-parties" id="rb-parties"><p class="rb-msg">Noch keine Comp geladen.</p></div>
+        </section>
+        <section class="rb-panel">
+          <h3>Gehirn <span class="rb-count" id="rb-cnt-bench">0</span></h3>
+          <div class="rb-body rb-log" id="rb-brain"><p class="rb-msg">Bereit, sobald ein Event verbunden ist.</p></div>
+        </section>
+      </div>
+      <div class="rb-overlay" id="rb-overlay" onclick="if(event.target===this)RB.closePick()">
+        <div class="rb-modal" id="rb-modal"></div>
+      </div>`;
+  }
+
+  function render(){
+    const p = byId('rb-players');
+    if (!p) return; // Seite nicht sichtbar
+    renderPlayers(); renderComp(); renderBrain();
+    const players = S.players.length;
+    const active = flatSlots().filter(s => s.weapons.length).length;
+    byId('rb-cnt-players').textContent = players;
+    byId('rb-cnt-slots').textContent = active + ' Slots';
+    byId('rb-cnt-bench').textContent = S.players.filter(x => !findSlot(x.name)).length;
+  }
+
+  function renderPlayers(){
+    const el = byId('rb-players');
+    if (!el) return;
+    if (!S.players.length){ el.innerHTML = '<p class="rb-msg">Noch keine Anmeldungen.</p>'; return; }
+    const built = !!S.builtAt;
+    el.innerHTML = S.players.map(p => {
+      const sl = findSlot(p.name);
+      const seat = sl ? 'gesetzt' : (built ? 'Bank' : 'offen');
+      const hist = S.hist[p.name] || {};
+      const chips = (p.prefs || []).map(w => {
+        const n = hist[canon(w)] || 0;
+        return `<span class="rb-chip" style="border-left-color:${ROLE_COLOR[roleOf(w)] || '#888'}" title="${esc(roleOf(w))} · ${n} Einsätze">${esc(w)}${n ? `<b>${n}</b>` : ''}</span>`;
+      }).join('');
+      const total = Object.values(hist).reduce((a,b) => a+b, 0);
+      return `<div class="rb-card ${p.tentative ? 'tent' : ''}" draggable="true" data-name="${esc(p.name)}">
+        <div class="top">
+          <span class="rb-nm">${esc(p.name)}</span>
+          ${p.name === (S.event || {}).shotCaller ? '<span class="tag" style="border-color:#c4a1ff;color:#c4a1ff">Caller</span>' : ''}
+          <span class="rb-seat ${sl ? '' : 'bench'}">${seat}</span>
+        </div>
+        <div class="rb-prefs">${chips || '<span class="rb-hint">keine Rollen gewählt</span>'}</div>
+        ${total ? `<div class="rb-hint">Historie: ${total} Einsätze</div>` : ''}
+      </div>`;
+    }).join('');
+
+    el.querySelectorAll('.rb-card').forEach(card => {
+      card.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', card.dataset.name);
+        e.dataTransfer.effectAllowed = 'move';
+      });
+    });
+  }
+
+  function renderComp(){
+    const wrap = byId('rb-parties');
+    if (!wrap) return;
+    if (!S.parties.length){ wrap.innerHTML = '<p class="rb-msg">Noch keine Comp geladen.</p>'; renderStats(); return; }
+
+    wrap.innerHTML = S.parties.map((pt, pi) => {
+      const active = pt.slots.filter(s => s.weapons.length);
+      const filled = active.filter(s => s.player).length;
+      return `<div class="rb-party">
+        <h4>${esc(pt.name)}<span>${filled}/${active.length}</span></h4>
+        <div>${pt.slots.map((sl, si) => {
+          if (!sl.weapons.length) return `<div class="rb-slot empty" style="border-left-color:var(--ln)"><div style="flex:1"><div class="w">Empty</div></div></div>`;
+          const c = ROLE_COLOR[roleOf(sl.weapons[0])] || '#888';
+          const empty = !sl.player;
+          const why = sl.player && S.builtAt ? reasonFor({ prefs: (S.players.find(x => x.name === sl.player) || {}).prefs || [], hist: S.hist[sl.player] || {}, caller: sl.player === (S.event||{}).shotCaller }, sl, sl.pick).head : '';
+          return `<div class="rb-slot ${empty ? 'empty' : ''}" data-pi="${pi}" data-si="${si}" style="border-left-color:${c}" title="${esc(roleOf(sl.weapons[0]))}">
+            <div style="flex:1;min-width:0">
+              <div class="w">${esc(sl.weapons.join(' / '))}${sl.caller ? ' · Caller' : ''}</div>
+              <div class="p">${empty ? 'frei' : esc(sl.player) + (sl.weapons.length > 1 && sl.pick ? ' <span class="mut" style="font-weight:400">· ' + esc(sl.pick) + '</span>' : '')}</div>
+            </div>
+            ${empty ? '' : `<span class="why">${esc(why)}</span><button class="x" title="Entfernen">×</button>`}
+          </div>`;
+        }).join('')}</div>
+      </div>`;
+    }).join('');
+
+    wrap.querySelectorAll('.rb-slot[data-pi]').forEach(el => {
+      const pi = +el.dataset.pi, si = +el.dataset.si;
+      el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('over'); });
+      el.addEventListener('dragleave', () => el.classList.remove('over'));
+      el.addEventListener('drop', e => {
+        e.preventDefault(); el.classList.remove('over');
+        const name = e.dataTransfer.getData('text/plain');
+        if (name) place(pi, si, name);
+      });
+      el.addEventListener('click', e => {
+        if (e.target.closest('.x')) return;
+        if (!S.parties[pi].slots[si].player) openPick(pi, si);
+      });
+      const x = el.querySelector('.x');
+      if (x) x.addEventListener('click', e => {
+        e.stopPropagation();
+        const sl = S.parties[pi].slots[si]; sl.player = null; sl.pick = null;
+        S.log = null; S.builtAt = null;
+        render();
+      });
+    });
+    renderStats();
+  }
+
+  function renderStats(){
+    const el = byId('rb-stats');
+    if (!el) return;
+    const all = flatSlots();
+    const main = all.filter(s => s.tier === 'main' && s.weapons.length);
+    const res = all.filter(s => s.tier === 'reserve' && s.weapons.length);
+    const bench = S.players.filter(p => !findSlot(p.name)).length;
+    el.innerHTML = `<span><b>${main.filter(s => s.player).length}</b>/${main.length} Haupt</span> · `
+      + `<span><b>${res.filter(s => s.player).length}</b>/${res.length} Reserve</span> · `
+      + `<span><b>${main.filter(s => !s.player).length + res.filter(s => !s.player).length}</b> offen</span> · `
+      + `<span><b>${bench}</b> Bank</span> · <span><b>${S.players.length}</b> angemeldet</span>`;
+  }
+
+  function renderBrain(){
+    const el = byId('rb-brain');
+    if (!el) return;
+    if (!S.log){
+      el.innerHTML = `<div class="sec">Bereit</div>
+        <div class="item info">${S.players.length} Anmeldungen, ${flatSlots().filter(s => s.weapons.length).length} aktive Slots.</div>
+        <div class="sec">Regeln</div>
+        <div class="item">1. Wunsch schlägt Historie.</div>
+        <div class="item">2. Bei Überschneidung entscheidet, wer die Rolle häufiger gespielt hat.</div>
+        <div class="item">3. Caller ist gesetzt, Reserve nur mit echtem Wunsch.</div>`;
+      return;
+    }
+    const L = S.log;
+    let h = `<div class="sec">Ergebnis</div>
+      <div class="item ok"><b>${L.filledMain}/${L.totalMain} Haupt</b> · ${L.filledRes}/${L.totalRes} Reserve · ${L.bench.length} Bank · ${L.open.length} offen</div>`;
+    h += `<div class="sec">Überschneidungen (${L.conflicts.length})</div>`;
+    h += L.conflicts.length ? L.conflicts.map(c => `<div class="item warn">${c}</div>`).join('') : '<div class="rb-msg">Keine.</div>';
+    if (L.bench.length){
+      h += `<div class="sec">Bank (${L.bench.length})</div>` + L.bench.map(b => `<div class="item">${b}</div>`).join('');
+    }
+    if (L.open.length){
+      h += `<div class="sec">Offene Slots (${L.open.length})</div>`;
+      h += L.open.slice(0,10).map(o => `<div class="item bad">${o}</div>`).join('');
+      if (L.open.length > 10) h += `<div class="rb-msg">… und ${L.open.length - 10} weitere</div>`;
+    }
+    h += `<div class="sec">Hinweise</div>`;
+    h += L.notes.length ? L.notes.map(n => `<div class="item info">${n}</div>`).join('') : '<div class="rb-msg">Keine.</div>';
+    el.innerHTML = h;
+  }
+
+  /* ---------------- Aktionen ---------------- */
+
+  function pickFor(name, slot, tier){
+    const p = S.players.find(x => x.name === name);
+    if (!p) return slot.weapons[0] || null;
+    return bestPick({ name, prefs: p.prefs, hist: S.hist[name] || {}, caller: name === (S.event||{}).shotCaller, tentative: p.tentative },
+      { weapons: slot.weapons, caller: slot.caller, tier }).pick;
+  }
+
+  function place(pi, si, name){
+    const target = S.parties[pi].slots[si];
+    if (!target.weapons.length || target.player === name) return;
+    const from = findSlot(name);
+    const prev = target.player;
+    if (from){ from.player = prev || null; from.pick = null; }
+    target.player = name;
+    target.pick = pickFor(name, target, S.parties[pi].tier);
+    if (from && prev) from.pick = pickFor(prev, from, S.parties[findSlotPi(from)] ? S.parties[findSlotPi(from)].tier : 'main');
+    S.log = null; S.builtAt = null;
+    render();
+  }
+  function findSlotPi(slot){
+    for (let i = 0; i < S.parties.length; i++) if (S.parties[i].slots.includes(slot)) return i;
+    return -1;
+  }
+
+  function openPick(pi, si){
+    const slot = S.parties[pi].slots[si];
+    const cands = S.players.filter(p => !findSlot(p.name))
+      .map(p => ({ p, bp: bestPick({ name:p.name, prefs:p.prefs, hist:S.hist[p.name] || {}, caller:p.name === (S.event||{}).shotCaller, tentative:p.tentative },
+        { weapons:slot.weapons, caller:slot.caller, tier:S.parties[pi].tier }) }))
+      .filter(c => c.bp.score > NO_MATCH + 1)
+      .sort((a,b) => b.bp.score - a.bp.score);
+
+    const rows = cands.map(c => {
+      const r = reasonFor({ prefs:c.p.prefs, hist:S.hist[c.p.name] || {}, caller:false }, slot, c.bp.pick);
+      return `<div class="rb-pick" data-name="${esc(c.p.name)}">
+        <span class="dot" style="background:${ROLE_COLOR[roleOf(slot.weapons[0])] || '#888'}"></span>
+        <span><b>${esc(c.p.name)}</b>${slot.weapons.length > 1 && c.bp.pick ? ` <span class="mut" style="font-size:.72rem">→ ${esc(c.bp.pick)}</span>` : ''}
+        <br><span class="mut" style="font-size:.72rem">${esc(r.text)}</span></span>
+        <span class="sc">${Math.round(c.bp.score)} Pkt</span>
+      </div>`;
+    }).join('');
+
+    byId('rb-modal').innerHTML = `<h3>${esc(slot.weapons.join(' / '))} besetzen</h3>
+      <p class="mut" style="font-size:.83rem;margin:0 0 8px">${esc(S.parties[pi].name)} · ${cands.length} freie Spieler</p>
+      ${rows || '<p class="rb-msg">Keine freien Spieler.</p>'}
+      <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="b" onclick="RB.closePick()">Schließen</button></div>`;
+    byId('rb-modal').querySelectorAll('.rb-pick').forEach(el => {
+      el.addEventListener('click', () => { place(pi, si, el.dataset.name); closePick(); });
+    });
+    byId('rb-overlay').classList.add('open');
+  }
+  function closePick(){ const o = byId('rb-overlay'); if (o) o.classList.remove('open'); }
+
+  function copy(){
+    const txt = S.parties.map(pt => {
+      const rows = pt.slots.filter(s => s.weapons.length).map(s =>
+        '  ' + (s.player || '—').padEnd(14) + ' ' + s.weapons.join(' / ') + (s.pick && s.weapons.length > 1 ? ' (' + s.pick + ')' : '')
+      ).join('\n');
+      return pt.name + '\n' + rows;
+    }).join('\n\n');
+    navigator.clipboard.writeText(txt).then(() => flash('Roster kopiert')).catch(() => flash('Kopieren nicht möglich'));
+  }
+
+  function bump(){
+    const seated = S.parties.flatMap(pt => pt.slots).filter(s => s.player && s.pick);
+    if (!seated.length) { flash('Niemand gesetzt'); return; }
+    if (!confirm(seated.length + ' Einsätze als gespielt zählen?')) return;
+    seated.forEach(s => {
+      S.hist[s.player] = S.hist[s.player] || {};
+      const k = canon(s.pick);
+      S.hist[s.player][k] = (S.hist[s.player][k] || 0) + 1;
+    });
+    localStorage.setItem(LS_HIST, JSON.stringify(S.hist));
+    render();
+    flash('Historie aktualisiert');
+  }
+
+  function setLiveBtn(){
+    const b = byId('rb-live');
+    if (!b) return;
+    b.textContent = S.live ? 'Live: an' : 'Live: aus';
+    b.classList.toggle('on', !!S.live);
+  }
+  function toggleLive(){
+    if (S.live){ clearInterval(S.live); S.live = null; setLiveBtn(); flash('Live gestoppt'); return; }
+    if (!S.token){ flash('Erst Event verbinden'); return; }
+    S.live = setInterval(() => fetchData(false), 5000);
+    setLiveBtn();
+    fetchData(false);
+    flash('Live – Abfrage alle 5 s');
+  }
+
+  function init(){
+    S.token = localStorage.getItem(LS_TOKEN) || S.token;
+    try { S.hist = JSON.parse(localStorage.getItem(LS_HIST) || '{}') || {}; } catch(e){ S.hist = {}; }
+    const inp = byId('rb-token');
+    if (inp && S.token) inp.value = S.token;
+    render();
+    setLiveBtn();
+    if (S.token && S.players.length) render();
+    else if (S.token) fetchData(true);
+  }
+
+  return { page, init, connect, build, copy, bump, toggleLive, reloadComp, closePick };
+})();
+
+P['admin-roster'] = () => RB.page();
+I['admin-roster'] = () => RB.init();
 
 // Initial Load
 loadCustomContent().then(() => {
