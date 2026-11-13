@@ -12,6 +12,15 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-13 – ZvZ exakt über Battle-IDs, Farben im Gilde-Tab
+
+- ZvZ wird nicht mehr über die Gruppengröße geschätzt: Der Worker lädt die ZvZ-Battles der Gilde (`/api/guild-profile/battles`, Masse 15–29, `massMode=guild`, 90 Tage, 12 h KV-Cache) und vergleicht die `BattleId` jedes Todes/Kills
+- Fallback auf `groupMemberCount >= 10`, wenn die Battle-Liste nicht erreichbar ist (`zvzSource: group`)
+- Antworten enthalten `zvzMass`, `zvzCount`, `zvzSource`, damit die Seite die Grundlage anzeigen kann
+- Gilde-Tab: Tode rot, Kills grün, K/D grün ab 1,5, orange ab 1,0, rot darunter; Roster-Badge ebenfalls rot
+- Hinweiszeile im Detail nennt die Masse (15–29) und die Zahl der Battles
+
+
 ### 2026-11-13 – Worker als eine Datei
 
 - `Worker/worker.js` angelegt: der komplette Worker (Feedback, Live-Editor, Roster, Discord, Tode, Gildenliste) in einer Datei zum Kopieren

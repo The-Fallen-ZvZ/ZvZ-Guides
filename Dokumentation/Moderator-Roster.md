@@ -77,7 +77,11 @@ Der Auto-Zuweiser liest die Todesdaten über die offizielle API, nicht über die
 | `lastDays` | Tage seit dem letzten Tod, `null` = keine Tode erfasst |
 | `missing` | Namen, die nicht in der Gilde gefunden wurden (z. B. Twinks) |
 
-**ZvZ-Erkennung:** Ein Kill/Tod zählt als ZvZ, wenn `groupMemberCount >= 10` oder `numberOfParticipants >= 10` – also die eigene Gruppe mindestens 10 Spieler hatte oder mindestens 10 Gegner beteiligt waren. Der Schwellwert steht als `ZVZ_MIN_GROUP` im Worker. Reine Solo-/Gank-Tode fallen damit raus.
+**ZvZ-Erkennung (genau):** Der Worker holt die ZvZ-Battles der Gilde über `GET /api/guild-profile/battles` (AlbionZvZ, öffentlich) mit **Masse 15–29** und `massMode=guild`, 90 Tage, 12 h gecacht. Jeder Tod und Kill hat eine `BattleId`; ZvZ ist, was in dieser ID-Liste steht. Das ist keine Schätzung mehr, sondern die echte Battle-Zuordnung.
+
+**Fallback:** Ist die Battle-Liste nicht erreichbar, gilt wieder `groupMemberCount >= 10` oder `numberOfParticipants >= 10` (`ZVZ_MIN_GROUP`). Die Antwort kennzeichnet das mit `zvzSource: "group"` statt `"battles"`.
+
+Grenze der Methode: Fights, in denen unsere Gilde unter 15 oder über 29 Masse hatte, zählen nicht als ZvZ. Das ist gewollt („unsere typische Größe"), lässt sich aber über `ZVZ_MASS_MIN` / `ZVZ_MASS_MAX` im Worker ändern.
 
 Gewichtung im Gehirn (max. ±10 Punkte, damit Wünsche dominieren):
 
@@ -112,6 +116,8 @@ letzte 30 Tage   Tode  Kills  K/D
 ZvZ                 4     12  3,00
 Alle                9     25  2,78
 ```
+
+Farben: **Tode rot**, **Kills grün**, K/D **grün ab 1,5**, **orange ab 1,0**, darunter **rot** (ohne Tode grau).
 
 | Spalte | Inhalt |
 | --- | --- |
@@ -259,5 +265,7 @@ Die Engine arbeitet zweistufig (erst Party 1 + 2, dann Reserve), setzt den Calle
 - Gilde-Tab im Headless-Test: Mitgliederliste, Klick lädt Details, 5 Tode als Tabelle, Waffe lesbar (T8_MAIN_MACE → MACE), Suche filtert, keine JS-Fehler.
 - Worker `handleGuild`/`handleDeathDetail`: 200 mit sortierter Liste, 404 bei unbekanntem Namen, KV-Cache ohne erneuten API-Request.
 - ZvZ: Worker zählt Tode mit `groupMemberCount >= 10` bzw. `numberOfParticipants >= 10`; Testdaten 4 Tode (2 ZvZ) → `zvz: 2`, `zvz7: 2`.
+- ZvZ über Battle-IDs: Stub mit Battles 111/222/333 und Toden 111, 999, 222, null, 333, 111 … → 6 von 10 als ZvZ, `zvzSource: battles`, `zvzBattles: 3`.
+- Farben im Gilde-Tab: Tode `rb-red`, Kills `rb-green`, K/D 0,50 rot, 1,00 orange, 3,00 grün; ZvZ-Hinweis „15–29 Masse".
 - Gilde-Tab: Umschalter ZvZ/Alle und 7/14/30/Gesamt, K/D 2/1 = 0,50 und 3/3 = 1,00, Gesamt 4/3 = 0,75.
 - Roster: nur ein Abruf in 8 s (5-Minuten-Intervall), beim Öffnen keine DM, nach einer neuen Anmeldung genau eine DM mit dem neuen Namen.

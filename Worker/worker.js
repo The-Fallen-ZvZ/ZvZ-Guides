@@ -288,12 +288,49 @@ async function handleNotify(request, env) {
 
 const ALBION_BASE = 'https://gameinfo-ams.albiononline.com/api/gameinfo';
 const DEATH_TTL_MS = 12 * 60 * 60 * 1000;
-const ZVZ_MIN_GROUP = 10;   // ab 10 Spielern in der Gruppe gilt ein Kill/Tod als ZvZ
+const ZVZ_MIN_GROUP = 10;   // Fallback, falls die Battle-Liste nicht erreichbar ist
+const ZVZ_MASS_MIN = 15;    // unsere typische ZvZ-Größe
+const ZVZ_MASS_MAX = 29;
+const ALBION_UA = 'The-Fallen-Roster/1.0 (+https://the-fallen-zvz.github.io/)';
 
-/** ZvZ-Erkennung: große eigene Gruppe oder viele beteiligte Gegner. */
-function isZvzEvent(d) {
+/**
+ * ZvZ-Erkennung.
+ * Primär: BattleId muss in der ZvZ-Battle-Liste der Gilde stehen (Masse 15–29).
+ * Fallback (Liste nicht verfügbar): große eigene Gruppe oder viele Gegner.
+ */
+function isZvzEvent(d, zvzSet) {
+  if (zvzSet) return !!(d.BattleId && zvzSet.has(d.BattleId));
   return (d.groupMemberCount || 0) >= ZVZ_MIN_GROUP
       || (d.numberOfParticipants || 0) >= ZVZ_MIN_GROUP;
+}
+
+/** Battle-IDs der ZvZ-Fights unserer Gilde (Masse 15–29), 12 h gecacht. */
+async function guildZvzBattles(env, guildId) {
+  const key = 'rb:zvz:' + guildId;
+  const cached = await kvGet(env, key);
+  if (cached && cached.at && Date.now() - cached.at < DEATH_TTL_MS) return cached;
+
+  const now = Date.now();
+  const from = now - 90 * 86400000;
+  const url = AZ_BASE + '/api/guild-profile/battles'
+    + '?server=europe'
+    + '&guildId=' + encodeURIComponent(guildId)
+    + '&fromMs=' + from + '&toMs=' + now
+    + '&minMass=' + ZVZ_MASS_MIN + '&maxMass=' + ZVZ_MASS_MAX
+    + '&massMode=guild&fetchAll=1';
+
+  const res = await fetch(url, {
+    headers: { 'Accept': 'application/json', 'User-Agent': ALBION_UA }
+  });
+  if (!res.ok) throw new Error('zvz battles HTTP ' + res.status);
+
+  const data = await res.json();
+  const rows = Array.isArray(data.rows) ? data.rows : [];
+  const ids = rows.map(r => r.id).filter(Boolean);
+
+  const out = { at: Date.now(), ids, count: ids.length };
+  await kvPut(env, key, out);
+  return out;
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -340,7 +377,7 @@ async function guildMembers(env, guildId) {
 }
 
 /** Todes-Ereignisse eines Spielers (Zeit + ZvZ-Flag), 12 h gecacht. */
-async function playerDeaths(env, id) {
+async function playerDeaths(env, id, zvzSet) {
   const key = 'rb:deaths2:' + id;
   const cached = await kvGet(env, key);
   if (cached && cached.at && Date.now() - cached.at < DEATH_TTL_MS) return cached;
@@ -352,7 +389,7 @@ async function playerDeaths(env, id) {
     if (!Array.isArray(page) || !page.length) break;
     page.forEach(d => {
       const t = new Date(d.TimeStamp).getTime();
-      if (t) events.push({ t, z: isZvzEvent(d) ? 1 : 0 });
+      if (t) events.push({ t, z: isZvzEvent(d, zvzSet) ? 1 : 0 });
     });
     if (page.length < 10) break;
     await sleep(600);
@@ -382,6 +419,12 @@ async function handleDeaths(request, env, url) {
   try { members = await guildMembers(env, guild); }
   catch (e) { return rosterJson({ error: 'guild_unreachable', detail: String(e && e.message || e) }, 502); }
 
+  let zvzSet = null;
+  try {
+    const zvz = await guildZvzBattles(env, guild);
+    zvzSet = new Set(zvz.ids);
+  } catch (e) { zvzSet = null; }
+
   const byName = new Map(members.map(m => [m.name.toLowerCase(), m]));
   const targets = [];
   const missing = [];
@@ -402,7 +445,7 @@ async function handleDeaths(request, env, url) {
 
   for (const t of targets) {
     try {
-      const d = await playerDeaths(env, t.m.id);
+      const d = await playerDeaths(env, t.m.id, zvzSet);
       const recent = d.events.filter(x => x.t >= cutoff);
       const week = d.events.filter(x => x.t >= cutoffWeek);
       const last = d.events.length ? d.events[0].t : 0;
@@ -421,7 +464,14 @@ async function handleDeaths(request, env, url) {
     await sleep(700);
   }
 
-  return rosterJson({ guild, days, players, missing });
+  return rosterJson({
+    guild,
+    days,
+    players,
+    missing,
+    zvzBattles: zvzSet ? zvzSet.size : null,
+    zvzMass: [ZVZ_MASS_MIN, ZVZ_MASS_MAX]
+  });
 }
 
 /* ---------- Gildenliste und Todesdetails ---------------------------------- */
@@ -446,7 +496,7 @@ async function handleGuild(request, env, url) {
 }
 
 /** Rohdaten eines Spielers (deaths oder kills) mit ZvZ-Flag, max. 40 Einträge. */
-async function fetchPlayerEvents(env, id, kind) {
+async function fetchPlayerEvents(env, id, kind, zvzSet) {
   const events = [];
 
   for (let offset = 0; offset < 40; offset += 10) {
@@ -458,7 +508,7 @@ async function fetchPlayerEvents(env, id, kind) {
       if (!t) return;
       const base = {
         t,
-        zvz: isZvzEvent(d) ? 1 : 0,
+        zvz: isZvzEvent(d, zvzSet) ? 1 : 0,
         area: d.KillArea || '',
         group: d.groupMemberCount || 0,
         parts: d.numberOfParticipants || 0,
@@ -494,13 +544,13 @@ async function fetchPlayerEvents(env, id, kind) {
 }
 
 /** Tode und Kills eines Spielers, 12 h gecacht. */
-async function playerDeathDetail(env, id) {
+async function playerDeathDetail(env, id, zvzSet) {
   const key = 'rb:detail2:' + id;
   const cached = await kvGet(env, key);
   if (cached && cached.at && Date.now() - cached.at < DEATH_TTL_MS) return cached;
 
-  const deaths = await fetchPlayerEvents(env, id, 'deaths');
-  const kills = await fetchPlayerEvents(env, id, 'kills');
+  const deaths = await fetchPlayerEvents(env, id, 'deaths', zvzSet);
+  const kills = await fetchPlayerEvents(env, id, 'kills', zvzSet);
 
   const data = { at: Date.now(), deaths, kills };
   await kvPut(env, key, data);
@@ -525,13 +575,19 @@ async function handleDeathDetail(request, env, url) {
   try { members = await guildMembers(env, guild); }
   catch (e) { return rosterJson({ error: 'guild_unreachable', detail: String(e && e.message || e) }, 502); }
 
+  let zvzSet = null;
+  try {
+    const zvz = await guildZvzBattles(env, guild);
+    zvzSet = new Set(zvz.ids);
+  } catch (e) { zvzSet = null; }
+
   const member = members.find(m => m.name.toLowerCase() === name.toLowerCase());
   if (!member) {
     return rosterJson({ error: 'unknown_player', hint: 'Name nicht in der Gildenliste' }, 404);
   }
 
   let detail;
-  try { detail = await playerDeathDetail(env, member.id); }
+  try { detail = await playerDeathDetail(env, member.id, zvzSet); }
   catch (e) { return rosterJson({ error: 'deaths_unreachable', detail: String(e && e.message || e) }, 502); }
 
   return rosterJson({
@@ -539,6 +595,9 @@ async function handleDeathDetail(request, env, url) {
     name: member.name,
     id: member.id,
     zvzMin: ZVZ_MIN_GROUP,
+    zvzMass: [ZVZ_MASS_MIN, ZVZ_MASS_MAX],
+    zvzCount: zvzSet ? zvzSet.size : null,
+    zvzSource: zvzSet ? 'battles' : 'group',
     deaths: detail.deaths,
     kills: detail.kills,
     capped: {

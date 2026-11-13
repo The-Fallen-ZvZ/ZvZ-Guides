@@ -234,6 +234,7 @@ body:has(main.rb-wide) .app{max-width:1720px}
 .rb-pick:hover{border-color:var(--mut)}
 .rb-pick .sc{margin-left:auto;color:var(--mut);font-size:.72rem}
 .rb-msg{color:var(--mut);font-size:.85rem;padding:6px 0}
+.rb-red{color:#ff6b6b}.rb-green{color:#5fd38a}.rb-orange{color:#ffa94d}
 
 /* Gilden-Tab */
 .rg-grid{display:grid;grid-template-columns:320px minmax(0,1fr);gap:12px;align-items:start}
@@ -2204,7 +2205,7 @@ const RB = (function(){
           ? 'keine Tode erfasst'
           : 'zuletzt vor ' + d.lastDays + (d.lastDays === 1 ? ' Tag' : ' Tagen');
         const color = d.lastDays == null ? 'var(--mut)' : d.lastDays <= 7 ? '#5fd38a' : d.lastDays <= 30 ? '#ffa94d' : 'var(--mut)';
-        deathLine = `<div class="rb-hint"><span style="color:${color}" title="ZvZ-Tode in 30 Tagen">† ${z}${d.partial ? '+' : ''} ZvZ</span> · ${when}</div>`;
+        deathLine = `<div class="rb-hint"><span class="rb-red" title="ZvZ-Tode in 30 Tagen">† ${z}${d.partial ? '+' : ''} ZvZ</span> · <span style="color:${color}">${when}</span></div>`;
       }
       return `<div class="rb-card ${p.tentative ? 'tent' : ''}" draggable="true" data-name="${esc(p.name)}">
         <div class="top">
@@ -2575,6 +2576,11 @@ const RG = (function(){
     const dZvz = dAll.filter(e => e.zvz);
     const kZvz = kAll.filter(e => e.zvz);
     const kd = (k, d) => d ? (k / d).toFixed(2).replace('.', ',') : '–';
+    const kdClass = (k, d) => {
+      if (!d) return '';
+      const r = k / d;
+      return r >= 1.5 ? 'rb-green' : r >= 1 ? 'rb-orange' : 'rb-red';
+    };
 
     const btn = (label, active, action) =>
       `<button class="b small ${active ? 'on' : ''}" onclick="${action}">${label}</button>`;
@@ -2592,8 +2598,8 @@ const RG = (function(){
 
     const summary = `<div class="tw" style="margin:0 0 12px"><table class="rg-table">
         <tr><th>${S.range ? 'letzte ' + S.range + ' Tage' : 'alle geladenen Einträge'}</th><th>Tode</th><th>Kills</th><th>K/D</th></tr>
-        <tr><td>ZvZ</td><td>${dZvz.length}</td><td>${kZvz.length}</td><td>${kd(kZvz.length, dZvz.length)}</td></tr>
-        <tr><td>Alle</td><td>${dAll.length}</td><td>${kAll.length}</td><td>${kd(kAll.length, dAll.length)}</td></tr>
+        <tr><td>ZvZ</td><td class="rb-red">${dZvz.length}</td><td class="rb-green">${kZvz.length}</td><td class="${kdClass(kZvz.length, dZvz.length)}">${kd(kZvz.length, dZvz.length)}</td></tr>
+        <tr><td>Alle</td><td class="rb-red">${dAll.length}</td><td class="rb-green">${kAll.length}</td><td class="${kdClass(kAll.length, dAll.length)}">${kd(kAll.length, dAll.length)}</td></tr>
       </table></div>`;
 
     const list = (S.mode === 'zvz' ? dZvz : dAll).slice(0, 20);
@@ -2613,8 +2619,12 @@ const RG = (function(){
     const capped = (S.detail.capped && (S.detail.capped.deaths || S.detail.capped.kills))
       ? '<p class="rb-msg">Hinweis: Die API liefert maximal 40 Einträge je Art.</p>' : '';
 
+    const zvzInfo = S.detail.zvzSource === 'battles'
+      ? `ZvZ = Battles mit ${S.detail.zvzMass[0]}–${S.detail.zvzMass[1]} Masse${S.detail.zvzCount != null ? ' (' + S.detail.zvzCount + ' Battles, 90 Tage)' : ''}.`
+      : `ZvZ = Gruppe ab ${S.detail.zvzMin || 10} Spielern (Battle-Liste nicht verfügbar).`;
+
     box.innerHTML = controls + summary
-      + (S.detail.zvzMin ? `<p class="rb-msg" style="margin:-4px 0 8px">ZvZ = Gruppe ab ${S.detail.zvzMin} Spielern.</p>` : '')
+      + `<p class="rb-msg" style="margin:-4px 0 8px">${esc(zvzInfo)}</p>`
       + `<div class="tw"><table class="rg-table">
           <tr><th>Datum</th><th>wann</th><th>Gebiet</th><th>getötet von</th><th>Waffe</th><th>IP</th></tr>
           ${rows}
