@@ -12,6 +12,14 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-13 – Todeswarnung: neues Format, Anmeldungen mit 5-Minuten-Sperre
+
+- Todeswarnung heißt jetzt **3-ZvZs-Todes-Warnungen**, ohne Battle-Zeile: „In den letzten 3-ZvZs gestorben:" plus eine Zeile je Spieler
+- Tode und Kills werden über die letzten 3 ZvZs summiert; gemeldet wird weiterhin nur, wer in einem Battle 2+ Tode hatte
+- Discord-Texte sind ASCII (keine Emojis/Sonderstriche), damit beim Kopieren nichts kaputtgehen kann
+- Anmeldungen: mindestens 5 Minuten Abstand pro Event (`rb:notifylast:<kanal>:<event>`), identischer Text wird 1 Stunde nicht wiederholt
+- Innerhalb der Sperre antwortet `/notify` mit `429 cooldown`; die Seite markiert nichts als gesendet und wiederholt es automatisch
+
 ### 2026-11-13 – Todes-Erinnerung testbar gemacht
 
 - `GET /alerts?demo=1&name=…&deaths=…` schickt eine Beispielnachricht (klar als Test markiert, ohne Merker)

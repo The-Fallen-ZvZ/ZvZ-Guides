@@ -383,6 +383,17 @@ async function handleRoster(request, env, url) {
 /* ---------- Discord ------------------------------------------------------- */
 
 const DISCORD_API = 'https://discord.com/api/v10';
+const NOTIFY_COOLDOWN_MS = 5 * 60 * 1000;    // min. 5 Min zwischen zwei Anmeldungs-Nachrichten
+const NOTIFY_DUPLICATE_MS = 60 * 60 * 1000;  // identische Nachricht 1 h lang nicht wiederholen
+
+function hashText(text) {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(16);
+}
 
 function discordAuth(env) {
   return {
@@ -430,6 +441,35 @@ async function notifyMods(env, content) {
   if (!env.DISCORD_TOKEN) return 0;
   if (env.DISCORD_CHANNEL_ID) return postChannel(env, env.DISCORD_CHANNEL_ID, content);
   return dmMods(env, content);
+}
+
+/**
+ * Anmeldungen mit 5-Minuten-Sperre und Doppel-Erkennung.
+ * So kann weder ein zweiter Tab noch ein Reload dieselbe Meldung spammen.
+ */
+async function sendWithCooldown(env, content, scope) {
+  const key = 'rb:notifylast:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':' + scope;
+  const last = await kvGet(env, key);
+  const now = Date.now();
+  const hash = hashText(content);
+
+  if (last && last.at) {
+    if (last.hash === hash && now - last.at < NOTIFY_DUPLICATE_MS) {
+      return { sent: 0, duplicate: true, throttled: true, retryInMs: 0 };
+    }
+    if (now - last.at < NOTIFY_COOLDOWN_MS) {
+      return {
+        sent: 0,
+        duplicate: false,
+        throttled: true,
+        retryInMs: NOTIFY_COOLDOWN_MS - (now - last.at)
+      };
+    }
+  }
+
+  const sent = await notifyMods(env, content);
+  if (sent > 0) await kvPut(env, key, { at: now, hash }, 3600);
+  return { sent, duplicate: false, throttled: false, retryInMs: 0 };
 }
 
 async function handleNotify(request, env) {
@@ -494,10 +534,23 @@ async function handleNotify(request, env) {
     + '\n\nManuell anpassen: ' + link;
   if (content.length > 1900) content = content.slice(0, 1870) + '\n... (gekuerzt)';
 
-  const sent = await notifyMods(env, content);
-  if (!sent) return rosterJson({ error: 'notify_failed', hint: 'DISCORD_CHANNEL_ID (Kanal) oder DISCORD_USER_ID (DM) prüfen' }, 502);
+  const scope = (eventTitle || 'default').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'default';
+  const out = await sendWithCooldown(env, content, scope);
 
-  return rosterJson({ ok: true, sent });
+  if (out.duplicate) return rosterJson({ ok: true, sent: 0, duplicate: true });
+  if (out.throttled) {
+    return rosterJson({
+      error: 'cooldown',
+      throttled: true,
+      retryInMs: out.retryInMs,
+      hint: 'Naechste Meldung fruehestens in ' + Math.ceil(out.retryInMs / 1000) + ' s'
+    }, 429);
+  }
+  if (!out.sent) {
+    return rosterJson({ error: 'notify_failed', hint: 'DISCORD_CHANNEL_ID (Kanal) oder DISCORD_USER_ID (DM) pruefen' }, 502);
+  }
+
+  return rosterJson({ ok: true, sent: out.sent });
 }
 
 /* ---------- Tode / Aktivität (offizielle Albion-API) ---------------------- */

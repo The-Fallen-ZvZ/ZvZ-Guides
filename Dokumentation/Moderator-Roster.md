@@ -60,6 +60,8 @@ Manuell anpassen: https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster
 - **Wer den Slot verlässt**, wird als „hat den Slot verlassen" gemeldet.
 - **Kein Doppelversand:** gleicher Spieler + gleiche Rolle wird nicht erneut geschickt; erst eine neue Rolle löst wieder aus.
 - **Nur bei geänderten Daten** – ein Poll ohne Änderung schickt nichts.
+- **5-Minuten-Sperre:** Zwischen zwei Anmeldungs-Nachrichten desselben Events liegen mindestens 5 Minuten. Kommt innerhalb der Sperre etwas Neues, antwortet der Worker mit `429 cooldown`; die Seite markiert es nicht als gesendet und schickt es beim nächsten Durchlauf (nach Ablauf) erneut.
+- **Doppel-Erkennung:** Ist der Text identisch mit der letzten Nachricht, wird er 1 Stunde lang nicht wiederholt – das verhindert doppelte Meldungen aus zwei Tabs oder nach einem Reload.
 - **Fehler werden nicht als gesendet markiert**, der nächste Build versucht es erneut.
 
 **Link anpinnen:** Der Button „Link anpinnen" postet den Roster-Link in `DISCORD_CHANNEL_ID` und pinnt die Nachricht. Dafür braucht der Bot `MANAGE_MESSAGES` im Kanal. Ohne die Variable meldet die Seite „DISCORD_CHANNEL_ID fehlt".
