@@ -55,7 +55,7 @@ Manuell anpassen: https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster
 ```
 
 - **Ein Spieler = eine Zeile**, mehrere Änderungen gebündelt in einer Nachricht (max. 20, Rest gekürzt).
-- **Nur wenn sich jemand neu angemeldet hat.** Reine Rollenverschiebungen (z. B. nach einer Historienänderung) lösen keine Meldung aus. Wer innerhalb der 5 Minuten dazukommt, landet in derselben Nachricht.
+- **Gemeldet wird jede Abweichung** gegenüber dem zuletzt gemeldeten Stand: neue Anmeldung, Rollenwechsel, Austritt. Die Erstbelegung beim ersten Login (oder nach gelöschtem Browser-Speicher) wird nur gemerkt, nicht gesendet.
 - **Beim ersten Öffnen keine Meldung** – die Erstbelegung ist keine neue Anmeldung.
 - **Wer den Slot verlässt**, wird als „hat den Slot verlassen" gemeldet.
 - **Kein Doppelversand:** gleicher Spieler + gleiche Rolle wird nicht erneut geschickt; erst eine neue Rolle löst wieder aus.

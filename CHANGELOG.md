@@ -12,6 +12,13 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-13 – Anmeldungen gingen verloren (newSignups-Gate)
+
+- Ursache: `build()` rief `notifyChanges` nur bei `S.newSignups > 0` auf – Rollenwechsel und neu geladene Seiten lösten dadurch nie einen Request aus, nur der Discord-Test-Knopf funktionierte
+- Jetzt wird nach jedem Build gegen den gemerkten Stand geprüft; die Erstbelegung wird nur gespeichert
+- Statuszeile im Roster zeigt die letzte Discord-Aktion (`gesendet`, `gemerkt`, `unverändert`, `Fehler`, Zeit)
+- `/health` liefert zusätzlich `logs` (letzte Entscheidungen) und `queue` (wartende Meldungen), Version `2026-11-13-5`
+
 ### 2026-11-13 – Anmeldungen: Warteschlange statt 429
 
 - Innerhalb der 5-Minuten-Sperre wird die Nachricht in `rb:notifyq:<kanal>:<event>` gemerkt und nach Ablauf automatisch gesendet

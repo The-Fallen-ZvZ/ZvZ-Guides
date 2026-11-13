@@ -1987,7 +1987,7 @@ const RB = (function(){
       conflicts, notes
     };
     S.builtAt = Date.now();
-    if (S.newSignups > 0) notifyChanges(roleMap);
+    notifyChanges(roleMap);
     render();
     flash(auto ? 'Automatisch zugewiesen' : 'Gruppe gebaut');
     if (auto) setAutoBtn();
@@ -2070,6 +2070,14 @@ const RB = (function(){
   function notifyChanges(roleMap){
     if (!S.notify || !S.token) return;
     const store = S.notified[S.token] || (S.notified[S.token] = {});
+
+    /* Erstbelegung nur merken, nicht melden (sonst 20 Zeilen beim ersten Login) */
+    if (!Object.keys(store).length) {
+      Object.entries(roleMap).forEach(([name, role]) => { store[name] = role; });
+      saveNotified();
+      return;
+    }
+
     const changes = [];
     Object.entries(roleMap).forEach(([name, role]) => {
       if (store[name] !== role) changes.push({ name, role });
@@ -2082,6 +2090,19 @@ const RB = (function(){
   }
 
   let notifyRetryTimer = null;
+  const LS_NLOG = 'tf-rb-notify-log';
+
+  function saveNotifyLog(result){
+    try { localStorage.setItem(LS_NLOG, JSON.stringify({ at: Date.now(), result })); } catch(e){}
+  }
+  function notifyStatusText(){
+    try {
+      const v = JSON.parse(localStorage.getItem(LS_NLOG) || 'null');
+      if (!v || !v.at) return '';
+      const t = new Date(v.at).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+      return 'Discord: ' + v.result + ' - ' + t;
+    } catch(e){ return ''; }
+  }
 
   async function postNotify(changes){
     const key = sessionStorage.getItem('feedbackModKey');
@@ -2100,6 +2121,7 @@ const RB = (function(){
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 429) {
+        saveNotifyLog('Sperre');
         const secs = Math.ceil((data.retryInMs || 0) / 1000);
         flash('Discord: 5-Minuten-Sperre aktiv' + (secs ? ' – nächste Meldung in ' + secs + ' s' : ''));
         if (notifyRetryTimer) clearTimeout(notifyRetryTimer);
@@ -2110,6 +2132,7 @@ const RB = (function(){
         return;
       }
       if (!res.ok) {
+        saveNotifyLog('Fehler ' + res.status);
         flash('Discord: ' + (data.hint || data.error || 'Versand fehlgeschlagen'));
         return;
       }
@@ -2118,9 +2141,11 @@ const RB = (function(){
       saveNotified();
       S.newSignups = 0;
       if (data.queued) {
+        saveNotifyLog('gemerkt');
         const mins = Math.max(1, Math.ceil((data.retryInMs || 0) / 60000));
         flash('Discord: Sperre aktiv – wird in ca. ' + mins + ' Min automatisch gesendet');
       } else {
+        saveNotifyLog(data.duplicate ? 'unverändert' : 'gesendet');
         flash(data.duplicate
           ? 'Discord: unverändert, nicht erneut gesendet'
           : (list.length === 1 ? 'Discord: 1 Änderung gemeldet' : 'Discord: ' + list.length + ' Änderungen gemeldet'));
@@ -2341,7 +2366,8 @@ const RB = (function(){
       + `<span><b>${res.filter(s => s.player).length}</b>/${res.length} Reserve</span> · `
       + `<span><b>${main.filter(s => !s.player).length + res.filter(s => !s.player).length}</b> offen</span> · `
       + `<span><b>${bench}</b> Bank</span> · <span><b>${S.players.length}</b> angemeldet</span>`
-      + (S.auto ? ` · <span style="color:var(--accent,#c4a1ff)">Auto${S.lastAuto ? ' · ' + new Date(S.lastAuto).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' }) : ''}</span>` : '');
+      + (S.auto ? ` · <span style="color:var(--accent,#c4a1ff)">Auto${S.lastAuto ? ' · ' + new Date(S.lastAuto).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' }) : ''}</span>` : '')
+      + (notifyStatusText() ? ` · <span>${notifyStatusText()}</span>` : '');
   }
 
   function renderBrain(){

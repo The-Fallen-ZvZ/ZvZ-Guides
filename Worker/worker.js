@@ -383,7 +383,7 @@ async function handleRoster(request, env, url) {
 /* ---------- Discord ------------------------------------------------------- */
 
 const DISCORD_API = 'https://discord.com/api/v10';
-const WORKER_VERSION = '2026-11-13-4';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
+const WORKER_VERSION = '2026-11-13-5';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
 const NOTIFY_COOLDOWN_MS = 5 * 60 * 1000;    // min. 5 Min zwischen zwei Anmeldungs-Nachrichten
 const NOTIFY_DUPLICATE_MS = 10 * 60 * 1000;  // identische Nachricht 10 Min nicht wiederholen
 const NOTIFY_QUEUE_TTL = 24 * 60 * 60;       // gemerkte Anmeldung max. 1 Tag aufheben
@@ -479,6 +479,17 @@ function queueKey(env, scope) {
   return 'rb:notifyq:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':' + scope;
 }
 
+/** Letzte Entscheidungen pro Event mitschreiben (fuer /health). */
+async function logNotify(env, scope, entry) {
+  try {
+    const key = 'rb:notifylog:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':' + scope;
+    const prev = await kvGet(env, key);
+    const list = Array.isArray(prev) ? prev : [];
+    list.unshift(Object.assign({ at: Date.now(), scope }, entry));
+    await kvPut(env, key, list.slice(0, 10), 86400);
+  } catch (e) { /* Log ist optional */ }
+}
+
 /** Sendet gemerkte Anmeldungen, sobald ihre Sperre abgelaufen ist. */
 async function flushNotifyQueue(env) {
   const prefix = 'rb:notifyq:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':';
@@ -501,6 +512,7 @@ async function flushNotifyQueue(env) {
     if (ok > 0) {
       await kvPut(env, lockKey, { at: Date.now(), hash: hashText(q.content) }, 3600);
       await kvDelete(env, k.name);
+      await logNotify(env, scope, { result: 'flushed', sent: ok });
       sent += ok;
     }
   }
@@ -585,16 +597,20 @@ async function handleNotify(request, env) {
 
   const scope = (eventTitle || 'default').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'default';
 
-  /* Erst die Anmeldungen aus der Sperre nachholen, dann die neue behandeln. */
+  /* Neue Anmeldung zuerst behandeln, danach andere wartende Events nachholen. */
+  const out = await sendWithCooldown(env, content, scope, body.force === true);
   try { await flushNotifyQueue(env); } catch (e) { /* naechster Lauf */ }
 
-  const out = await sendWithCooldown(env, content, scope, body.force === true);
-
-  if (out.duplicate) return rosterJson({ ok: true, sent: 0, duplicate: true });
+  if (out.duplicate) {
+    await logNotify(env, scope, { changes: changes.length, result: 'duplicate' });
+    return rosterJson({ ok: true, sent: 0, duplicate: true });
+  }
   if (out.queued) {
+    await logNotify(env, scope, { changes: changes.length, result: 'queued', retryInMs: Math.round(out.retryInMs) });
     return rosterJson({ ok: true, sent: 0, queued: true, retryInMs: out.retryInMs });
   }
   if (out.throttled) {
+    await logNotify(env, scope, { changes: changes.length, result: 'cooldown' });
     return rosterJson({
       error: 'cooldown',
       throttled: true,
@@ -603,9 +619,11 @@ async function handleNotify(request, env) {
     }, 429);
   }
   if (!out.sent) {
+    await logNotify(env, scope, { changes: changes.length, result: 'failed' });
     return rosterJson({ error: 'notify_failed', hint: 'DISCORD_CHANNEL_ID (Kanal) oder DISCORD_USER_ID (DM) pruefen' }, 502);
   }
 
+  await logNotify(env, scope, { changes: changes.length, result: 'sent', sent: out.sent, force: body.force === true });
   return rosterJson({ ok: true, sent: out.sent });
 }
 
@@ -951,6 +969,19 @@ async function handleHealth(request, env, url) {
     }
   } catch (e) {
     out.locksError = String(e && e.message || e);
+  }
+
+  try {
+    const logList = await env.FEEDBACK_TF.list({ prefix: 'rb:notifylog:' });
+    out.logs = [];
+    for (const k of logList.keys) {
+      const v = await kvGet(env, k.name);
+      if (Array.isArray(v)) out.logs.push({ key: k.name, entries: v.slice(0, 5) });
+    }
+    const qList = await env.FEEDBACK_TF.list({ prefix: 'rb:notifyq:' });
+    out.queue = qList.keys.map(k => k.name);
+  } catch (e) {
+    out.logsError = String(e && e.message || e);
   }
 
   if (url.searchParams.get('send') === '1') out.discord = await diagnoseDiscord(env);
