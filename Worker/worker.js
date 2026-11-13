@@ -13,13 +13,16 @@
          GET  /guild?guild=<id>&key=<mod-key>
          GET  /guildstats?guild=<id>&window=7d|30d|90d|all&force=1&key=<mod-key>
          GET  /guildrecent?guild=<id>&force=1&key=<mod-key>
+         GET  /alerts?guild=<id>&notify=0|1&force=1&key=<mod-key>
          GET  /deaths/detail?guild=<id>&name=<name>&key=<mod-key>
+       - Cron (scheduled): prüft alle 5 Minuten die letzten 3 Battles auf Mehrfach-Tode
 
    Bindings:
      MOD_KEY            (Pflicht, Moderatoren-Key)
-     DISCORD_TOKEN      (Pflicht für DM/Pin)
-     DISCORD_USER_ID    (Pflicht, Komma-getrennt erlaubt)
-     DISCORD_CHANNEL_ID (optional, nur fürs Anpinnen)
+     DISCORD_TOKEN      (Pflicht für Meldungen)
+     DISCORD_CHANNEL_ID (Pflicht, Zielkanal für Feedback/Anmeldungen/Todeswarnungen)
+     DISCORD_USER_ID    (optional, nur Fallback-DM wenn keine Kanal-ID gesetzt ist)
+     ALERT_GUILD        (optional, Gilden-ID für den Cron; Standard ist The-Fallen)
      FEEDBACK_TF        (Pflicht, KV; dient auch als Cache für Tode)
    ========================================================================== */
 
@@ -379,6 +382,56 @@ async function handleRoster(request, env, url) {
 
 /* ---------- Discord ------------------------------------------------------- */
 
+const DISCORD_API = 'https://discord.com/api/v10';
+
+function discordAuth(env) {
+  return {
+    'Authorization': 'Bot ' + env.DISCORD_TOKEN,
+    'Content-Type': 'application/json'
+  };
+}
+
+/** Eine Nachricht in einen Kanal posten. 1 = ok, 0 = fehlgeschlagen. */
+async function postChannel(env, channelId, content) {
+  if (!env.DISCORD_TOKEN || !channelId) return 0;
+  try {
+    const res = await fetch(DISCORD_API + '/channels/' + channelId + '/messages', {
+      method: 'POST',
+      headers: discordAuth(env),
+      body: JSON.stringify({ content: content.slice(0, 1900) })
+    });
+    return res.ok ? 1 : 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+/** Fallback: DM an alle Moderatoren. */
+async function dmMods(env, content) {
+  const ids = String(env.DISCORD_USER_ID || '').split(',').map(s => s.trim()).filter(Boolean);
+  let sent = 0;
+  for (const id of ids) {
+    try {
+      const dm = await fetch(DISCORD_API + '/users/@me/channels', {
+        method: 'POST',
+        headers: discordAuth(env),
+        body: JSON.stringify({ recipient_id: id })
+      });
+      if (!dm.ok) continue;
+      const ch = await dm.json();
+      if (await postChannel(env, ch.id, content)) sent++;
+    } catch (e) { /* nächster Empfänger */ }
+  }
+  return sent;
+}
+
+/** Alle Meldungen gehen in den Moderations-Kanal; ohne Kanal-ID als DM. */
+async function notifyMods(env, content) {
+  if (!env.DISCORD_TOKEN) return 0;
+  if (env.DISCORD_CHANNEL_ID) return postChannel(env, env.DISCORD_CHANNEL_ID, content);
+  return dmMods(env, content);
+}
+
 async function handleNotify(request, env) {
   if (request.method !== 'POST') return rosterJson({ error: 'method_not_allowed' }, 405);
 
@@ -394,10 +447,7 @@ async function handleNotify(request, env) {
     ? body.link
     : 'https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster';
 
-  const auth = {
-    'Authorization': 'Bot ' + env.DISCORD_TOKEN,
-    'Content-Type': 'application/json'
-  };
+  const auth = discordAuth(env);
 
   /* Link in einen Kanal posten und anpinnen */
   if (body.type === 'pin') {
@@ -439,32 +489,13 @@ async function handleNotify(request, env) {
       : 'Anmeldung von: **' + name + '** → ' + role;
   });
 
-  let content = '**Roster-Update**' + (eventTitle ? ' · ' + eventTitle : '') + '\n'
+  let content = '**📋 Neue Anmeldung**' + (eventTitle ? ' · ' + eventTitle : '') + '\n'
     + lines.join('\n')
     + '\n\nManuell anpassen: ' + link;
   if (content.length > 1900) content = content.slice(0, 1870) + '\n… (gekürzt)';
 
-  const ids = String(env.DISCORD_USER_ID || '').split(',').map(s => s.trim()).filter(Boolean);
-  if (!ids.length) return rosterJson({ error: 'no_recipient', hint: 'DISCORD_USER_ID fehlt' }, 400);
-
-  let sent = 0;
-  for (const id of ids) {
-    try {
-      const dm = await fetch('https://discord.com/api/v10/users/@me/channels', {
-        method: 'POST',
-        headers: auth,
-        body: JSON.stringify({ recipient_id: id })
-      });
-      if (!dm.ok) continue;
-      const ch = await dm.json();
-      const msg = await fetch('https://discord.com/api/v10/channels/' + ch.id + '/messages', {
-        method: 'POST',
-        headers: auth,
-        body: JSON.stringify({ content })
-      });
-      if (msg.ok) sent++;
-    } catch (e) { /* nächster Empfänger */ }
-  }
+  const sent = await notifyMods(env, content);
+  if (!sent) return rosterJson({ error: 'notify_failed', hint: 'DISCORD_CHANNEL_ID (Kanal) oder DISCORD_USER_ID (DM) prüfen' }, 502);
 
   return rosterJson({ ok: true, sent });
 }
@@ -477,6 +508,9 @@ const ZVZ_MIN_GROUP = 10;   // Fallback, falls die Battle-Liste nicht erreichbar
 const ZVZ_MASS_MIN = 15;    // unsere typische ZvZ-Größe
 const ZVZ_MASS_MAX = 29;
 const ZVZ_AGG_MAX = 40;     // Subrequest-Limit der Free-Instanz (max. 50 pro Aufruf) schonen
+const ALERT_MIN_DEATHS = 2; // ab 2 Toden in einem Battle -> Erinnerung
+const ALERT_BATTLES = 3;    // die letzten 3 ZvZ-Battles prüfen
+const ALERT_TTL = 30 * 86400; // Merker 30 Tage (Battles sind unveränderlich)
 const ALBION_UA = 'The-Fallen-Roster/1.0 (+https://the-fallen-zvz.github.io/)';
 
 /**
@@ -591,6 +625,118 @@ async function zvzAggregate(env, guildId, days, limit) {
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* ---------- Todes-Erinnerung (letzte 3 Battles) ---------------------------- */
+
+function alertKey(guild, a) {
+  return 'rb:alert:' + guild + ':' + a.battleId + ':' + String(a.name || '').toLowerCase();
+}
+
+/** Spieler mit mindestens 2 Toden in den letzten 3 ZvZ-Battles. */
+async function collectDeathAlerts(env, guild) {
+  const battles = await zvzAggregate(env, guild, 90, ALERT_BATTLES);
+  const alerts = [];
+
+  battles.forEach(bt => {
+    (bt.players || []).forEach(p => {
+      if (p.guildId !== guild) return;
+      if ((p.deaths || 0) < ALERT_MIN_DEATHS) return;
+      alerts.push({
+        name: p.name,
+        deaths: p.deaths,
+        kills: p.kills || 0,
+        battleId: bt.id,
+        t: bt.t,
+        mass: bt.mass
+      });
+    });
+  });
+
+  return { alerts, battles: battles.length };
+}
+
+function alertTime(ms) {
+  return new Date(ms).toLocaleString('de-DE', {
+    timeZone: 'Europe/Berlin',
+    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+  });
+}
+
+/** Eine eigene Nachricht pro Battle, nur mit den neuen Fällen. */
+async function sendDeathAlerts(env, fresh) {
+  const byBattle = new Map();
+  fresh.forEach(a => {
+    if (!byBattle.has(a.battleId)) byBattle.set(a.battleId, { t: a.t, mass: a.mass, list: [] });
+    byBattle.get(a.battleId).list.push(a);
+  });
+
+  let sent = 0;
+  for (const [, b] of byBattle) {
+    const lines = b.list
+      .sort((x, y) => y.deaths - x.deaths || y.kills - x.kills)
+      .map(x => '• **' + x.name + '** — ' + x.deaths + ' Tode, ' + x.kills + ' Kills');
+
+    const content = '**☠️ Todes-Erinnerung · ZvZ**\n'
+      + 'Battle ' + alertTime(b.t) + ' · Masse ' + (b.mass || '?') + '\n'
+      + lines.join('\n');
+
+    sent += await notifyMods(env, content);
+  }
+  return sent;
+}
+
+/**
+ * Prüft die letzten Battles und meldet neue Mehrfach-Tode.
+ * Merker pro Battle+Spieler verhindert Wiederholungen.
+ */
+async function checkDeathAlerts(env, guild, opts = {}) {
+  const { alerts, battles } = await collectDeathAlerts(env, guild);
+
+  const fresh = [];
+  for (const a of alerts) {
+    if (await kvGet(env, alertKey(guild, a))) continue;
+    fresh.push(a);
+  }
+
+  let sent = 0;
+  if (fresh.length && opts.notify !== false) {
+    sent = await sendDeathAlerts(env, fresh);
+    if (sent > 0) {
+      for (const a of fresh) await kvPut(env, alertKey(guild, a), 1, ALERT_TTL);
+    }
+  }
+
+  return { battles, total: alerts.length, fresh: fresh.length, sent };
+}
+
+/** Manueller/Client-Aufruf: /alerts?guild=…&key=…[&notify=0][&force=1] */
+async function handleAlerts(request, env, url) {
+  if (request.method !== 'GET') return rosterJson({ error: 'method_not_allowed' }, 405);
+  if (!env.MOD_KEY || url.searchParams.get('key') !== env.MOD_KEY) {
+    return rosterJson({ error: 'unauthorized' }, 401);
+  }
+
+  const guild = (url.searchParams.get('guild') || '').trim();
+  if (!/^[A-Za-z0-9_-]{10,30}$/.test(guild)) {
+    return rosterJson({ error: 'bad_guild' }, 400);
+  }
+
+  if (url.searchParams.get('force') === '1') await kvDelete(env, 'rb:zvz:' + guild);
+
+  let res;
+  try { res = await checkDeathAlerts(env, guild, { notify: url.searchParams.get('notify') !== '0' }); }
+  catch (e) { return rosterJson({ error: 'alerts_unreachable', detail: String(e && e.message || e) }, 502); }
+
+  return rosterJson({
+    guild,
+    battles: res.battles,
+    minDeaths: ALERT_MIN_DEATHS,
+    total: res.total,
+    fresh: res.fresh,
+    sent: res.sent,
+    checkedAt: new Date().toISOString()
+  });
+}
 
 async function kvGet(env, key) {
   try {
@@ -958,6 +1104,11 @@ export default {
       catch (e) { return rosterJson({ error: 'guildrecent_failed', detail: String(e && e.message || e) }, 500); }
     }
 
+    if (url.pathname === '/alerts') {
+      try { return await handleAlerts(request, env, url); }
+      catch (e) { return rosterJson({ error: 'alerts_failed', detail: String(e && e.message || e) }, 500); }
+    }
+
     if (url.pathname === '/deaths/detail') {
       try { return await handleDeathDetail(request, env, url); }
       catch (e) { return rosterJson({ error: 'detail_failed', detail: String(e && e.message || e) }, 500); }
@@ -987,35 +1138,14 @@ export default {
           }));
         }
 
-        const discordPayload = {
-          content: `**Neues Feedback!**\n**Bereich:** ${body.category} > ${body.subcategory}\n**Nachricht:**\n${body.message}`
-        };
+        const text = '**📝 Neues Feedback**\n'
+          + '**Bereich:** ' + body.category + ' > ' + body.subcategory + '\n'
+          + '**Nachricht:**\n' + String(body.message).slice(0, 1500);
 
-        const discordResponse = await fetch('https://discord.com/api/v10/users/@me/channels', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bot ${env.DISCORD_TOKEN}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ recipient_id: env.DISCORD_USER_ID.split(',')[0] })
-        });
+        let notified = 0;
+        try { notified = await notifyMods(env, text); } catch (e) { notified = 0; }
 
-        if (!discordResponse.ok) {
-          throw new Error("Discord DM konnte nicht gesendet werden.");
-        }
-
-        const dmChannel = await discordResponse.json();
-
-        await fetch(`https://discord.com/api/v10/channels/${dmChannel.id}/messages`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bot ${env.DISCORD_TOKEN}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(discordPayload)
-        });
-
-        return new Response(JSON.stringify({ success: true }), 
+        return new Response(JSON.stringify({ success: true, notified: !!notified }), 
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
@@ -1098,5 +1228,11 @@ export default {
     }
 
     return new Response('Methode nicht erlaubt', { status: 405, headers: corsHeaders });
+  },
+
+  /* Cron-Trigger (z. B. alle 5 Minuten): Todes-Erinnerungen prüfen */
+  async scheduled(event, env, ctx) {
+    const guild = env.ALERT_GUILD || 'p9uAFij9ReO0BhIhHlVa8g';
+    ctx.waitUntil(checkDeathAlerts(env, guild).catch(() => {}));
   }
 };

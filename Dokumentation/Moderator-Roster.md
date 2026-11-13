@@ -10,7 +10,7 @@ Stand: 13.11.2026 · **in `Anwendung/index.html` eingebaut** · Worker-Erweiteru
 | Gilde-Tab `#admin-guild` | eingebaut: alle Mitglieder, Klick zeigt die letzten Tode |
 | AlbionZvZ | **bleibt verbindlich** – das Brain liefert nur den Vorschlag und eine Kopiervorlage |
 | Worker-Route `/roster` | Code fertig (`Worker/roster.js`), muss noch deployt werden |
-| Discord | DM bei jeder Änderung, optional angepinnter Roster-Link |
+| Discord | Kanal-Nachricht bei jeder Änderung, Todes-Erinnerung per Cron, optional angepinnter Roster-Link |
 | Historie | lokal im Browser (später optional KV) |
 | Live-Aktualisierung | Polling alle 5 Minuten, startet beim Öffnen automatisch |
 | Auto-Zuweisung | standardmäßig an: bei Änderungen sofort, sonst alle 5 Minuten |
@@ -42,19 +42,21 @@ Damit ist der Ablauf: Moderatoren-Login → Seite öffnen (Live + Auto laufen) �
 
 Der Schalter **Discord** (neben „Historie +1") steuert, ob Meldungen rausgehen; Standard ist an.
 
+Alle Meldungen gehen in den Kanal aus `DISCORD_CHANNEL_ID` (Feedback, Anmeldungen, Todes-Erinnerung). Ist keine Kanal-ID gesetzt, fällt der Worker auf DMs an `DISCORD_USER_ID` zurück.
+
 Ablauf: Nach jedem Build vergleicht die Seite die Zuweisung mit dem zuletzt gemeldeten Stand (`tf-rb-notified`, pro Event). Nur echte Änderungen erzeugen eine Nachricht:
 
 ```
-**Roster-Update** · ZVZ-Builds ZVZ Test Event
+**📋 Neue Anmeldung** · ZVZ-Builds ZVZ Test Event
 Anmeldung von: **Pinsel** → Locus
 Anmeldung von: **Boerse** → Tank Hallowfall
 
 Manuell anpassen: https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster
 ```
 
-- **Ein Spieler = eine Zeile**, mehrere Änderungen gebündelt in einer DM (max. 20, Rest gekürzt).
-- **Nur wenn sich jemand neu angemeldet hat.** Reine Rollenverschiebungen (z. B. nach einer Historienänderung) lösen keine DM aus. Wer innerhalb der 5 Minuten dazukommt, landet in derselben Nachricht.
-- **Beim ersten Öffnen keine DM** – die Erstbelegung ist keine neue Anmeldung.
+- **Ein Spieler = eine Zeile**, mehrere Änderungen gebündelt in einer Nachricht (max. 20, Rest gekürzt).
+- **Nur wenn sich jemand neu angemeldet hat.** Reine Rollenverschiebungen (z. B. nach einer Historienänderung) lösen keine Meldung aus. Wer innerhalb der 5 Minuten dazukommt, landet in derselben Nachricht.
+- **Beim ersten Öffnen keine Meldung** – die Erstbelegung ist keine neue Anmeldung.
 - **Wer den Slot verlässt**, wird als „hat den Slot verlassen" gemeldet.
 - **Kein Doppelversand:** gleicher Spieler + gleiche Rolle wird nicht erneut geschickt; erst eine neue Rolle löst wieder aus.
 - **Nur bei geänderten Daten** – ein Poll ohne Änderung schickt nichts.
@@ -62,7 +64,21 @@ Manuell anpassen: https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster
 
 **Link anpinnen:** Der Button „Link anpinnen" postet den Roster-Link in `DISCORD_CHANNEL_ID` und pinnt die Nachricht. Dafür braucht der Bot `MANAGE_MESSAGES` im Kanal. Ohne die Variable meldet die Seite „DISCORD_CHANNEL_ID fehlt".
 
-Hinweis: DMs selbst lassen sich in Discord nicht anpinnen – deshalb DM für Updates, Kanal-Pin für den Link.
+## Todes-Erinnerung im Kanal
+
+Der Cron-Trigger (`*/5 * * * *`) prüft die **letzten 3 ZvZ-Battles**. Wer in einem dieser Battles **mindestens 2 Tode** hat, löst eine Nachricht aus:
+
+```
+**☠️ Todes-Erinnerung · ZvZ**
+Battle 13.11., 21:34 · Masse 21
+• **Relgok** — 3 Tode, 1 Kill
+• **PDragonyx** — 2 Tode, 4 Kills
+```
+
+- Eine Nachricht pro Battle, sortiert nach Toden.
+- Merker `rb:alert:<guild>:<battleId>:<name>` im KV (30 Tage): jede Warnung kommt genau einmal, auch wenn Cron und manueller Aufruf parallel laufen.
+- Manuell testen: `GET /alerts?guild=<id>&key=<mod-key>` (nur prüfen: `&notify=0`, Cache erneuern: `&force=1`).
+- Gilden-ID für den Cron: `ALERT_GUILD`, Standard `p9uAFij9ReO0BhIhHlVa8g` (The-Fallen).
 
 ## Tode und Aktivität (Albion-API)
 
@@ -164,6 +180,7 @@ Datenquelle: `/guildstats` (Players-Tabelle) und `/guildrecent` (Battle-Aggregat
    GET /deaths/detail?guild=<id>&name=<name>&key=<mod-key>
    GET /guildstats?guild=<id>&window=30d&key=<mod-key>   → alle Spieler
    GET /guildrecent?guild=<id>&key=<mod-key>             → Tode der letzten 3 Tage
+   GET /alerts?guild=<id>&key=<mod-key>                  → Todes-Erinnerung prüfen
    ```
 
    Ohne `key` muss überall `401 unauthorized` kommen. `&force=1` umgeht den 12-h-Cache (Button „Daten aktualisieren" im Statistik-Tab).
@@ -190,7 +207,7 @@ export default {
 
 </details>
 
-**Bindings:** `MOD_KEY`, `DISCORD_TOKEN`, `DISCORD_USER_ID` sind vorhanden; optional `DISCORD_CHANNEL_ID` für den Pin. `FEEDBACK_TF` dient als Cache – es kommt nichts Neues dazu.
+**Bindings:** `MOD_KEY`, `DISCORD_TOKEN` und `FEEDBACK_TF` sind vorhanden. `DISCORD_CHANNEL_ID` muss auf den Zielkanal gesetzt sein (Feedback, Anmeldungen, Todes-Erinnerung und Pin). `DISCORD_USER_ID` bleibt optional als DM-Fallback. `ALERT_GUILD` ist optional. Zusätzlich im Dashboard unter **Triggers** einen Cron-Trigger `*/5 * * * *` anlegen, damit die Todes-Erinnerung ohne offene Seite läuft.
 
 **CORS:** Der Worker antwortet mit `Access-Control-Allow-Origin: *` wie der bisherige Code; der Mod-Key bleibt der Riegel. Dadurch funktioniert die Seite auch von `file://` und localhost.
 

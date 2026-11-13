@@ -12,6 +12,15 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-13 – Discord: Kanal-Meldungen und Todes-Erinnerung
+
+- Alle Meldungen gehen jetzt in einen Discord-Kanal (`DISCORD_CHANNEL_ID`), nicht mehr als DM; ohne Kanal-ID greift weiterhin die DM als Fallback
+- Drei eigene Nachrichtenformate: **📝 Neues Feedback**, **📋 Neue Anmeldung**, **☠️ Todes-Erinnerung**
+- Feedback-Post scheitert nicht mehr, wenn Discord nicht erreichbar ist (Feedback liegt im KV, Antwort enthält `notified`)
+- Neu: `GET /alerts?guild=…&key=…` prüft die letzten 3 ZvZ-Battles und meldet Spieler mit mindestens 2 Toden in einem Battle (Name, Tode, Kills, Battle-Zeit, Masse)
+- Merker pro Battle + Spieler im KV (30 Tage), damit jede Warnung nur einmal kommt
+- `scheduled`-Handler für einen Cron-Trigger (`*/5 * * * *`); Gilden-ID über `ALERT_GUILD`, Standard The-Fallen
+
 ### 2026-11-13 – Statistik-Tab: Gesamtübersicht, 3-Tage-Tode, 12-h-Cache
 
 - Neuer Admin-Tab **Statistik** (`#admin-stats`), erreichbar über die Seitenleiste unter „Gilde"
