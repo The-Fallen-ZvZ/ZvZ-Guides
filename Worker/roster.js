@@ -301,6 +301,13 @@ async function handleNotify(request, env) {
 
 const ALBION_BASE = 'https://gameinfo-ams.albiononline.com/api/gameinfo';
 const DEATH_TTL_MS = 12 * 60 * 60 * 1000;
+const ZVZ_MIN_GROUP = 10;   // ab 10 Spielern in der Gruppe gilt ein Kill/Tod als ZvZ
+
+/** ZvZ-Erkennung: große eigene Gruppe oder viele beteiligte Gegner. */
+function isZvzEvent(d) {
+  return (d.groupMemberCount || 0) >= ZVZ_MIN_GROUP
+      || (d.numberOfParticipants || 0) >= ZVZ_MIN_GROUP;
+}
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -345,29 +352,26 @@ async function guildMembers(env, guildId) {
   return slim;
 }
 
-/** Todes-Zeitstempel eines Spielers, 12 h gecacht. */
+/** Todes-Ereignisse eines Spielers (Zeit + ZvZ-Flag), 12 h gecacht. */
 async function playerDeaths(env, id) {
-  const key = 'rb:deaths:' + id;
+  const key = 'rb:deaths2:' + id;
   const cached = await kvGet(env, key);
   if (cached && cached.at && Date.now() - cached.at < DEATH_TTL_MS) return cached;
 
-  const cutoff = Date.now() - 35 * 86400000;
-  const stamps = [];
+  const events = [];
 
-  // maximal zwei Seiten (20 Tode); reicht fuer 30-Tage-Zaehlung in der Praxis
-  for (let offset = 0; offset < 20; offset += 10) {
+  for (let offset = 0; offset < 40; offset += 10) {
     const page = await albionJson(ALBION_BASE + '/players/' + id + '/deaths?limit=10&offset=' + offset);
     if (!Array.isArray(page) || !page.length) break;
     page.forEach(d => {
       const t = new Date(d.TimeStamp).getTime();
-      if (t) stamps.push(t);
+      if (t) events.push({ t, z: isZvzEvent(d) ? 1 : 0 });
     });
     if (page.length < 10) break;
-    if (stamps.length && Math.min.apply(null, stamps) < cutoff) break;
     await sleep(600);
   }
 
-  const data = { at: Date.now(), stamps: stamps.slice().sort((a, b) => b - a) };
+  const data = { at: Date.now(), events: events.sort((a, b) => b.t - a.t) };
   await kvPut(env, key, data);
   return data;
 }
@@ -412,15 +416,17 @@ async function handleDeaths(request, env, url) {
   for (const t of targets) {
     try {
       const d = await playerDeaths(env, t.m.id);
-      const recent = d.stamps.filter(x => x >= cutoff);
-      const week = d.stamps.filter(x => x >= cutoffWeek);
-      const last = d.stamps.length ? d.stamps[0] : 0;
+      const recent = d.events.filter(x => x.t >= cutoff);
+      const week = d.events.filter(x => x.t >= cutoffWeek);
+      const last = d.events.length ? d.events[0].t : 0;
 
       players[t.name] = {
         deaths: recent.length,
+        zvz: recent.filter(x => x.z).length,
         deaths7: week.length,
+        zvz7: week.filter(x => x.z).length,
         lastDays: last ? Math.floor((Date.now() - last) / 86400000) : null,
-        partial: d.stamps.length >= 10 && (!last || (Date.now() - last) < cutoff)
+        partial: d.events.length >= 40 && !!last && last >= cutoff
       };
     } catch (e) {
       missing.push(t.name);
@@ -452,37 +458,64 @@ async function handleGuild(request, env, url) {
   return rosterJson({ guild, count: sorted.length, members: sorted });
 }
 
-/** Letzte Tode eines Spielers mit Details, 12 h gecacht. */
-async function playerDeathDetail(env, id) {
-  const key = 'rb:detail:' + id;
-  const cached = await kvGet(env, key);
-  if (cached && cached.at && Date.now() - cached.at < DEATH_TTL_MS) return cached;
-
+/** Rohdaten eines Spielers (deaths oder kills) mit ZvZ-Flag, max. 40 Einträge. */
+async function fetchPlayerEvents(env, id, kind) {
   const events = [];
-  for (let offset = 0; offset < 30; offset += 10) {
-    const page = await albionJson(ALBION_BASE + '/players/' + id + '/deaths?limit=10&offset=' + offset);
+
+  for (let offset = 0; offset < 40; offset += 10) {
+    const page = await albionJson(ALBION_BASE + '/players/' + id + '/' + kind + '?limit=10&offset=' + offset);
     if (!Array.isArray(page) || !page.length) break;
 
     page.forEach(d => {
-      events.push({
-        t: d.TimeStamp,
+      const t = d.TimeStamp;
+      if (!t) return;
+      const base = {
+        t,
+        zvz: isZvzEvent(d) ? 1 : 0,
         area: d.KillArea || '',
-        killer: d.Killer && d.Killer.Name ? d.Killer.Name : '',
-        killerGuild: d.Killer && d.Killer.GuildName ? d.Killer.GuildName : '',
-        killerAlliance: d.Killer && d.Killer.AllianceName ? d.Killer.AllianceName : '',
-        weapon: d.Victim && d.Victim.Equipment && d.Victim.Equipment.MainHand
-          ? d.Victim.Equipment.MainHand.Type : '',
-        ip: Math.round((d.Victim && d.Victim.AverageItemPower) || 0),
+        group: d.groupMemberCount || 0,
+        parts: d.numberOfParticipants || 0,
         fame: d.TotalVictimKillFame || 0,
         battleId: d.BattleId || null
-      });
+      };
+
+      if (kind === 'deaths') {
+        events.push(Object.assign(base, {
+          killer: d.Killer && d.Killer.Name ? d.Killer.Name : '',
+          killerGuild: d.Killer && d.Killer.GuildName ? d.Killer.GuildName : '',
+          killerAlliance: d.Killer && d.Killer.AllianceName ? d.Killer.AllianceName : '',
+          weapon: d.Victim && d.Victim.Equipment && d.Victim.Equipment.MainHand
+            ? d.Victim.Equipment.MainHand.Type : '',
+          ip: Math.round((d.Victim && d.Victim.AverageItemPower) || 0)
+        }));
+      } else {
+        events.push(Object.assign(base, {
+          victim: d.Victim && d.Victim.Name ? d.Victim.Name : '',
+          victimGuild: d.Victim && d.Victim.GuildName ? d.Victim.GuildName : '',
+          weapon: d.Killer && d.Killer.Equipment && d.Killer.Equipment.MainHand
+            ? d.Killer.Equipment.MainHand.Type : '',
+          ip: Math.round((d.Killer && d.Killer.AverageItemPower) || 0)
+        }));
+      }
     });
 
     if (page.length < 10) break;
     await sleep(600);
   }
 
-  const data = { at: Date.now(), events };
+  return events;
+}
+
+/** Tode und Kills eines Spielers, 12 h gecacht. */
+async function playerDeathDetail(env, id) {
+  const key = 'rb:detail2:' + id;
+  const cached = await kvGet(env, key);
+  if (cached && cached.at && Date.now() - cached.at < DEATH_TTL_MS) return cached;
+
+  const deaths = await fetchPlayerEvents(env, id, 'deaths');
+  const kills = await fetchPlayerEvents(env, id, 'kills');
+
+  const data = { at: Date.now(), deaths, kills };
   await kvPut(env, key, data);
   return data;
 }
@@ -518,7 +551,13 @@ async function handleDeathDetail(request, env, url) {
     guild,
     name: member.name,
     id: member.id,
-    deaths: detail.events,
+    zvzMin: ZVZ_MIN_GROUP,
+    deaths: detail.deaths,
+    kills: detail.kills,
+    capped: {
+      deaths: detail.deaths.length >= 40,
+      kills: detail.kills.length >= 40
+    },
     fetchedAt: new Date(detail.at).toISOString()
   });
 }

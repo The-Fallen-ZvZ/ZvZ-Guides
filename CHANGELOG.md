@@ -12,6 +12,16 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-13 – ZvZ-Filter, K/D und sparsamere Abfragen
+
+- ZvZ-Erkennung über `groupMemberCount >= 10` bzw. `numberOfParticipants >= 10` (`ZVZ_MIN_GROUP`); Roster-Badge und Gewichtung nutzen nur noch ZvZ-Tode
+- Gilde-Tab: Umschalter **ZvZ / Gesamt**, Zeitraum **7 / 14 / 30 / Gesamt**, Auswertung mit Toden, Kills und K/D für beide Welten
+- `/deaths/detail` liefert jetzt Tode **und** Kills (je max. 40) inklusive ZvZ-Flag, Gruppe und Beteiligten
+- Polling von 5 s auf **5 Minuten** reduziert (Roster-Abruf), Auto-Zuweisung bleibt bei 5 Minuten
+- Discord-DM nur noch, wenn sich jemand **neu angemeldet** hat; beim ersten Öffnen keine Nachricht, Änderungen innerhalb von 5 Minuten gebündelt
+- Cache 12 h für Tode/Details; `/deaths` zählt bis 40 Ereignisse
+
+
 ### 2026-11-13 – Gilde-Tab mit Todesdetails
 
 - Neue Admin-Seite `#admin-guild`: alle Mitglieder alphabetisch, Suchfeld, Klick auf einen Namen zeigt die letzten Tode

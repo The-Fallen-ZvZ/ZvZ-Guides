@@ -12,14 +12,14 @@ Stand: 13.11.2026 · **in `Anwendung/index.html` eingebaut** · Worker-Erweiteru
 | Worker-Route `/roster` | Code fertig (`Worker/roster.js`), muss noch deployt werden |
 | Discord | DM bei jeder Änderung, optional angepinnter Roster-Link |
 | Historie | lokal im Browser (später optional KV) |
-| Live-Aktualisierung | Polling alle 5 s, startet beim Öffnen automatisch |
+| Live-Aktualisierung | Polling alle 5 Minuten, startet beim Öffnen automatisch |
 | Auto-Zuweisung | standardmäßig an: bei Änderungen sofort, sonst alle 5 Minuten |
 
 ## Ablauf im Betrieb
 
 1. Moderatoren-Login → **Roster-Brain** in der Seitenleiste.
 2. Event-Token aus dem AlbionZvZ-Link einfügen (`/e/…`) → **Verbinden**.
-3. **Live** startet automatisch – neue Anmeldungen erscheinen ohne Reload (≤ 5 s). Beim Zurückwechseln in den Tab wird sofort aktualisiert.
+3. **Live** startet automatisch – neue Anmeldungen erscheinen ohne Reload (Abfrage alle 5 Minuten). Beim Zurückwechseln in den Tab wird sofort aktualisiert.
 4. **Auto** ist standardmäßig an: Das Gehirn weist bei jeder Änderung sofort und sonst alle 5 Minuten selbst zu. Wer selbst bauen will, schaltet Auto aus – oder greift einfach manuell ein, dann schaltet es sich ab.
 5. **Build the Group** – einmaliger Vorschlag mit Begründung, Konflikten, Bank und offenen Slots.
 5. Manuell korrigieren: Spieler auf einen Slot ziehen, freien Slot anklicken (nach Passung sortierte Liste), × zum Entfernen.
@@ -53,6 +53,8 @@ Manuell anpassen: https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster
 ```
 
 - **Ein Spieler = eine Zeile**, mehrere Änderungen gebündelt in einer DM (max. 20, Rest gekürzt).
+- **Nur wenn sich jemand neu angemeldet hat.** Reine Rollenverschiebungen (z. B. nach einer Historienänderung) lösen keine DM aus. Wer innerhalb der 5 Minuten dazukommt, landet in derselben Nachricht.
+- **Beim ersten Öffnen keine DM** – die Erstbelegung ist keine neue Anmeldung.
 - **Wer den Slot verlässt**, wird als „hat den Slot verlassen" gemeldet.
 - **Kein Doppelversand:** gleicher Spieler + gleiche Rolle wird nicht erneut geschickt; erst eine neue Rolle löst wieder aus.
 - **Nur bei geänderten Daten** – ein Poll ohne Änderung schickt nichts.
@@ -68,10 +70,14 @@ Der Auto-Zuweiser liest die Todesdaten über die offizielle API, nicht über die
 
 | Feld | Bedeutung |
 | --- | --- |
-| `deaths` | Tode in den letzten 30 Tagen (max. 20 gezählt, `partial` markiert die Obergrenze) |
+| `deaths` | Tode in den letzten 30 Tagen (max. 40 gezählt, `partial` markiert die Obergrenze) |
+| `zvz` | davon ZvZ-Tode |
 | `deaths7` | Tode in den letzten 7 Tagen |
+| `zvz7` | davon ZvZ-Tode |
 | `lastDays` | Tage seit dem letzten Tod, `null` = keine Tode erfasst |
 | `missing` | Namen, die nicht in der Gilde gefunden wurden (z. B. Twinks) |
+
+**ZvZ-Erkennung:** Ein Kill/Tod zählt als ZvZ, wenn `groupMemberCount >= 10` oder `numberOfParticipants >= 10` – also die eigene Gruppe mindestens 10 Spieler hatte oder mindestens 10 Gegner beteiligt waren. Der Schwellwert steht als `ZVZ_MIN_GROUP` im Worker. Reine Solo-/Gank-Tode fallen damit raus.
 
 Gewichtung im Gehirn (max. ±10 Punkte, damit Wünsche dominieren):
 
@@ -80,9 +86,9 @@ Gewichtung im Gehirn (max. ±10 Punkte, damit Wünsche dominieren):
 | letzter Tod ≤ 7 Tage | +6 |
 | ≤ 14 Tage | +3 |
 | älter als 30 Tage | −5 |
-| je Tod in 30 Tagen | −0,5 (max. −6) |
+| je **ZvZ**-Tod in 30 Tagen | −0,5 (max. −6) |
 
-Das ist bewusst **Aktivität plus leichte Vorsicht**, keine Bestrafung: Tanks sterben systembedingt häufiger als Longbows. Angezeigt wird die Zahl als `† 10 · zuletzt vor 3 Tagen`, grün bis 7 Tage, orange bis 30, grau danach.
+Das ist bewusst **Aktivität plus leichte Vorsicht**, keine Bestrafung: Tanks sterben systembedingt häufiger als Longbows. Angezeigt wird die ZvZ-Zahl als `† 4 ZvZ · zuletzt vor 3 Tagen`, grün bis 7 Tage, orange bis 30, grau danach.
 
 **Cache und Drosselung:** Der Worker hält Mitglieder 12 h und Tode pro Spieler 12 h im vorhandenen KV (`FEEDBACK_TF`). Beim ersten Abruf fragt er die API sequenziell mit 700 ms Abstand (die API antwortet sonst mit 429), danach kommt alles aus dem Cache. Nur die angemeldeten Spieler werden abgefragt, maximal 60 pro Aufruf.
 
@@ -90,20 +96,35 @@ Das ist bewusst **Aktivität plus leichte Vorsicht**, keine Bestrafung: Tanks st
 
 ## Gilde-Tab
 
-`#admin-guild` listet alle Mitglieder alphabetisch (mit Suchfeld). Ein Klick auf einen Namen lädt die letzten Tode:
+`#admin-guild` listet alle Mitglieder alphabetisch (mit Suchfeld). Ein Klick auf einen Namen lädt die letzten Tode.
+
+Oben im Detailbereich zwei Umschalter:
+
+| Schalter | Wirkung |
+| --- | --- |
+| **ZvZ / Gesamt** | filtert die Todesliste (ZvZ-Tode vs. alle Tode) |
+| **7 T / 14 T / 30 T / Gesamt** | Zeitraum für Liste und Auswertung |
+
+Darunter steht die Auswertung für den gewählten Zeitraum, immer für beide Welten:
+
+```
+letzte 30 Tage   Tode  Kills  K/D
+ZvZ                 4     12  3,00
+Alle                9     25  2,78
+```
 
 | Spalte | Inhalt |
 | --- | --- |
 | Datum | Zeitpunkt des Todes |
 | wann | relativ („heute", „vor 3 Tagen") |
-| Gebiet | `OPEN_WORLD`, … |
+| Gebiet | `OPEN_WORLD`, … plus `ZvZ`-Marke |
 | getötet von | Spielername + Gilde |
 | Waffe | Waffe des Opfers aus `Equipment.MainHand` |
 | IP | durchschnittliche Item Power |
 
-Datenquelle: `/guild` (Mitglieder, 12 h im KV) und `/deaths/detail` (bis 30 Tode, 12 h Cache). Beim ersten Aufruf pro Spieler 1–3 API-Seiten, danach sofort.
+Datenquelle: `/guild` (Mitglieder, 12 h im KV) und `/deaths/detail` (bis 40 Tode und 40 Kills, 12 h Cache). Beim ersten Aufruf pro Spieler bis zu 8 API-Seiten, danach sofort.
 
-Grenzen: Die API kennt nur Tode, keine Heilung oder Assistenz; `KillArea` ist die einzige Ortsangabe. Namen müssen exakt dem In-Game-Namen entsprechen – Twinks erscheinen nicht in der Gildenliste.
+Grenzen: Die API kennt nur Tode/Kills, keine Heilung oder Assistenz; `KillArea` ist die einzige Ortsangabe. „Gesamt" umfasst die geladenen Einträge (max. 40 je Art), nicht die komplette Historie. Namen müssen exakt dem In-Game-Namen entsprechen – Twinks erscheinen nicht in der Gildenliste.
 
 ## Worker: was du ändern musst
 
@@ -156,7 +177,7 @@ https://<worker>/roster?event=<64-hex>                  -> 401 unauthorized
 
 - AlbionZvZ liefert öffentlich `GET /api/events/public/<token>/roster` (~4 KB) und `…/assignments/ops?sinceSeq=` (~400 B Delta).
 - Es gibt **keinen** CORS-Header und keinen WebSocket/SSE-Kanal – der Browser darf nicht direkt, und Push ist nicht verfügbar.
-- Deshalb: Worker holt die Daten, die Seite fragt den Worker alle 5 s. Das ist derselbe Weg, den AlbionZvZ selbst nutzt.
+- Deshalb: Worker holt die Daten, die Seite fragt den Worker alle 5 Minuten. Das ist derselbe Weg, den AlbionZvZ selbst nutzt.
 - Der Worker cacht die Event-Seite (Rollen + Comp) 5 Minuten, damit nicht bei jedem Poll 800 KB HTML geladen werden.
 
 ## Zahlen neben den Rollen
@@ -225,7 +246,7 @@ Die Engine arbeitet zweistufig (erst Party 1 + 2, dann Reserve), setzt den Calle
 2. **Kein Multi-Moderator-Sync** – die Live-Abfrage liest AlbionZvZ, nicht die Änderungen eines zweiten Callers.
 3. **Kein Zurückschreiben** nach AlbionZvZ: Das ginge nur mit deiner Login-Session und ist bewusst nicht eingebaut. Übertragung per Kopiervorlage.
 4. **Token manuell** – kein Event-Picker; der Link wird eingefügt.
-5. **Polling-Intervall 5 s** – bei Bedarf im Modul (`setInterval(..., 5000)`) anpassbar.
+5. **Polling-Intervall 5 Minuten** – bei Bedarf im Modul (`setInterval(..., 300000)`) anpassbar.
 
 ## Testprotokoll
 
@@ -241,3 +262,6 @@ Die Engine arbeitet zweistufig (erst Party 1 + 2, dann Reserve), setzt den Calle
 - Discord im Headless-Test: erste Meldung mit 12 Änderungen und Link, kein Doppelversand bei unverändertem Build, neuer Spieler löst genau eine Meldung mit einer Zeile aus, ausgeschalteter Schalter verhindert den Versand.
 - Gilde-Tab im Headless-Test: Mitgliederliste, Klick lädt Details, 5 Tode als Tabelle, Waffe lesbar (T8_MAIN_MACE → MACE), Suche filtert, keine JS-Fehler.
 - Worker `handleGuild`/`handleDeathDetail`: 200 mit sortierter Liste, 404 bei unbekanntem Namen, KV-Cache ohne erneuten API-Request.
+- ZvZ: Worker zählt Tode mit `groupMemberCount >= 10` bzw. `numberOfParticipants >= 10`; Testdaten 4 Tode (2 ZvZ) → `zvz: 2`, `zvz7: 2`.
+- Gilde-Tab: Umschalter ZvZ/Alle und 7/14/30/Gesamt, K/D 2/1 = 0,50 und 3/3 = 1,00, Gesamt 4/3 = 0,75.
+- Roster: nur ein Abruf in 8 s (5-Minuten-Intervall), beim Öffnen keine DM, nach einer neuen Anmeldung genau eine DM mit dem neuen Namen.

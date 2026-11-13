@@ -1551,7 +1551,7 @@ const RB = (function(){
   const S = {
     token:'', event:null, parties:[], players:[], playstyles:{}, hist:{},
     builtAt:null, log:null, live:null, last:null, status:'',
-    auto:false, lastAuto:0, changed:false,
+    auto:false, lastAuto:0, changed:false, newSignups:0,
     notify:true, notified:{}, deaths:{}, deathsAt:0
   };
 
@@ -1609,7 +1609,7 @@ const RB = (function(){
     return s;
   }
 
-  /** Aktivität aus der Albion-API: kürzlich gestorben = aktiv, viele Tode = leichte Abwertung. */
+  /** Aktivität aus der Albion-API: kürzlich gestorben = aktiv, viele ZvZ-Tode = leichte Abwertung. */
   function deathScore(p){
     const d = p.deaths;
     if (!d) return 0;
@@ -1619,7 +1619,8 @@ const RB = (function(){
       else if (d.lastDays <= 14) s += 3;
       else if (d.lastDays > 30) s -= 5;
     }
-    s -= Math.min(d.deaths || 0, 12) * 0.5;
+    const zvz = d.zvz != null ? d.zvz : (d.deaths || 0);
+    s -= Math.min(zvz, 12) * 0.5;
     return Math.max(-10, Math.min(10, s));
   }
 
@@ -1854,6 +1855,7 @@ const RB = (function(){
     if (first || !S.parties.length) buildParties(data);
 
     S.changed = added.length > 0 || gone.length > 0 || prefsChanged;
+    if (!first && added.length) S.newSignups += added.length;
     if (S.changed){ S.log = null; S.builtAt = null; }
     if (!first && added.length) flash(added.length === 1 ? 'Neue Anmeldung: ' + added[0] : added.length + ' neue Anmeldungen');
   }
@@ -1979,7 +1981,7 @@ const RB = (function(){
       conflicts, notes
     };
     S.builtAt = Date.now();
-    notifyChanges(roleMap);
+    if (S.newSignups > 0) notifyChanges(roleMap);
     render();
     flash(auto ? 'Automatisch zugewiesen' : 'Gruppe gebaut');
     if (auto) setAutoBtn();
@@ -2092,6 +2094,7 @@ const RB = (function(){
       const store = S.notified[S.token] || (S.notified[S.token] = {});
       list.forEach(c => { if (c.role === '—') delete store[c.name]; else store[c.name] = c.role; });
       saveNotified();
+      S.newSignups = 0;
       flash(list.length === 1 ? 'Discord: 1 Änderung gemeldet' : 'Discord: ' + list.length + ' Änderungen gemeldet');
     }catch(e){ /* beim nächsten Build erneut versuchen */ }
   }
@@ -2196,11 +2199,12 @@ const RB = (function(){
       const d = S.deaths[p.name];
       let deathLine = '';
       if (d) {
+        const z = d.zvz != null ? d.zvz : d.deaths;
         const when = d.lastDays == null
           ? 'keine Tode erfasst'
           : 'zuletzt vor ' + d.lastDays + (d.lastDays === 1 ? ' Tag' : ' Tagen');
         const color = d.lastDays == null ? 'var(--mut)' : d.lastDays <= 7 ? '#5fd38a' : d.lastDays <= 30 ? '#ffa94d' : 'var(--mut)';
-        deathLine = `<div class="rb-hint"><span style="color:${color}" title="Tode in 30 Tagen">† ${d.deaths}${d.partial ? '+' : ''}</span> · ${when}</div>`;
+        deathLine = `<div class="rb-hint"><span style="color:${color}" title="ZvZ-Tode in 30 Tagen">† ${z}${d.partial ? '+' : ''} ZvZ</span> · ${when}</div>`;
       }
       return `<div class="rb-card ${p.tentative ? 'tent' : ''}" draggable="true" data-name="${esc(p.name)}">
         <div class="top">
@@ -2408,12 +2412,12 @@ const RB = (function(){
     if (!S.token){ flash('Erst Event verbinden'); return; }
     startLive();
     fetchData(false);
-    flash('Live – Abfrage alle 5 s');
+    flash('Live – Abfrage alle 5 Min');
   }
 
   function startLive(){
     if (S.live || !S.token) return;
-    S.live = setInterval(() => fetchData(false), 5000);
+    S.live = setInterval(() => fetchData(false), 300000);   // alle 5 Minuten
     setLiveBtn();
   }
   function stopLive(){
@@ -2457,7 +2461,7 @@ I['admin-roster'] = () => RB.init();
    GILDE (Admin-Tab): Mitglieder + letzte Tode
    ============================================================ */
 const RG = (function(){
-  const S = { members: [], selected: null, detail: null, filter: '', at: 0 };
+  const S = { members: [], selected: null, detail: null, filter: '', at: 0, mode: 'zvz', range: 30 };
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const byId = id => document.getElementById(id);
@@ -2560,36 +2564,65 @@ const RG = (function(){
   function renderDetail(){
     const box = byId('rg-detail');
     if (!box || !S.detail) return;
-    const events = S.detail.deaths || [];
-    if (!events.length){
-      box.innerHTML = '<p class="rb-msg">Keine Tode in der API erfasst.</p>';
-      return;
-    }
-    const now = Date.now();
-    const d30 = events.filter(e => now - new Date(e.t).getTime() < 30 * 86400000).length;
-    const d7 = events.filter(e => now - new Date(e.t).getTime() < 7 * 86400000).length;
 
-    const rows = events.slice(0, 20).map(e =>
-      `<tr>
+    const deathsAll = S.detail.deaths || [];
+    const killsAll = S.detail.kills || [];
+    const cutoff = S.range ? Date.now() - S.range * 86400000 : 0;
+    const inRange = e => !cutoff || new Date(e.t).getTime() >= cutoff;
+
+    const dAll = deathsAll.filter(inRange);
+    const kAll = killsAll.filter(inRange);
+    const dZvz = dAll.filter(e => e.zvz);
+    const kZvz = kAll.filter(e => e.zvz);
+    const kd = (k, d) => d ? (k / d).toFixed(2).replace('.', ',') : '–';
+
+    const btn = (label, active, action) =>
+      `<button class="b small ${active ? 'on' : ''}" onclick="${action}">${label}</button>`;
+
+    const controls = `<div class="rb-bar" style="margin:0 0 10px">
+        <span style="display:inline-flex;gap:4px">
+          ${btn('ZvZ', S.mode === 'zvz', "RG.setMode('zvz')")}
+          ${btn('Gesamt', S.mode === 'all', "RG.setMode('all')")}
+        </span>
+        <span style="display:inline-flex;gap:4px">
+          ${[7,14,30].map(r => btn(r + ' T', S.range === r, 'RG.setRange(' + r + ')')).join('')}
+          ${btn('Gesamt', S.range === 0, 'RG.setRange(0)')}
+        </span>
+      </div>`;
+
+    const summary = `<div class="tw" style="margin:0 0 12px"><table class="rg-table">
+        <tr><th>${S.range ? 'letzte ' + S.range + ' Tage' : 'alle geladenen Einträge'}</th><th>Tode</th><th>Kills</th><th>K/D</th></tr>
+        <tr><td>ZvZ</td><td>${dZvz.length}</td><td>${kZvz.length}</td><td>${kd(kZvz.length, dZvz.length)}</td></tr>
+        <tr><td>Alle</td><td>${dAll.length}</td><td>${kAll.length}</td><td>${kd(kAll.length, dAll.length)}</td></tr>
+      </table></div>`;
+
+    const list = (S.mode === 'zvz' ? dZvz : dAll).slice(0, 20);
+    const rows = list.map(e => `<tr>
         <td class="n">${esc(date(e.t))}</td>
         <td>${esc(daysAgo(e.t))}</td>
-        <td>${esc(e.area || '—')}</td>
+        <td>${esc(e.area || '—')}${e.zvz ? ' <span class="rb-count">ZvZ</span>' : ''}</td>
         <td>${esc(e.killer || '—')}${e.killerGuild ? ' <span class="rb-count">' + esc(e.killerGuild) + '</span>' : ''}</td>
         <td>${esc(weapon(e.weapon))}</td>
         <td class="n">${e.ip ? e.ip : '—'}</td>
       </tr>`).join('');
 
-    box.innerHTML = `<div class="rg-sum">
-        <span>Tode 30 T: <b>${d30}</b></span>
-        <span>Tode 7 T: <b>${d7}</b></span>
-        <span>zuletzt: <b>${esc(daysAgo(events[0].t))}</b></span>
-      </div>
-      <div class="tw"><table class="rg-table">
-        <tr><th>Datum</th><th>wann</th><th>Gebiet</th><th>getötet von</th><th>Waffe</th><th>IP</th></tr>
-        ${rows}
-      </table></div>
-      ${events.length > 20 ? '<p class="rb-msg">… und ' + (events.length - 20) + ' weitere</p>' : ''}`;
+    const empty = list.length ? '' : '<p class="rb-msg">Keine Tode im gewählten Zeitraum.</p>';
+    const allInMode = S.mode === 'zvz' ? dZvz : dAll;
+    const more = list.length && allInMode.length > 20
+      ? '<p class="rb-msg">… und ' + (allInMode.length - 20) + ' weitere</p>' : '';
+    const capped = (S.detail.capped && (S.detail.capped.deaths || S.detail.capped.kills))
+      ? '<p class="rb-msg">Hinweis: Die API liefert maximal 40 Einträge je Art.</p>' : '';
+
+    box.innerHTML = controls + summary
+      + (S.detail.zvzMin ? `<p class="rb-msg" style="margin:-4px 0 8px">ZvZ = Gruppe ab ${S.detail.zvzMin} Spielern.</p>` : '')
+      + `<div class="tw"><table class="rg-table">
+          <tr><th>Datum</th><th>wann</th><th>Gebiet</th><th>getötet von</th><th>Waffe</th><th>IP</th></tr>
+          ${rows}
+        </table></div>` + empty + more + capped;
   }
+
+  function setMode(m){ S.mode = m; renderDetail(); }
+  function setRange(r){ S.range = r; renderDetail(); }
 
   function filter(v){ S.filter = v; renderList(); }
 
@@ -2609,7 +2642,7 @@ const RG = (function(){
     }
   }
 
-  return { page, init, filter, reload };
+  return { page, init, filter, reload, setMode, setRange };
 })();
 
 P['admin-guild'] = () => RG.page();
