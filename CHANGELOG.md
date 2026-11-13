@@ -12,6 +12,13 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-13 – Button „Wartende senden"
+
+- Neuer Knopf im Roster-Brain schickt die während der 5-Minuten-Sperre gemerkten An-/Abmeldungen sofort
+- Worker: `POST /notify` mit `{ "key": "…", "type": "flush" }` → sendet die Warteschlange mit `force` (ignoriert die Sperre)
+- Antwort: `{ ok, sent, flushed }`; die Seite meldet „nichts offen" oder „X wartende Meldung(en) gesendet"
+- Der Discord-Test-Knopf bleibt unverändert (nur Beispielnachricht, kein echter Inhalt)
+
 ### 2026-11-13 – Anmeldungen gingen verloren (newSignups-Gate)
 
 - Ursache: `build()` rief `notifyChanges` nur bei `S.newSignups > 0` auf – Rollenwechsel und neu geladene Seiten lösten dadurch nie einen Request aus, nur der Discord-Test-Knopf funktionierte

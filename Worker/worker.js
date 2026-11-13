@@ -383,7 +383,7 @@ async function handleRoster(request, env, url) {
 /* ---------- Discord ------------------------------------------------------- */
 
 const DISCORD_API = 'https://discord.com/api/v10';
-const WORKER_VERSION = '2026-11-13-5';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
+const WORKER_VERSION = '2026-11-13-6';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
 const NOTIFY_COOLDOWN_MS = 5 * 60 * 1000;    // min. 5 Min zwischen zwei Anmeldungs-Nachrichten
 const NOTIFY_DUPLICATE_MS = 10 * 60 * 1000;  // identische Nachricht 10 Min nicht wiederholen
 const NOTIFY_QUEUE_TTL = 24 * 60 * 60;       // gemerkte Anmeldung max. 1 Tag aufheben
@@ -490,8 +490,8 @@ async function logNotify(env, scope, entry) {
   } catch (e) { /* Log ist optional */ }
 }
 
-/** Sendet gemerkte Anmeldungen, sobald ihre Sperre abgelaufen ist. */
-async function flushNotifyQueue(env) {
+/** Sendet gemerkte Anmeldungen, sobald ihre Sperre abgelaufen ist (force = sofort). */
+async function flushNotifyQueue(env, force) {
   const prefix = 'rb:notifyq:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':';
   let sent = 0;
 
@@ -506,7 +506,7 @@ async function flushNotifyQueue(env) {
     const scope = k.name.slice(prefix.length);
     const lockKey = 'rb:notifylast:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':' + scope;
     const last = await kvGet(env, lockKey);
-    if (last && last.at && Date.now() - last.at < NOTIFY_COOLDOWN_MS) continue;
+    if (!force && last && last.at && Date.now() - last.at < NOTIFY_COOLDOWN_MS) continue;
 
     const ok = await notifyMods(env, q.content);
     if (ok > 0) {
@@ -536,6 +536,13 @@ async function handleNotify(request, env) {
     : 'https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster';
 
   const auth = discordAuth(env);
+
+  /* Manuell: wartende Anmeldungen sofort senden: { key, type:'flush' } */
+  if (body.type === 'flush') {
+    const sent = await flushNotifyQueue(env, true);
+    await logNotify(env, 'flush', { result: sent ? 'flushed-manual' : 'flush-empty', sent });
+    return rosterJson({ ok: true, sent, flushed: sent > 0 });
+  }
 
   /* Sperre manuell loeschen (zum Testen): { key, type:'reset' } */
   if (body.type === 'reset') {

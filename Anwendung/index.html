@@ -2153,6 +2153,29 @@ const RB = (function(){
     }catch(e){ /* beim nächsten Build erneut versuchen */ }
   }
 
+  /** Sendet die waehrend der Sperre gemerkten Meldungen sofort. */
+  async function flushQueued(){
+    const key = sessionStorage.getItem('feedbackModKey');
+    if (!key) { flash('Discord: nicht angemeldet – bitte neu einloggen'); return; }
+    flash('Discord: sende Wartende…');
+    try{
+      const res = await fetch(ROSTER_NOTIFY_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, type: 'flush' })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { flash('Discord: ' + (data.hint || data.error || ('HTTP ' + res.status))); return; }
+      if (data.sent) {
+        saveNotifyLog('gesendet (manuell)');
+        flash('Discord: ' + data.sent + ' wartende Meldung' + (data.sent === 1 ? '' : 'en') + ' gesendet');
+      } else {
+        saveNotifyLog('nichts offen');
+        flash('Discord: nichts offen');
+      }
+    }catch(e){ flash('Discord: Netzwerkfehler'); }
+  }
+
   /** Testnachricht, umgeht Sperre und Doppel-Erkennung bewusst. */
   async function testDiscord(){
     const key = sessionStorage.getItem('feedbackModKey');
@@ -2235,6 +2258,7 @@ const RB = (function(){
             <button class="b" onclick="RB.bump()" title="Aktuelle Zuweisung als einen gespielten Einsatz zählen">Historie +1</button>
             <button class="b" id="rb-notify" onclick="RB.toggleNotify()" title="Discord-Meldung bei jeder neuen Zuweisung">Discord: an</button>
             <button class="b" onclick="RB.testDiscord()" title="Schickt sofort eine Testnachricht in den Kanal (umgeht die 5-Minuten-Sperre)">Discord-Test</button>
+            <button class="b" onclick="RB.flushQueued()" title="Sendet die während der Sperre gemerkten An- und Abmeldungen sofort">Wartende senden</button>
           </div>
           <div id="rb-stats" class="mut" style="padding:6px 10px;font-size:.73rem;border-bottom:var(--bw) solid var(--ln)"></div>
           <div class="rb-parties" id="rb-parties"><p class="rb-msg">Noch keine Comp geladen.</p></div>
@@ -2530,7 +2554,7 @@ const RB = (function(){
     }
   }
 
-  return { page, init, connect, build, copy, bump, toggleLive, toggleAuto, toggleNotify, testDiscord, pinLink, reloadComp, closePick };
+  return { page, init, connect, build, copy, bump, toggleLive, toggleAuto, toggleNotify, testDiscord, flushQueued, pinLink, reloadComp, closePick };
 })();
 
 P['admin-roster'] = () => RB.page();
