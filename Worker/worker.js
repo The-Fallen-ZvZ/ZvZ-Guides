@@ -387,7 +387,7 @@ async function handleRoster(request, env, url) {
 
 const DISCORD_API = 'https://discord.com/api/v10';
 let LAST_DISCORD = null;                     // letzter Discord-Fehler (nur Diagnose)
-const WORKER_VERSION = '2026-11-13-9';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
+const WORKER_VERSION = '2026-11-14-1';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
 const NOTIFY_COOLDOWN_MS = 5 * 60 * 1000;    // min. 5 Min zwischen zwei Anmeldungs-Nachrichten
 const NOTIFY_DUPLICATE_MS = 10 * 60 * 1000;  // identische Nachricht 10 Min nicht wiederholen
 const NOTIFY_QUEUE_TTL = 24 * 60 * 60;       // gemerkte Anmeldung max. 1 Tag aufheben
@@ -606,7 +606,7 @@ async function handleNotify(request, env) {
   const lines = changes.map(c => {
     const name = String(c.name || '').slice(0, 40);
     const role = String(c.role || '').slice(0, 60);
-    return role === '-'
+    return (role === '-' || role === '—' || role === '–')
       ? '**' + name + '** hat den Slot verlassen'
       : 'Anmeldung von: **' + name + '** -> ' + role;
   });
@@ -616,7 +616,11 @@ async function handleNotify(request, env) {
     + '\n\nManuell anpassen: ' + link;
   if (content.length > 1900) content = content.slice(0, 1870) + '\n... (gekuerzt)';
 
-  const scope = (eventTitle || 'default').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'default';
+  /* Sperre/Doppel-Erkennung pro Event-Token, sonst pro Titel (Fallback) */
+  const eventKey = String(body.eventKey || '').toLowerCase();
+  const scope = /^[0-9a-f]{64}$/.test(eventKey)
+    ? 'ev-' + eventKey.slice(0, 24)
+    : ((eventTitle || 'default').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'default');
 
   /* Neue Anmeldung zuerst behandeln, danach andere wartende Events nachholen. */
   const out = await sendWithCooldown(env, content, scope, body.force === true);

@@ -12,6 +12,26 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-14 – Discord: An-/Abmeldungen wurden nicht erkannt
+
+- Ursache 1: `notifyChanges()` verglich nur die **Zuweisung** (`Name → Rolle`). Wer den Event verlässt und mit derselben Rolle wieder kommt, ergibt am Ende denselben Stand → kein Unterschied → kein Request → „Discord: nichts offen"
+- Ursache 2: Der Abgleich lief nur im **Build** (`Auto`) und nur mit **gesetzten** Spielern; Bank-Spieler und reine An-/Abmeldungen ohne Build waren unsichtbar
+- Ursache 3: Die Live-Abfrage lief alle 5 Minuten – Änderungen in AlbionZvZ waren entsprechend lange unsichtbar
+- Jetzt: `currentRoleMap()` liest die tatsächlich gesetzten Slots (inkl. Bank, `''` = noch kein Slot) und `notifyChanges()` läuft nach **jedem** Datenabruf und nach jedem Build
+- Erstbelegung pro Event-Token wird weiterhin nur gemerkt; eine später nachgetragene Rolle (`'' → Rolle`) wird **still** übernommen, damit der erste manuelle Build nicht 48 Zeilen aussendet
+- Abmeldung erscheint als „hat den Slot verlassen" (Worker akzeptiert jetzt `-`, `—` und `–`; vorher wurde nur `-` erkannt, die Seite sendet `—`)
+- Worker: Sperre und Doppel-Erkennung laufen über den **Event-Token** (`eventKey`) statt über den Event-Titel – zwei Events mit gleichem Namen teilen sich keine Sperre mehr; Version `2026-11-14-1`
+- Live-Abfrage auf **60 s** verkürzt (`LIVE_MS`), Auto-Build bleibt bei 5 Minuten
+- Hinweis: Ein Verlassen **und** Wiederkommen innerhalb eines Abfrage-Intervalls (< 60 s) ist technisch nicht sichtbar – es gibt keinen Push-Kanal, nur Polling
+- „Wartende senden" meldet jetzt „Discord: nichts offen (keine gemerkte Meldung)"
+
+### 2026-11-14 – Comp-Zählung im Roster-Prototyp: 41 Slots
+
+- `Prototyp/Roster-Brain.html`: Comp-Kommentar auf „2 × 20 Haupt-Slots + 1 Battlemount = 41 Slots; Party 3 = Alternativen" geändert
+- Template-Label `comp40`: `The-Fallen · 40 + Reserve` → `The-Fallen · 41 (40 + 1 BM)`
+- Hinweistext über der Comp ergänzt: „Comp: 41 Slots (40 + 1 BM)"
+- Keine Logik geändert: die Zuordnung (Haupt-Slots vor Reserve, Reserve 25 % abgewertet) bleibt identisch, Party 3 bleibt `tier:'reserve'`
+
 ### 2026-11-13 – Mobile: Menü-Button funktioniert
 
 - Der Button **Menü** hatte keinen Klick-Handler – jetzt öffnet/schließt er die Navigation (`aria-expanded`, aktiver Zustand)

@@ -12,7 +12,7 @@ Stand: 13.11.2026 · **in `Anwendung/index.html` eingebaut** · Worker-Erweiteru
 | Worker-Route `/roster` | Code fertig (`Worker/roster.js`), muss noch deployt werden |
 | Discord | Kanal-Nachricht bei jeder Änderung, Todes-Erinnerung per Cron, optional angepinnter Roster-Link |
 | Historie | lokal im Browser (später optional KV) |
-| Live-Aktualisierung | Polling alle 5 Minuten, startet beim Öffnen automatisch |
+| Live-Aktualisierung | Polling jede Minute, startet beim Öffnen automatisch |
 | Auto-Zuweisung | standardmäßig an: bei Änderungen sofort, sonst alle 5 Minuten |
 
 ## Ablauf im Betrieb
@@ -44,7 +44,7 @@ Der Schalter **Discord** (neben „Historie +1") steuert, ob Meldungen rausgehen
 
 Alle Meldungen gehen in den Kanal aus `DISCORD_CHANNEL_ID` (Feedback, Anmeldungen, Todes-Erinnerung). Ist keine Kanal-ID gesetzt, fällt der Worker auf DMs an `DISCORD_USER_ID` zurück.
 
-Ablauf: Nach jedem Build vergleicht die Seite die Zuweisung mit dem zuletzt gemeldeten Stand (`tf-rb-notified`, pro Event). Nur echte Änderungen erzeugen eine Nachricht:
+Ablauf: Nach jedem Datenabruf (60 s) und nach jedem Build vergleicht die Seite die **Anmeldungen samt aktueller Rolle** mit dem zuletzt gemeldeten Stand (`tf-rb-notified`, pro Event-Token). Nur echte Änderungen erzeugen eine Nachricht:
 
 ```
 **📋 Neue Anmeldung** · ZVZ-Builds ZVZ Test Event
@@ -59,6 +59,8 @@ Manuell anpassen: https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster
 - **Beim ersten Öffnen keine Meldung** – die Erstbelegung ist keine neue Anmeldung.
 - **Wer den Slot verlässt**, wird als „hat den Slot verlassen" gemeldet.
 - **Kein Doppelversand:** gleicher Spieler + gleiche Rolle wird nicht erneut geschickt; erst eine neue Rolle löst wieder aus.
+- **Pro Event-Token:** Sperre und Doppel-Erkennung im Worker laufen über `eventKey` (Token). Zwei Events mit gleichem Titel teilen sich keine Sperre mehr. Ohne Token greift der Titel als Ersatzschlüssel.
+- **Wer noch keinen Slot hat** (z. B. Auto aus, vor dem ersten Build), wird beim Nachtragen der Rolle nicht erneut gemeldet – die Erstmeldung lautet dann „noch offen".
 - **Nur bei geänderten Daten** – ein Poll ohne Änderung schickt nichts.
 - **5-Minuten-Sperre mit Warteschlange:** Zwischen zwei Anmeldungs-Nachrichten desselben Events liegen mindestens 5 Minuten. Kommt innerhalb der Sperre etwas Neues, wird der Text in `rb:notifyq:<kanal>:<event>` gemerkt und **automatisch** gesendet, sobald die Sperre abgelaufen ist – durch den Cron (alle 5 Min) oder beim nächsten Aufruf, auch ohne offene Seite.
 - **Doppel-Erkennung:** Ist der Text identisch mit der letzten Nachricht, wird er 10 Minuten lang nicht wiederholt – das verhindert doppelte Meldungen aus zwei Tabs oder nach einem Reload.
@@ -306,7 +308,7 @@ Die Engine arbeitet zweistufig (erst Party 1 + 2, dann Reserve), setzt den Calle
 2. **Kein Multi-Moderator-Sync** – die Live-Abfrage liest AlbionZvZ, nicht die Änderungen eines zweiten Callers.
 3. **Kein Zurückschreiben** nach AlbionZvZ: Das ginge nur mit deiner Login-Session und ist bewusst nicht eingebaut. Übertragung per Kopiervorlage.
 4. **Token manuell** – kein Event-Picker; der Link wird eingefügt.
-5. **Polling-Intervall 5 Minuten** – bei Bedarf im Modul (`setInterval(..., 300000)`) anpassbar.
+5. **Polling-Intervall 60 s** (`LIVE_MS` im Modul) – Auto-Build bleibt bei 5 Minuten. Ein Verlassen **und** Wiederkommen innerhalb eines Intervalls ist nicht erkennbar.
 
 ## Testprotokoll
 

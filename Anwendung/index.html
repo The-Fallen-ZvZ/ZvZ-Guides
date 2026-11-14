@@ -1543,6 +1543,7 @@ const RB = (function(){
   const LS_NOTIFY = 'tf-rb-notify';
   const LS_NOTIFIED = 'tf-rb-notified';
   const AUTO_MS  = 5 * 60 * 1000;        // Auto-Zuweisung mindestens alle 5 Minuten
+  const LIVE_MS  = 60 * 1000;            // Anmeldungen jede Minute abfragen (früher 5 Min)
   const TIER_RESERVE_FROM = 2;          // Party 1+2 = Haupt, ab Party 3 Reserve
 
   const ALIAS = {
@@ -1808,6 +1809,7 @@ const RB = (function(){
       S.stamp = 'Stand ' + new Date().toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
       setStatus(S.stamp);
       maybeAuto(first ? 'first' : (S.changed ? 'change' : 'poll'));
+      notifyChanges();          // An-/Abmeldungen auch ohne Build erkennen
       if (S.changed) S.deathsAt = 0;
       loadDeaths();
     }catch(e){ setStatus('Netzwerkfehler – Worker erreichbar?'); }
@@ -1928,13 +1930,8 @@ const RB = (function(){
     const assigned = {};
     res.forEach((r, i) => { if (r) assigned[r.player.name] = { slot: active[i], score: r.score, pick: r.pick }; });
 
-    // Rolle je Spieler für die Discord-Meldung
-    const roleMap = {};
-    res.forEach((r, i) => {
-      if (!r) return;
-      const s = active[i];
-      roleMap[r.player.name] = s.weapons.length > 1 ? (r.pick || s.weapons[0]) : s.weapons.join(' / ');
-    });
+    // Rolle je Spieler fuer die Discord-Meldung liefert currentRoleMap() –
+    // sie liest die tatsaechlich gesetzten Slots (inkl. Bank) und braucht keinen Solver.
 
     const bench = players.filter(p => !assigned[p.name]);
     const open = active.filter((s, i) => !res[i]);
@@ -2013,7 +2010,7 @@ const RB = (function(){
       conflicts, notes
     };
     S.builtAt = Date.now();
-    notifyChanges(roleMap);
+    notifyChanges();
     render();
     flash(auto ? 'Automatisch zugewiesen' : 'Gruppe gebaut');
     if (auto) setAutoBtn();
@@ -2092,27 +2089,55 @@ const RB = (function(){
     try { localStorage.setItem(LS_NOTIFIED, JSON.stringify(S.notified)); } catch(e){}
   }
 
-  /** Vergleicht die neue Zuweisung mit dem zuletzt gemeldeten Stand. */
-  function notifyChanges(roleMap){
+  /** Rolle, die aktuell im Roster steht; '' = noch kein Slot (z. B. vor dem ersten Build). */
+  function roleOfSlot(sl){
+    if (!sl) return '';
+    return sl.weapons.length > 1 ? (sl.pick || sl.weapons[0]) : sl.weapons.join(' / ');
+  }
+
+  /** Name -> Rolle aus den tatsaechlich gesetzten Slots (unabhaengig von Auto/Build). */
+  function currentRoleMap(){
+    const map = {};
+    S.players.forEach(p => { map[p.name] = roleOfSlot(findSlot(p.name)); });
+    return map;
+  }
+
+  /** Vergleicht die Anmeldungen mit dem zuletzt gemeldeten Stand (pro Event-Token). */
+  function notifyChanges(){
     if (!S.notify || !S.token) return;
     const store = S.notified[S.token] || (S.notified[S.token] = {});
+    const known = Object.keys(store).length > 0;
+    const roleMap = currentRoleMap();
 
     /* Erstbelegung nur merken, nicht melden (sonst 20 Zeilen beim ersten Login) */
-    if (!Object.keys(store).length) {
-      Object.entries(roleMap).forEach(([name, role]) => { store[name] = role; });
+    if (!known) {
+      S.notified[S.token] = roleMap;
       saveNotified();
       return;
     }
 
+    const next = Object.assign({}, store);
     const changes = [];
+
     Object.entries(roleMap).forEach(([name, role]) => {
-      if (store[name] !== role) changes.push({ name, role });
+      const prev = store[name];
+      if (prev === undefined) {
+        changes.push({ name, role: role || 'noch offen' });
+        next[name] = role;
+      } else if (!prev && role) {
+        next[name] = role;              // Rolle war noch unbekannt -> still nachtragen
+      } else if (prev !== role) {
+        changes.push({ name, role: role || '—' });
+        next[name] = role;
+      }
     });
+
     Object.keys(store).forEach(name => {
-      if (!(name in roleMap)) changes.push({ name, role: '—' });
+      if (!(name in roleMap)) { changes.push({ name, role: '—' }); delete next[name]; }
     });
-    if (!changes.length) return;
-    postNotify(changes);
+
+    if (!changes.length) { S.notified[S.token] = next; saveNotified(); return; }
+    postNotify(changes, next);
   }
 
   let notifyRetryTimer = null;
@@ -2130,7 +2155,7 @@ const RB = (function(){
     } catch(e){ return ''; }
   }
 
-  async function postNotify(changes){
+  async function postNotify(changes, next){
     const key = sessionStorage.getItem('feedbackModKey');
     if (!key) { flash('Discord: nicht angemeldet'); return; }
     const list = changes.slice(0, 20);
@@ -2141,6 +2166,7 @@ const RB = (function(){
         body: JSON.stringify({
           key,
           event: (S.event || {}).title || '',
+          eventKey: S.token,
           changes: list,
           link: rosterLink()
         })
@@ -2153,7 +2179,7 @@ const RB = (function(){
         if (notifyRetryTimer) clearTimeout(notifyRetryTimer);
         notifyRetryTimer = setTimeout(() => {
           notifyRetryTimer = null;
-          postNotify(changes);
+          postNotify(changes, next);
         }, Math.max(2000, (data.retryInMs || 5000) + 1500));
         return;
       }
@@ -2162,8 +2188,12 @@ const RB = (function(){
         flash('Discord: ' + (data.hint || data.error || 'Versand fehlgeschlagen'));
         return;
       }
-      const store = S.notified[S.token] || (S.notified[S.token] = {});
-      list.forEach(c => { if (c.role === '—') delete store[c.name]; else store[c.name] = c.role; });
+      if (next) {
+        S.notified[S.token] = next;
+      } else {
+        const store = S.notified[S.token] || (S.notified[S.token] = {});
+        list.forEach(c => { if (c.role === '—') delete store[c.name]; else store[c.name] = c.role; });
+      }
       saveNotified();
       S.newSignups = 0;
       if (data.queued) {
@@ -2197,7 +2227,7 @@ const RB = (function(){
         flash('Discord: ' + data.sent + ' wartende Meldung' + (data.sent === 1 ? '' : 'en') + ' gesendet');
       } else {
         saveNotifyLog('nichts offen');
-        flash('Discord: nichts offen');
+        flash('Discord: nichts offen (keine gemerkte Meldung)');
       }
     }catch(e){ flash('Discord: Netzwerkfehler'); }
   }
@@ -2546,7 +2576,7 @@ const RB = (function(){
 
   function startLive(){
     if (S.live || !S.token) return;
-    S.live = setInterval(() => fetchData(false), 300000);   // alle 5 Minuten
+    S.live = setInterval(() => fetchData(false), LIVE_MS);   // jede Minute
     setLiveBtn();
   }
   function stopLive(){
