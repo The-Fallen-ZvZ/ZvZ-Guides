@@ -12,6 +12,15 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-14 – Discord: jede Anmeldung kam doppelt
+
+- Ursache: seit dem Umbau rief `fetchData()` den Abgleich zweimal im selben Tick auf (einmal über `build()`, einmal direkt). `postNotify()` ist asynchron und schreibt den Merker erst nach der Antwort – der zweite Aufruf sah den alten Stand und schickte denselben Text erneut
+- Fix Client: `notifyPending`-Sperre – solange ein Request unterwegs ist, wird kein zweiter ausgelöst (wird im `finally` immer zurückgesetzt, auch bei fehlendem Mod-Key)
+- Fix Client: im 429-Fall wird der Stand sofort übernommen, damit der nächste Poll nicht denselben Text noch einmal anfordert
+- Fix Worker: `flushNotifyQueue` verwirft wartende Texte, die dem zuletzt gesendeten entsprechen (10-Minuten-Fenster) – damit kann ein gemerkter Text nicht nach dem Direktversand noch einmal rausgehen; Version `2026-11-14-2`
+- Getestet: Doppelaufruf im selben Tick → genau ein Request; Baseline still, Abmeldung `—`, Wiederanmeldung mit Rolle, stilles Nachtragen der Rolle, Rollenwechsel – unverändert korrekt
+- Restrisiko: zwei **verschiedene Geräte** können im selben Moment posten – Cloudflare KV ist eventually consistent, ein harter Lock ist dort nicht möglich
+
 ### 2026-11-14 – Discord: An-/Abmeldungen wurden nicht erkannt
 
 - Ursache 1: `notifyChanges()` verglich nur die **Zuweisung** (`Name → Rolle`). Wer den Event verlässt und mit derselben Rolle wieder kommt, ergibt am Ende denselben Stand → kein Unterschied → kein Request → „Discord: nichts offen"

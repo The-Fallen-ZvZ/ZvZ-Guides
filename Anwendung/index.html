@@ -2137,9 +2137,15 @@ const RB = (function(){
     });
 
     if (!changes.length) { S.notified[S.token] = next; saveNotified(); return; }
+
+    /* Nur ein Request gleichzeitig: sonst feuert der zweite Aufruf (Build + Poll)
+       denselben Stand erneut, weil der Merker erst nach der Antwort geschrieben wird. */
+    if (notifyPending) return;
+    notifyPending = true;
     postNotify(changes, next);
   }
 
+  let notifyPending = false;
   let notifyRetryTimer = null;
   const LS_NLOG = 'tf-rb-notify-log';
 
@@ -2156,10 +2162,10 @@ const RB = (function(){
   }
 
   async function postNotify(changes, next){
-    const key = sessionStorage.getItem('feedbackModKey');
-    if (!key) { flash('Discord: nicht angemeldet'); return; }
-    const list = changes.slice(0, 20);
     try{
+      const key = sessionStorage.getItem('feedbackModKey');
+      if (!key) { flash('Discord: nicht angemeldet'); return; }
+      const list = changes.slice(0, 20);
       const res = await fetch(ROSTER_NOTIFY_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2176,9 +2182,13 @@ const RB = (function(){
         saveNotifyLog('Sperre');
         const secs = Math.ceil((data.retryInMs || 0) / 1000);
         flash('Discord: 5-Minuten-Sperre aktiv' + (secs ? ' – nächste Meldung in ' + secs + ' s' : ''));
+        /* Der Worker hat den Text gemerkt – Stand sofort uebernehmen, sonst
+           erzeugt der naechste Poll denselben Request noch einmal. */
+        if (next) { S.notified[S.token] = next; saveNotified(); }
         if (notifyRetryTimer) clearTimeout(notifyRetryTimer);
         notifyRetryTimer = setTimeout(() => {
           notifyRetryTimer = null;
+          notifyPending = true;
           postNotify(changes, next);
         }, Math.max(2000, (data.retryInMs || 5000) + 1500));
         return;
@@ -2206,7 +2216,8 @@ const RB = (function(){
           ? 'Discord: unverändert, nicht erneut gesendet'
           : (list.length === 1 ? 'Discord: 1 Änderung gemeldet' : 'Discord: ' + list.length + ' Änderungen gemeldet'));
       }
-    }catch(e){ /* beim nächsten Build erneut versuchen */ }
+    }catch(e){ /* beim naechsten Poll erneut versuchen */ }
+    finally{ notifyPending = false; }
   }
 
   /** Sendet die waehrend der Sperre gemerkten Meldungen sofort. */

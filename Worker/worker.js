@@ -387,7 +387,7 @@ async function handleRoster(request, env, url) {
 
 const DISCORD_API = 'https://discord.com/api/v10';
 let LAST_DISCORD = null;                     // letzter Discord-Fehler (nur Diagnose)
-const WORKER_VERSION = '2026-11-14-1';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
+const WORKER_VERSION = '2026-11-14-2';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
 const NOTIFY_COOLDOWN_MS = 5 * 60 * 1000;    // min. 5 Min zwischen zwei Anmeldungs-Nachrichten
 const NOTIFY_DUPLICATE_MS = 10 * 60 * 1000;  // identische Nachricht 10 Min nicht wiederholen
 const NOTIFY_QUEUE_TTL = 24 * 60 * 60;       // gemerkte Anmeldung max. 1 Tag aufheben
@@ -518,6 +518,14 @@ async function flushNotifyQueue(env, force) {
     const scope = k.name.slice(prefix.length);
     const lockKey = 'rb:notifylast:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':' + scope;
     const last = await kvGet(env, lockKey);
+
+    /* Wartet noch derselbe Text wie der zuletzt gesendete, nicht erneut posten */
+    if (last && last.hash === hashText(q.content) && Date.now() - last.at < NOTIFY_DUPLICATE_MS) {
+      await kvDelete(env, k.name);
+      await logNotify(env, scope, { result: 'flush-duplicate' });
+      continue;
+    }
+
     if (!force && last && last.at && Date.now() - last.at < NOTIFY_COOLDOWN_MS) continue;
 
     const ok = await notifyMods(env, q.content);
