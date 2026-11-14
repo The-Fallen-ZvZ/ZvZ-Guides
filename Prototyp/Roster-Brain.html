@@ -165,7 +165,7 @@ code{background:var(--hv);border-radius:4px;padding:1px 5px;font-size:.85em}
     <h2>Gehirn <span class="count" id="cnt-bench" title="Spieler ohne Slot">0</span></h2>
     <div class="body" id="brain"></div>
     <div class="foot">
-      <span class="mut" style="font-size:.75rem">Passung aus Wunschreihenfolge + Historie. Reserve-Slots (BMs, Offtimer) sind 25 % abgewertet. „Build the Group" ist ein Vorschlag.</span>
+      <span class="mut" style="font-size:.75rem">Passung aus Wunschreihenfolge + Historie. Comp: 41 Slots (40 + 1 BM); Reserve-Slots (BMs, Offtimer) sind 25 % abgewertet. "Build the Group" ist ein Vorschlag.</span>
     </div>
   </section>
 
@@ -221,7 +221,7 @@ const S = (w, caller)=>({weapons:Array.isArray(w)?w:[w], caller:!!caller, player
 const DUAL = ()=>S(['Longbow','Demonfang']);
 const EMPTY = ()=>S([]);
 
-/* Comp-Stand 13.11.2026: 2 x 20 Haupt-Slots + Reservedatenbank */
+/* Comp-Stand 14.11.2026: 2 x 20 Haupt-Slots + 1 Battlemount = 41 Slots; Party 3 = Alternativen (zählen nicht mit) */
 const PARTY1 = [
   S('1H Mace', true),
   S('1H Hammer (Setup)'),
@@ -269,7 +269,7 @@ const RESERVE = [
 ];
 
 const TEMPLATES = {
-  'comp40': {label:'The-Fallen · 40 + Reserve', parties:[
+  'comp40': {label:'The-Fallen · 41 (40 + 1 BM)', parties:[
     {name:'Party 1', tier:'main', slots:PARTY1},
     {name:'Party 2', tier:'main', slots:PARTY2},
     {name:'Alternative Rollen und BMs', tier:'reserve', slots:RESERVE}
