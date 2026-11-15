@@ -72,6 +72,22 @@ Manuell anpassen: https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster
 
 **Link anpinnen:** Der Button „Link anpinnen" postet den Roster-Link in `DISCORD_CHANNEL_ID` und pinnt die Nachricht. Dafür braucht der Bot `MANAGE_MESSAGES` im Kanal. Ohne die Variable meldet die Seite „DISCORD_CHANNEL_ID fehlt".
 
+## Spieler manuell eintragen
+
+Wer sich nicht bei AlbionZvZ angemeldet hat (Nachrücker, Vertretung, Gast), lässt sich direkt im Roster ergänzen:
+
+1. Im Panel **Angemeldet** auf **+ Spieler** klicken.
+2. Name eintragen, optional Wunschrollen (mit Komma getrennt, max. 6) und **tentative** setzen.
+3. **Hinzufügen** – der Spieler erscheint sofort in der Liste, ist ziehbar wie jeder andere und wird bei aktivem Auto direkt eingeplant.
+
+| Verhalten | Details |
+| --- | --- |
+| Kennzeichnung | Badge `manuell` am Eintrag, Entfernen über `×` (Slot wird dabei frei) |
+| Polls | Der Eintrag bleibt bei jedem Datenabruf erhalten, auch wenn AlbionZvZ ihn nicht listet |
+| Discord | Manuelle Einträge lösen **keine** Anmeldungs-Nachricht aus und fehlen deshalb im Änderungs-Spiegel – sie sind keine Albion-Anmeldung |
+| Später offiziell angemeldet | Sobald der Name in den AlbionZvZ-Daten auftaucht, übernimmt die Seite die offiziellen Wunschrollen; der manuelle Merker fällt weg |
+| Speicherung | pro Event-Token im Browser (`tf-rb-manual`) – nicht geräteübergreifend, andere Moderatoren sehen den Eintrag nicht |
+
 ## Änderungs-Spiegel auf der Seite
 
 Unter der Comp sitzt das Panel **Änderungen** (volle Breite). Es zeigt dieselben Zeilen, die als Discord-Nachricht rausgehen – mit Uhrzeit, Spieler, alter/neuer Rolle und Status:

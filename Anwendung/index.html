@@ -243,6 +243,15 @@ body:has(main.rb-wide) .app{max-width:1720px}
 .rb-pick .sc{margin-left:auto;color:var(--mut);font-size:.72rem}
 .rb-msg{color:var(--mut);font-size:.85rem;padding:6px 0}
 .rb-red{color:#ff6b6b}.rb-green{color:#5fd38a}.rb-orange{color:#ffa94d}
+.rb-add{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px 10px;border-bottom:var(--bw) solid var(--ln)}
+.rb-add[hidden]{display:none}
+.rb-add input:not([type="checkbox"]){flex:1;min-width:110px;background:var(--bg);border:var(--bw) solid var(--ln);border-radius:var(--r-sm);padding:5px 7px;font:inherit;font-size:.8rem;outline:0}
+.rb-add input:not([type="checkbox"]):focus{border-color:var(--mut)}
+.rb-add label{display:flex;align-items:center;gap:4px;font-size:.72rem;color:var(--mut);white-space:nowrap}
+.rb-tag{font-size:.62rem;border:1px solid var(--warn);color:var(--warn);border-radius:20px;padding:0 5px;white-space:nowrap}
+.rb-del{border:0;background:transparent;color:var(--mut);cursor:pointer;font-size:1rem;line-height:1;padding:0 2px}
+.rb-del:hover{color:#ff6b6b}
+.rb-panel>h3 .b{text-transform:none;letter-spacing:0;flex:0 0 auto}
 
 /* Gilden-Tab */
 .rg-grid{display:grid;grid-template-columns:320px minmax(0,1fr);gap:12px;align-items:start}
@@ -1550,6 +1559,7 @@ const RB = (function(){
   const LS_NOTIFY = 'tf-rb-notify';
   const LS_NOTIFIED = 'tf-rb-notified';
   const LS_CHANGES = 'tf-rb-changes';   // lokaler Spiegel, falls /changes (noch) fehlt
+  const LS_MANUAL = 'tf-rb-manual';     // manuell eingetragene Spieler (pro Event-Token)
   const AUTO_MS  = 5 * 60 * 1000;        // Auto-Zuweisung mindestens alle 5 Minuten
   const LIVE_MS  = 60 * 1000;            // Anmeldungen jede Minute abfragen (früher 5 Min)
   const TIER_RESERVE_FROM = 2;          // Party 1+2 = Haupt, ab Party 3 Reserve
@@ -1594,7 +1604,8 @@ const RB = (function(){
     builtAt:null, log:null, live:null, last:null, status:'',
     auto:false, lastAuto:0, changed:false, newSignups:0,
     notify:true, notified:{}, deaths:{}, deathsAt:0,
-    changes:[], changesLocal:[], changesAt:0, changesOff:false
+    changes:[], changesLocal:[], changesAt:0, changesOff:false,
+    manual:{}
   };
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1780,6 +1791,98 @@ const RB = (function(){
     return out;
   }
 
+  /* ---------------- Manuell eingetragene Spieler ---------------- */
+
+  function loadManual(){
+    try {
+      const v = JSON.parse(localStorage.getItem(LS_MANUAL) || '{}');
+      S.manual = (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+    } catch(e){ S.manual = {}; }
+  }
+
+  function saveManual(){
+    try { localStorage.setItem(LS_MANUAL, JSON.stringify(S.manual)); } catch(e){}
+  }
+
+  /** Manuelle Einträge des aktuellen Events. */
+  function manualFor(token){
+    const t = token || S.token;
+    if (!t) return [];
+    const list = S.manual[t];
+    return Array.isArray(list) ? list : [];
+  }
+
+  function setManualFor(list){
+    if (!S.token) return;
+    if (list.length) S.manual[S.token] = list;
+    else delete S.manual[S.token];
+    saveManual();
+  }
+
+  function isManualName(name){
+    const n = String(name || '').toLowerCase();
+    return manualFor().some(m => String(m.name || '').toLowerCase() === n);
+  }
+
+  function showAddPlayer(){
+    const box = byId('rb-add');
+    if (!box) return;
+    if (!S.token) { flash('Bitte zuerst ein Event verbinden'); return; }
+    box.hidden = false;
+    const name = byId('rb-add-name'), prefs = byId('rb-add-prefs'), tent = byId('rb-add-tent');
+    if (name) { name.value = ''; name.focus(); }
+    if (prefs) prefs.value = '';
+    if (tent) tent.checked = false;
+  }
+
+  function cancelAddPlayer(){
+    const box = byId('rb-add');
+    if (box) box.hidden = true;
+  }
+
+  function parsePrefs(raw){
+    return String(raw || '')
+      .split(/[,;]+/)
+      .map(s => s.trim())
+      .filter(Boolean)
+      .slice(0, 6)
+      .map(canon);
+  }
+
+  /** Trägt einen Spieler ein, der sich nicht bei AlbionZvZ angemeldet hat. */
+  function confirmAddPlayer(){
+    if (!S.token) { flash('Bitte zuerst ein Event verbinden'); return; }
+    const name = String((byId('rb-add-name') || {}).value || '').trim().slice(0, 40);
+    if (!name) { flash('Name fehlt'); return; }
+    if (S.players.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+      flash(name + ' steht schon in der Liste');
+      return;
+    }
+
+    const prefs = parsePrefs((byId('rb-add-prefs') || {}).value);
+    const tentative = !!((byId('rb-add-tent') || {}).checked);
+
+    setManualFor(manualFor().concat([{ name, prefs, tentative }]));
+    S.players.push({ name, prefs, tentative, manual:true });
+    cancelAddPlayer();
+    maybeAuto('change');       // Auto an: sofort einplanen
+    render();
+    flash(name + ' manuell eingetragen');
+  }
+
+  /** Entfernt einen manuell eingetragenen Spieler wieder. */
+  function removeManualPlayer(name){
+    const lc = String(name || '').toLowerCase();
+    setManualFor(manualFor().filter(m => String(m.name || '').toLowerCase() !== lc));
+    S.players = S.players.filter(p => p.name.toLowerCase() !== lc);
+    S.parties.forEach(pt => pt.slots.forEach(sl => {
+      if (sl.player && sl.player.toLowerCase() === lc) { sl.player = null; sl.pick = null; }
+    }));
+    S.log = null; S.builtAt = null;
+    render();
+    flash(name + ' entfernt');
+  }
+
   /* ---------------- Daten ---------------- */
 
   function setStatus(t){ S.status = t; const el = byId('rb-status'); if (el) el.textContent = t; }
@@ -1877,6 +1980,8 @@ const RB = (function(){
     const known = new Map(S.players.map(p => [p.name.toLowerCase(), p]));
     const added = [];
     let prefsChanged = false;
+    const manualNames = new Set(manualFor().map(m => String(m.name || '').toLowerCase()));
+
     incoming.forEach(p => {
       const old = known.get(p.name.toLowerCase());
       if (old) {
@@ -1884,12 +1989,27 @@ const RB = (function(){
         if (!same) prefsChanged = true;
         old.prefs = p.prefs;
         old.tentative = p.tentative;
+        old.manual = false;                 // jetzt offiziell bei AlbionZvZ angemeldet
+        manualNames.delete(p.name.toLowerCase());
         known.delete(p.name.toLowerCase());
       }
       else { S.players.push(p); added.push(p.name); }
     });
 
-    const gone = [...known.values()].map(p => p.name);
+    /* Wer inzwischen offiziell angemeldet ist, fliegt aus der manuellen Liste */
+    if (manualNames.size !== manualFor().length) {
+      setManualFor(manualFor().filter(m => manualNames.has(String(m.name || '').toLowerCase())));
+    }
+
+    /* Manuelle Einträge bleiben erhalten, auch wenn AlbionZvZ sie nicht kennt */
+    manualFor().forEach(m => {
+      const lc = String(m.name || '').toLowerCase();
+      if (!lc) return;
+      if (S.players.some(p => p.name.toLowerCase() === lc)) return;
+      S.players.push({ name:m.name, prefs:(m.prefs || []).map(canon), tentative:!!m.tentative, manual:true });
+    });
+
+    const gone = [...known.values()].filter(p => !isManualName(p.name)).map(p => p.name);
     if (gone.length){
       S.players = S.players.filter(p => !gone.includes(p.name));
       S.parties.forEach(pt => pt.slots.forEach(sl => {
@@ -2106,10 +2226,11 @@ const RB = (function(){
     return sl.weapons.length > 1 ? (sl.pick || sl.weapons[0]) : sl.weapons.join(' / ');
   }
 
-  /** Name -> Rolle aus den tatsaechlich gesetzten Slots (unabhaengig von Auto/Build). */
+  /** Name -> Rolle aus den tatsaechlich gesetzten Slots (unabhaengig von Auto/Build).
+      Manuell eingetragene Spieler bleiben aussen vor: sie sind keine AlbionZvZ-Anmeldung. */
   function currentRoleMap(){
     const map = {};
-    S.players.forEach(p => { map[p.name] = roleOfSlot(findSlot(p.name)); });
+    S.players.forEach(p => { if (!p.manual) map[p.name] = roleOfSlot(findSlot(p.name)); });
     return map;
   }
 
@@ -2433,7 +2554,16 @@ const RB = (function(){
       </div>
       <div class="rb-grid">
         <section class="rb-panel">
-          <h3>Angemeldet <span class="rb-count" id="rb-cnt-players">0</span></h3>
+          <h3>Angemeldet <span class="rb-count" id="rb-cnt-players">0</span>
+            <button class="b small" onclick="RB.showAddPlayer()" title="Spieler ohne AlbionZvZ-Anmeldung eintragen">+ Spieler</button>
+          </h3>
+          <div class="rb-add" id="rb-add" hidden>
+            <input id="rb-add-name" placeholder="Name" maxlength="40" onkeydown="if(event.key==='Enter')RB.confirmAddPlayer()">
+            <input id="rb-add-prefs" placeholder="Wunschrollen, mit Komma" onkeydown="if(event.key==='Enter')RB.confirmAddPlayer()">
+            <label><input type="checkbox" id="rb-add-tent"> tentative</label>
+            <button class="b small" onclick="RB.confirmAddPlayer()">Hinzufügen</button>
+            <button class="b small" onclick="RB.cancelAddPlayer()" title="Abbrechen">×</button>
+          </div>
           <div class="rb-body" id="rb-players"><p class="rb-msg">Noch kein Event verbunden.</p></div>
         </section>
         <section class="rb-panel">
@@ -2504,8 +2634,10 @@ const RB = (function(){
       return `<div class="rb-card ${p.tentative ? 'tent' : ''}" draggable="true" data-name="${esc(p.name)}">
         <div class="top">
           <span class="rb-nm">${esc(p.name)}</span>
+          ${p.manual ? '<span class="rb-tag" title="Ohne AlbionZvZ-Anmeldung eingetragen">manuell</span>' : ''}
           ${p.name === (S.event || {}).shotCaller ? '<span class="tag" style="border-color:#c4a1ff;color:#c4a1ff">Caller</span>' : ''}
           <span class="rb-seat ${sl ? '' : 'bench'}">${seat}</span>
+          ${p.manual ? `<button class="rb-del" data-del="${esc(p.name)}" title="Manuellen Eintrag entfernen">×</button>` : ''}
         </div>
         <div class="rb-prefs">${chips || '<span class="rb-hint">keine Rollen gewählt</span>'}</div>
         ${total ? `<div class="rb-hint">Historie: ${total} Einsätze</div>` : ''}
@@ -2517,6 +2649,12 @@ const RB = (function(){
       card.addEventListener('dragstart', e => {
         e.dataTransfer.setData('text/plain', card.dataset.name);
         e.dataTransfer.effectAllowed = 'move';
+      });
+      const del = card.querySelector('.rb-del');
+      if (del) del.addEventListener('click', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        removeManualPlayer(card.dataset.name);
       });
     });
   }
@@ -2734,6 +2872,7 @@ const RB = (function(){
     S.notify = localStorage.getItem(LS_NOTIFY) !== '0'; // Standard: an
     S.notified = loadNotified();
     loadLocalChanges();
+    loadManual();
     setAutoBtn();
     setNotifyBtn();
 
@@ -2749,7 +2888,7 @@ const RB = (function(){
   }
 
   return { page, init, connect, build, copy, bump, toggleLive, toggleAuto, toggleNotify, testDiscord, flushQueued, pinLink, reloadComp, closePick,
-    reloadChanges: () => loadChanges(true) };
+    reloadChanges: () => loadChanges(true), showAddPlayer, cancelAddPlayer, confirmAddPlayer, removeManualPlayer };
 })();
 
 P['admin-roster'] = () => RB.page();

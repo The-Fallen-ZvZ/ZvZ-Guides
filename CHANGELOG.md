@@ -12,6 +12,16 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-15 – Roster: Spieler ohne AlbionZvZ-Anmeldung eintragen
+
+- Neuer Knopf **+ Spieler** im Panel „Angemeldet": Name, optional Wunschrollen (Komma, max. 6) und **tentative**; Enter im Namensfeld fügt direkt hinzu
+- Eintrag erscheint sofort als normale Karte mit Badge `manuell`, ist ziehbar wie jede Anmeldung und wird bei aktivem Auto sofort eingeplant; `×` entfernt ihn wieder (Slot wird frei)
+- `applyData()` schützt manuelle Einträge vor dem Aufräumen nach jedem Poll (`gone`-Filter), damit sie nicht nach 60 s verschwinden
+- Wird der Spieler später offiziell bei AlbionZvZ angemeldet, übernimmt die Seite die offiziellen Wunschrollen und der manuelle Merker fällt weg
+- `currentRoleMap()` blendet manuelle Spieler aus: keine falsche „Neue Anmeldung" im Discord und kein Eintrag im Änderungs-Spiegel
+- Speicherung pro Event-Token im Browser (`tf-rb-manual`) – bewusst ohne Worker-Änderung, also ohne neuen Deploy nutzbar
+- Getestet per Node-Simulation des Roster-Moduls: Hinzufügen, Poll ohne Albion-Daten, Duplikat abgelehnt, offizielle Anmeldung übernommen, Entfernen; Seite syntaktisch geprüft
+
 ### 2026-11-15 – Roster-Seite: Änderungs-Spiegel wie im Discord
 
 - Neues Panel **Änderungen** unter der Comp (volle Breite): zeigt jede gemeldete An-/Abmeldung mit Uhrzeit, Spieler, Rolle und Status (`gesendet`, `gemerkt`, `schon gemeldet`, `Sperre`, `fehlgeschlagen`)
