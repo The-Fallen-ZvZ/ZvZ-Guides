@@ -228,6 +228,12 @@ body:has(main.rb-wide) .app{max-width:1720px}
 .rb-log .bad{border-color:#ff6b6b}.rb-log .info{border-color:var(--accent,#c4a1ff)}
 .rb-log .sec{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:12px 0 6px}
 .rb-log .sec:first-child{margin-top:0}
+.rb-history{grid-column:1/-1}
+.rb-history .rb-body{max-height:300px}
+.rb-history .item .h{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px}
+.rb-history .when{color:var(--mut);font-size:.7rem;font-variant-numeric:tabular-nums}
+.rb-history .tagline{margin-left:auto;font-size:.66rem;color:var(--mut);border:var(--bw) solid var(--ln);border-radius:20px;padding:0 6px;white-space:nowrap}
+.rb-history .src{font-size:.66rem;color:var(--mut);margin:0 0 8px}
 .rb-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;padding:16px;z-index:60}
 .rb-overlay.open{display:flex}
 .rb-modal{background:var(--bg);border:var(--bw) solid var(--ln);border-radius:var(--r-md);max-width:640px;width:100%;max-height:88vh;overflow:auto;padding:16px}
@@ -301,6 +307,7 @@ const ROSTER_GUILD_STATS_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.work
 const ROSTER_GUILD_RECENT_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/guildrecent';
 const ROSTER_GUILD_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/guild';
 const ROSTER_DEATH_DETAIL_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/deaths/detail';
+const ROSTER_CHANGES_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/changes';
 const RB_GUILD_ID = 'p9uAFij9ReO0BhIhHlVa8g';   // The-Fallen (EU)
 
 /* ============================================================
@@ -1542,6 +1549,7 @@ const RB = (function(){
   const LS_AUTO  = 'tf-rb-auto';
   const LS_NOTIFY = 'tf-rb-notify';
   const LS_NOTIFIED = 'tf-rb-notified';
+  const LS_CHANGES = 'tf-rb-changes';   // lokaler Spiegel, falls /changes (noch) fehlt
   const AUTO_MS  = 5 * 60 * 1000;        // Auto-Zuweisung mindestens alle 5 Minuten
   const LIVE_MS  = 60 * 1000;            // Anmeldungen jede Minute abfragen (früher 5 Min)
   const TIER_RESERVE_FROM = 2;          // Party 1+2 = Haupt, ab Party 3 Reserve
@@ -1585,7 +1593,8 @@ const RB = (function(){
     token:'', event:null, parties:[], players:[], playstyles:{}, hist:{},
     builtAt:null, log:null, live:null, last:null, status:'',
     auto:false, lastAuto:0, changed:false, newSignups:0,
-    notify:true, notified:{}, deaths:{}, deathsAt:0
+    notify:true, notified:{}, deaths:{}, deathsAt:0,
+    changes:[], changesLocal:[], changesAt:0, changesOff:false
   };
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1791,6 +1800,7 @@ const RB = (function(){
     if (!tok) { flash('Kein gültiger Token (64 Zeichen aus /e/…)'); return; }
     S.token = tok;
     S.parties = []; S.players = []; S.log = null; S.builtAt = null;
+    S.changes = []; S.changesAt = 0; S.changesOff = false;
     localStorage.setItem(LS_TOKEN, tok);
     fetchData(true);
   }
@@ -1810,6 +1820,7 @@ const RB = (function(){
       setStatus(S.stamp);
       maybeAuto(first ? 'first' : (S.changed ? 'change' : 'poll'));
       notifyChanges();          // An-/Abmeldungen auch ohne Build erkennen
+      loadChanges();            // gleiche Änderungen auch auf der Seite zeigen
       if (S.changed) S.deathsAt = 0;
       loadDeaths();
     }catch(e){ setStatus('Netzwerkfehler – Worker erreichbar?'); }
@@ -2161,6 +2172,109 @@ const RB = (function(){
     } catch(e){ return ''; }
   }
 
+  /* ---------------- Änderungs-Spiegel (wie im Discord) ---------------- */
+
+  const CHANGE_LABEL = {
+    sent:'gesendet', flushed:'nachgesendet', queued:'gemerkt', duplicate:'schon gemeldet',
+    cooldown:'Sperre', failed:'fehlgeschlagen', claimed:'parallel'
+  };
+  const CHANGE_CLASS = {
+    sent:'ok', flushed:'ok', queued:'warn', cooldown:'warn',
+    duplicate:'info', claimed:'info', failed:'bad'
+  };
+
+  function loadLocalChanges(){
+    try {
+      const v = JSON.parse(localStorage.getItem(LS_CHANGES) || '[]');
+      S.changesLocal = Array.isArray(v) ? v : [];
+    } catch(e){ S.changesLocal = []; }
+  }
+
+  function saveLocalChanges(){
+    try { localStorage.setItem(LS_CHANGES, JSON.stringify(S.changesLocal.slice(0, 40))); } catch(e){}
+  }
+
+  /** Merkt sich die Zeilen, die gerade an Discord gingen (Fallback ohne /changes). */
+  function rememberChanges(list, result){
+    if (!list || !list.length) return;
+    S.changesLocal.unshift({
+      at: Date.now(), token: S.token, event: (S.event || {}).title || '',
+      result: result || 'sent',
+      changes: list.map(c => ({ name: c.name, role: c.role }))
+    });
+    S.changesLocal = S.changesLocal.slice(0, 40);
+    saveLocalChanges();
+    renderChanges();
+  }
+
+  /** Holt die zuletzt gemeldeten Änderungen aus dem Worker (alle Geräte). */
+  async function loadChanges(force){
+    if (!S.token) return;
+    if (!force && Date.now() - S.changesAt < 30 * 1000) return;
+    const key = sessionStorage.getItem('feedbackModKey');
+    if (!key) return;
+    S.changesAt = Date.now();
+    try{
+      const res = await fetch(ROSTER_CHANGES_ENDPOINT
+        + '?event=' + encodeURIComponent(S.token)
+        + '&limit=40&key=' + encodeURIComponent(key), { cache:'no-store' });
+      if (res.status === 401 || res.status === 403) return;
+      if (!res.ok) { S.changesOff = true; renderChanges(); return; }
+      const data = await res.json().catch(() => ({}));
+      S.changes = Array.isArray(data.entries) ? data.entries : [];
+      S.changesOff = false;
+      renderChanges();
+    }catch(e){ S.changesOff = true; renderChanges(); }
+  }
+
+  function changeTime(at){
+    const d = new Date(at);
+    if (isNaN(d.getTime())) return '';
+    const sameDay = d.toDateString() === new Date().toDateString();
+    return sameDay
+      ? d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' })
+      : d.toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+  }
+
+  function renderChanges(){
+    const el = byId('rb-changes');
+    if (!el) return;
+    const server = S.changes || [];
+    const local = (S.changesLocal || []).filter(e => !e.token || e.token === S.token);
+    const entries = server.length ? server : local;
+    const cnt = byId('rb-cnt-changes');
+    if (cnt) cnt.textContent = entries.length;
+    if (!entries.length){
+      el.innerHTML = '<p class="rb-msg">Noch keine Änderungen gemeldet.</p>';
+      return;
+    }
+
+    let h = '';
+    if (!server.length && S.changesOff){
+      h += '<p class="src">Der Worker liefert die Liste noch nicht (/changes) – es wird nur dieser Browser gezeigt. Nach dem Deploy verschwindet der Hinweis.</p>';
+    }
+
+    entries.slice(0, 25).forEach(e => {
+      const res = String(e.result || 'sent');
+      const list = Array.isArray(e.changes) ? e.changes : [];
+      const body = list.length
+        ? list.map(c => {
+            const role = String(c.role || '');
+            const left = role === '-' || role === '—' || role === '–';
+            return left
+              ? '<div><b>' + esc(c.name) + '</b> hat den Slot verlassen</div>'
+              : '<div>Anmeldung: <b>' + esc(c.name) + '</b> → ' + esc(role || 'noch offen') + '</div>';
+          }).join('')
+        : '<div class="mut">' + (Number(e.count) || 0) + ' Änderungen (älterer Eintrag)</div>';
+      h += '<div class="item ' + (CHANGE_CLASS[res] || 'info') + '">'
+        + '<div class="h"><span class="when">' + changeTime(e.at) + '</span>'
+        + '<b>Neue Anmeldung</b>' + (e.event ? ' <span class="mut">· ' + esc(e.event) + '</span>' : '')
+        + '<span class="tagline">' + esc(CHANGE_LABEL[res] || res) + '</span></div>'
+        + body + '</div>';
+    });
+    el.innerHTML = h;
+  }
+
   async function postNotify(changes, next){
     try{
       const key = sessionStorage.getItem('feedbackModKey');
@@ -2178,6 +2292,11 @@ const RB = (function(){
         })
       });
       const data = await res.json().catch(() => ({}));
+      const result = res.status === 429 ? 'cooldown'
+        : data.queued ? 'queued'
+        : data.duplicate ? 'duplicate'
+        : res.ok ? 'sent' : 'failed';
+      rememberChanges(list, result);
       if (res.status === 429) {
         saveNotifyLog('Sperre');
         const secs = Math.ceil((data.retryInMs || 0) / 1000);
@@ -2216,6 +2335,7 @@ const RB = (function(){
           ? 'Discord: unverändert, nicht erneut gesendet'
           : (list.length === 1 ? 'Discord: 1 Änderung gemeldet' : 'Discord: ' + list.length + ' Änderungen gemeldet'));
       }
+      loadChanges(true);   // gesendete Meldung sofort im Spiegel zeigen
     }catch(e){ /* beim naechsten Poll erneut versuchen */ }
     finally{ notifyPending = false; }
   }
@@ -2334,6 +2454,12 @@ const RB = (function(){
           <h3>Gehirn <span class="rb-count" id="rb-cnt-bench">0</span></h3>
           <div class="rb-body rb-log" id="rb-brain"><p class="rb-msg">Bereit, sobald ein Event verbunden ist.</p></div>
         </section>
+        <section class="rb-panel rb-history">
+          <h3>Änderungen <span class="rb-count" id="rb-cnt-changes">0</span>
+            <button class="b small" style="margin-left:auto" onclick="RB.reloadChanges()" title="Liste der gemeldeten An-/Abmeldungen neu holen">Aktualisieren</button>
+          </h3>
+          <div class="rb-body rb-log" id="rb-changes"><p class="rb-msg">Noch keine Änderungen gemeldet.</p></div>
+        </section>
       </div>
       <div class="rb-overlay" id="rb-overlay" onclick="if(event.target===this)RB.closePick()">
         <div class="rb-modal" id="rb-modal"></div>
@@ -2343,7 +2469,7 @@ const RB = (function(){
   function render(){
     const p = byId('rb-players');
     if (!p) return; // Seite nicht sichtbar
-    renderPlayers(); renderComp(); renderBrain();
+    renderPlayers(); renderComp(); renderBrain(); renderChanges();
     const players = S.players.length;
     const active = flatSlots().filter(s => s.weapons.length).length;
     byId('rb-cnt-players').textContent = players;
@@ -2607,6 +2733,7 @@ const RB = (function(){
     S.auto = localStorage.getItem(LS_AUTO) !== '0';   // Standard: an
     S.notify = localStorage.getItem(LS_NOTIFY) !== '0'; // Standard: an
     S.notified = loadNotified();
+    loadLocalChanges();
     setAutoBtn();
     setNotifyBtn();
 
@@ -2621,7 +2748,8 @@ const RB = (function(){
     }
   }
 
-  return { page, init, connect, build, copy, bump, toggleLive, toggleAuto, toggleNotify, testDiscord, flushQueued, pinLink, reloadComp, closePick };
+  return { page, init, connect, build, copy, bump, toggleLive, toggleAuto, toggleNotify, testDiscord, flushQueued, pinLink, reloadComp, closePick,
+    reloadChanges: () => loadChanges(true) };
 })();
 
 P['admin-roster'] = () => RB.page();

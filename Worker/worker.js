@@ -9,6 +9,7 @@
          GET  /roster?event=<64-hex>&key=<mod-key>
          POST /notify   { key, event, changes:[{name,role}], link }
          POST /notify   { key, type:'pin', link }
+         GET  /changes?event=<64-hex>&limit=40&key=<mod-key>   (Spiegel der Discord-Meldungen)
          GET  /deaths?guild=<id>&names=A,B,C&days=30&key=<mod-key>
          GET  /guild?guild=<id>&key=<mod-key>
          GET  /guildstats?guild=<id>&window=7d|30d|90d|all&force=1&key=<mod-key>
@@ -387,7 +388,7 @@ async function handleRoster(request, env, url) {
 
 const DISCORD_API = 'https://discord.com/api/v10';
 let LAST_DISCORD = null;                     // letzter Discord-Fehler (nur Diagnose)
-const WORKER_VERSION = '2026-11-15-1';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
+const WORKER_VERSION = '2026-11-15-2';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
 const NOTIFY_COOLDOWN_MS = 5 * 60 * 1000;    // min. 5 Min zwischen zwei Anmeldungs-Nachrichten
 const NOTIFY_DUPLICATE_MS = 10 * 60 * 1000;  // identische Nachricht 10 Min nicht wiederholen
 const NOTIFY_QUEUE_TTL = 24 * 60 * 60;       // gemerkte Anmeldung max. 1 Tag aufheben
@@ -561,14 +562,14 @@ function queueKey(env, scope) {
   return 'rb:notifyq:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':' + scope;
 }
 
-/** Letzte Entscheidungen pro Event mitschreiben (fuer /health). */
+/** Letzte Entscheidungen pro Event mitschreiben (fuer /changes und /health). */
 async function logNotify(env, scope, entry) {
   try {
     const key = 'rb:notifylog:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':' + scope;
     const prev = await kvGet(env, key);
     const list = Array.isArray(prev) ? prev : [];
     list.unshift(Object.assign({ at: Date.now(), scope }, entry));
-    await kvPut(env, key, list.slice(0, 10), 86400);
+    await kvPut(env, key, list.slice(0, 40), 604800);   // 7 Tage, 40 Meldungen
   } catch (e) { /* Log ist optional */ }
 }
 
@@ -715,20 +716,27 @@ async function handleNotify(request, env) {
     ? 'ev-' + eventKey.slice(0, 24)
     : ((eventTitle || 'default').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'default');
 
+  /* Fuer den Aenderungs-Spiegel auf der Seite: dieselben Zeilen wie im Discord */
+  const logChanges = changes.map(c => ({
+    name: String(c.name || '').slice(0, 40),
+    role: String(c.role || '').slice(0, 60)
+  }));
+  const logBase = { event: eventTitle, changes: logChanges, count: logChanges.length };
+
   /* Neue Anmeldung zuerst behandeln, danach andere wartende Events nachholen. */
   const out = await sendWithCooldown(env, content, scope, body.force === true);
   try { await flushNotifyQueue(env); } catch (e) { /* naechster Lauf */ }
 
   if (out.duplicate) {
-    await logNotify(env, scope, { changes: changes.length, result: 'duplicate' });
+    await logNotify(env, scope, Object.assign({}, logBase, { result: 'duplicate' }));
     return rosterJson({ ok: true, sent: 0, duplicate: true });
   }
   if (out.queued) {
-    await logNotify(env, scope, { changes: changes.length, result: 'queued', retryInMs: Math.round(out.retryInMs) });
+    await logNotify(env, scope, Object.assign({}, logBase, { result: 'queued', retryInMs: Math.round(out.retryInMs) }));
     return rosterJson({ ok: true, sent: 0, queued: true, retryInMs: out.retryInMs });
   }
   if (out.throttled) {
-    await logNotify(env, scope, { changes: changes.length, result: 'cooldown' });
+    await logNotify(env, scope, Object.assign({}, logBase, { result: 'cooldown' }));
     return rosterJson({
       error: 'cooldown',
       throttled: true,
@@ -737,12 +745,44 @@ async function handleNotify(request, env) {
     }, 429);
   }
   if (!out.sent) {
-    await logNotify(env, scope, { changes: changes.length, result: 'failed' });
+    await logNotify(env, scope, Object.assign({}, logBase, { result: 'failed' }));
     return rosterJson({ error: 'notify_failed', hint: 'DISCORD_CHANNEL_ID (Kanal) oder DISCORD_USER_ID (DM) pruefen' }, 502);
   }
 
-  await logNotify(env, scope, { changes: changes.length, result: 'sent', sent: out.sent, force: body.force === true });
+  await logNotify(env, scope, Object.assign({}, logBase, { result: 'sent', sent: out.sent, force: body.force === true }));
   return rosterJson({ ok: true, sent: out.sent });
+}
+
+/**
+ * GET /changes?key=.&event=<64-hex>[&limit=40]
+ * Liefert die zuletzt per Discord gemeldeten An-/Abmeldungen (Spiegel fuer die Seite).
+ */
+async function handleChanges(request, env, url) {
+  if (request.method !== 'GET') return rosterJson({ error: 'method_not_allowed' }, 405);
+  if (!env.MOD_KEY || url.searchParams.get('key') !== env.MOD_KEY) {
+    return rosterJson({ error: 'unauthorized' }, 401);
+  }
+
+  const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit') || '40', 10)));
+  const prefix = 'rb:notifylog:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':';
+  const token = (url.searchParams.get('event') || '').trim().toLowerCase();
+  const only = /^[0-9a-f]{64}$/.test(token) ? 'ev-' + token.slice(0, 24) : '';
+
+  let list;
+  try { list = await env.FEEDBACK_TF.list({ prefix }); }
+  catch (e) { return rosterJson({ entries: [], error: 'kv_unavailable', detail: String(e && e.message || e) }); }
+
+  const entries = [];
+  for (const k of list.keys) {
+    const scope = k.name.slice(prefix.length);
+    if (only && scope !== only) continue;
+    const v = await kvGet(env, k.name);
+    if (!Array.isArray(v)) continue;
+    v.forEach(e => { if (e && e.at) entries.push(Object.assign({ scope }, e)); });
+  }
+
+  entries.sort((a, b) => b.at - a.at);
+  return rosterJson({ entries: entries.slice(0, limit), version: WORKER_VERSION, now: new Date().toISOString() });
 }
 
 /* ---------- Tode / Aktivität (offizielle Albion-API) ---------------------- */
@@ -1479,6 +1519,11 @@ export default {
     if (url.pathname === '/notify') {
       try { return await handleNotify(request, env); }
       catch (e) { return rosterJson({ error: 'notify_failed', detail: String(e && e.message || e) }, 500); }
+    }
+
+    if (url.pathname === '/changes') {
+      try { return await handleChanges(request, env, url); }
+      catch (e) { return rosterJson({ error: 'changes_failed', detail: String(e && e.message || e) }, 500); }
     }
 
     if (url.pathname === '/deaths') {

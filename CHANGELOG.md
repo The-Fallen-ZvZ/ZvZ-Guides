@@ -12,6 +12,15 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-15 – Roster-Seite: Änderungs-Spiegel wie im Discord
+
+- Neues Panel **Änderungen** unter der Comp (volle Breite): zeigt jede gemeldete An-/Abmeldung mit Uhrzeit, Spieler, Rolle und Status (`gesendet`, `gemerkt`, `schon gemeldet`, `Sperre`, `fehlgeschlagen`)
+- Quelle: neuer Worker-Endpunkt `GET /changes?event=<token>&limit=40&key=…` – liefert die gespeicherten Meldungen (7 Tage, 40 pro Event) inklusive der Namen und Rollen
+- `logNotify()` speichert jetzt die tatsächlichen Zeilen (`changes: [{name, role}]`) statt nur der Anzahl; 40 Einträge, 7 Tage TTL
+- Seite holt die Liste beim Poll (max. alle 30 s), nach jeder Meldung und über den Knopf **Aktualisieren**
+- Fallback: solange der Worker noch nicht neu deployt ist (kein `/changes`), zeigt das Panel die lokal gemerkten Meldungen dieses Browsers mit Hinweis
+- Worker-Version `2026-11-15-2`; `node --check` (Worker) und Syntaxprüfung der Script-Blöcke (Seite) sauber
+
 ### 2026-11-15 – Discord: dieselbe Anmeldung kam trotzdem 3×
 
 - Ursache: Die Sperre war ein **Read-then-Write** auf KV – mehrere Aufrufe (mehrere Admin-Tabs, `/roster`-Poll, Cron, „Wartende senden") lasen alle „noch nichts gesendet" und posteten danach jeder einmal. Genau das Bild im Discord: 3 identische Blöcke in derselben Minute
