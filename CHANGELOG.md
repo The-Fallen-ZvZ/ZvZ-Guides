@@ -12,6 +12,18 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-15 – Discord: dieselbe Anmeldung kam trotzdem 3×
+
+- Ursache: Die Sperre war ein **Read-then-Write** auf KV – mehrere Aufrufe (mehrere Admin-Tabs, `/roster`-Poll, Cron, „Wartende senden") lasen alle „noch nichts gesendet" und posteten danach jeder einmal. Genau das Bild im Discord: 3 identische Blöcke in derselben Minute
+- Zusätzlich konnte `flushNotifyQueue` denselben Wartenden-Text parallel aus zwei Requests senden, weil der Merker erst nach dem Posten geschrieben wurde
+- Neu im Worker: `sendOnce()` mit **Anspruch + Gegenlesen** (`rb:sent:<kanal>:<text-hash>`): erst Anspruch schreiben, 300 ms warten, zurücklesen – nur wer seinen eigenen Token sieht, sendet; der Merker steht 30 Min
+- `sendWithCooldown` prüft den Merker **vor** Sperre und Warteschlange; ein bereits gesendeter Text wird nicht mehr eingereiht, ein nur beanspruchter bleibt in der Warteschlange (falls der andere Versand scheitert)
+- `flushNotifyQueue` verwirft Wartende nur noch bei bestätigtem Versand (`state: 'sent'`), fremde Ansprüche werden abgewartet statt doppelt gesendet
+- Todes-Warnungen laufen ebenfalls über `sendOnce` (Cron und manueller Aufruf können parallel laufen)
+- Testnachricht (`force`) umgeht Sperre und Merker bewusst weiter
+- Worker-Version `2026-11-15-1` (in `/health` sichtbar), `node --check` sauber
+- Restrisiko: Cloudflare KV ist eventually consistent – bei extremem Zufall (zwei Colo-Standorte im selben Moment) bleibt ein theoretischer Doppelsender; innerhalb eines Browsers/Standorts ist der Fall damit geschlossen
+
 ### 2026-11-14 – Discord: jede Anmeldung kam doppelt
 
 - Ursache: seit dem Umbau rief `fetchData()` den Abgleich zweimal im selben Tick auf (einmal über `build()`, einmal direkt). `postNotify()` ist asynchron und schreibt den Merker erst nach der Antwort – der zweite Aufruf sah den alten Stand und schickte denselben Text erneut

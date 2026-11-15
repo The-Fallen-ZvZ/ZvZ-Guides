@@ -387,10 +387,13 @@ async function handleRoster(request, env, url) {
 
 const DISCORD_API = 'https://discord.com/api/v10';
 let LAST_DISCORD = null;                     // letzter Discord-Fehler (nur Diagnose)
-const WORKER_VERSION = '2026-11-14-2';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
+const WORKER_VERSION = '2026-11-15-1';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
 const NOTIFY_COOLDOWN_MS = 5 * 60 * 1000;    // min. 5 Min zwischen zwei Anmeldungs-Nachrichten
 const NOTIFY_DUPLICATE_MS = 10 * 60 * 1000;  // identische Nachricht 10 Min nicht wiederholen
 const NOTIFY_QUEUE_TTL = 24 * 60 * 60;       // gemerkte Anmeldung max. 1 Tag aufheben
+const SEND_CLAIM_TTL = 10 * 60;              // Anspruch auf einen Text (Sekunden)
+const SEND_CLAIM_WAIT_MS = 300;              // so lange warten, bis parallele Aufrufe den Anspruch sehen
+const SEND_LEDGER_TTL = 30 * 60;             // derselbe Text geht 30 Min nur einmal raus (Sekunden)
 
 function hashText(text) {
   let h = 2166136261;
@@ -457,6 +460,53 @@ async function notifyMods(env, content) {
   return dmMods(env, content);
 }
 
+/** Merker "dieser Text ist raus" (pro Kanal und Text-Hash). */
+function sentKey(env, hash) {
+  return 'rb:sent:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':' + hash;
+}
+
+/**
+ * Anspruch auf einen Text: erst schreiben, kurz warten, dann zuruecklesen.
+ * Von mehreren gleichzeitigen Aufrufen (mehrere Tabs, Roster-Poll, Cron)
+ * gewinnt dadurch genau einer – alle anderen sehen den fremden Anspruch.
+ */
+async function claimSend(env, content) {
+  const hash = hashText(content);
+  const key = sentKey(env, hash);
+
+  const prev = await kvGet(env, key);
+  if (prev) return { hash, key, token: null, state: prev.state || 'sent', at: prev.at || 0 };
+
+  const token = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+  await kvPut(env, key, { state: 'claim', at: Date.now(), token, hash }, SEND_CLAIM_TTL);
+  await sleep(SEND_CLAIM_WAIT_MS);
+  const back = await kvGet(env, key);
+
+  if (back && back.state === 'claim' && back.token === token) {
+    return { hash, key, token, state: 'claim', at: back.at || Date.now() };
+  }
+  return { hash, key, token: null, state: (back && back.state) || 'claim', at: (back && back.at) || 0 };
+}
+
+/**
+ * Sendet einen Text hoechstens einmal pro SEND_LEDGER_TTL.
+ * Damit kann derselbe Text nicht mehrfach rausgehen, auch wenn mehrere
+ * Geraete/Tabs denselben Request im selben Moment schicken.
+ */
+async function sendOnce(env, content) {
+  const claim = await claimSend(env, content);
+  if (!claim.token) {
+    return { sent: 0, duplicate: true, state: claim.state, at: claim.at };
+  }
+  const sent = await notifyMods(env, content);
+  if (sent > 0) {
+    await kvPut(env, claim.key, { state: 'sent', at: Date.now(), hash: claim.hash }, SEND_LEDGER_TTL);
+  } else {
+    await kvDelete(env, claim.key);   // Fehlversuch gibt den Text wieder frei
+  }
+  return { sent, duplicate: false, state: sent > 0 ? 'sent' : 'failed', at: Date.now() };
+}
+
 /**
  * Anmeldungen mit 5-Minuten-Sperre und Doppel-Erkennung.
  * So kann weder ein zweiter Tab noch ein Reload dieselbe Meldung spammen.
@@ -468,7 +518,22 @@ async function sendWithCooldown(env, content, scope, force) {
   const now = Date.now();
   const hash = hashText(content);
 
-  if (!force && last && last.at) {
+  /* Testnachricht (force): bewusst ohne Sperre und ohne Doppel-Erkennung */
+  if (force) {
+    const sent = await notifyMods(env, content);
+    return { sent, duplicate: false, throttled: false, queued: false, retryInMs: 0 };
+  }
+
+  /* Gleicher Text wurde bereits gesendet oder wird gerade gesendet -> fertig */
+  const ledger = await kvGet(env, sentKey(env, hash));
+  if (ledger) {
+    /* Nur bei "sent" ist der Wartende Eintrag wirklich erledigt; bei "claim"
+       bleibt er liegen, falls der andere Aufruf am Versand scheitert. */
+    if (ledger.state === 'sent') await kvDelete(env, queueKey(env, scope));
+    return { sent: 0, duplicate: true, throttled: true, queued: false, retryInMs: 0 };
+  }
+
+  if (last && last.at) {
     if (last.hash === hash && now - last.at < NOTIFY_DUPLICATE_MS) {
       return { sent: 0, duplicate: true, throttled: true, queued: false, retryInMs: 0 };
     }
@@ -479,12 +544,17 @@ async function sendWithCooldown(env, content, scope, force) {
     }
   }
 
-  const sent = await notifyMods(env, content);
-  if (sent > 0) {
+  const out = await sendOnce(env, content);
+  if (out.sent > 0) {
     await kvPut(env, key, { at: now, hash }, 3600);
     await kvDelete(env, queueKey(env, scope));
+    return { sent: out.sent, duplicate: false, throttled: false, queued: false, retryInMs: 0 };
   }
-  return { sent, duplicate: false, throttled: false, queued: false, retryInMs: 0 };
+  if (out.duplicate) {
+    /* Ein anderer Aufruf sendet denselben Text bereits */
+    return { sent: 0, duplicate: true, throttled: true, queued: false, retryInMs: 0 };
+  }
+  return { sent: 0, duplicate: false, throttled: false, queued: false, retryInMs: 0 };
 }
 
 function queueKey(env, scope) {
@@ -518,9 +588,20 @@ async function flushNotifyQueue(env, force) {
     const scope = k.name.slice(prefix.length);
     const lockKey = 'rb:notifylast:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':' + scope;
     const last = await kvGet(env, lockKey);
+    const hash = hashText(q.content);
+
+    /* Text ist bereits raus (oder wird gerade gesendet) -> Wartenden Eintrag verwerfen */
+    const ledger = await kvGet(env, sentKey(env, hash));
+    if (ledger && ledger.state === 'sent') {
+      await kvDelete(env, k.name);
+      await logNotify(env, scope, { result: 'flush-duplicate' });
+      continue;
+    }
+    /* Fremder Anspruch: dieser Aufruf wartet, bis der andere fertig ist */
+    if (ledger) continue;
 
     /* Wartet noch derselbe Text wie der zuletzt gesendete, nicht erneut posten */
-    if (last && last.hash === hashText(q.content) && Date.now() - last.at < NOTIFY_DUPLICATE_MS) {
+    if (last && last.hash === hash && Date.now() - last.at < NOTIFY_DUPLICATE_MS) {
       await kvDelete(env, k.name);
       await logNotify(env, scope, { result: 'flush-duplicate' });
       continue;
@@ -528,12 +609,16 @@ async function flushNotifyQueue(env, force) {
 
     if (!force && last && last.at && Date.now() - last.at < NOTIFY_COOLDOWN_MS) continue;
 
-    const ok = await notifyMods(env, q.content);
-    if (ok > 0) {
-      await kvPut(env, lockKey, { at: Date.now(), hash: hashText(q.content) }, 3600);
+    const out = await sendOnce(env, q.content);
+    if (out.sent > 0) {
+      await kvPut(env, lockKey, { at: Date.now(), hash }, 3600);
       await kvDelete(env, k.name);
-      await logNotify(env, scope, { result: 'flushed', sent: ok });
-      sent += ok;
+      await logNotify(env, scope, { result: 'flushed', sent: out.sent });
+      sent += out.sent;
+    } else if (out.duplicate) {
+      /* Ein paralleler Aufruf hat den Text uebernommen; nur bei Erfolg verwerfen */
+      if (out.state === 'sent') await kvDelete(env, k.name);
+      await logNotify(env, scope, { result: 'flush-claimed' });
     } else {
       await logNotify(env, scope, { result: 'flush-failed', discord: LAST_DISCORD });
     }
@@ -848,7 +933,9 @@ async function sendDeathAlerts(env, fresh, totals) {
     + 'In den letzten 3-ZvZs gestorben:\n'
     + lines.map(x => '- **' + x.name + '**: ' + x.deaths + ' Tode, ' + x.kills + ' Kills').join('\n');
 
-  return notifyMods(env, content);
+  /* Cron und manuelle Abfrage koennen gleichzeitig laufen – nur einer sendet */
+  const out = await sendOnce(env, content);
+  return out.sent;
 }
 
 /**
