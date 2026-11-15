@@ -243,11 +243,16 @@ body:has(main.rb-wide) .app{max-width:1720px}
 .rb-pick .sc{margin-left:auto;color:var(--mut);font-size:.72rem}
 .rb-msg{color:var(--mut);font-size:.85rem;padding:6px 0}
 .rb-red{color:#ff6b6b}.rb-green{color:#5fd38a}.rb-orange{color:#ffa94d}
-.rb-add{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px 10px;border-bottom:var(--bw) solid var(--ln)}
-.rb-add[hidden]{display:none}
-.rb-add input:not([type="checkbox"]){flex:1;min-width:110px;background:var(--bg);border:var(--bw) solid var(--ln);border-radius:var(--r-sm);padding:5px 7px;font:inherit;font-size:.8rem;outline:0}
-.rb-add input:not([type="checkbox"]):focus{border-color:var(--mut)}
-.rb-add label{display:flex;align-items:center;gap:4px;font-size:.72rem;color:var(--mut);white-space:nowrap}
+.rb-add-q{width:100%;background:var(--bg);border:var(--bw) solid var(--ln);border-radius:var(--r-sm);padding:7px 9px;font:inherit;font-size:.85rem;outline:0}
+.rb-add-q:focus{border-color:var(--mut)}
+.rb-add-list{max-height:38vh;overflow:auto;margin:8px 0 14px}
+.rb-add-list .rb-pick{cursor:pointer}
+.rb-add-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0}
+.rb-add-row input:not([type="checkbox"]){flex:1;min-width:120px;background:var(--bg);border:var(--bw) solid var(--ln);border-radius:var(--r-sm);padding:6px 8px;font:inherit;font-size:.82rem;outline:0}
+.rb-add-row label{display:flex;align-items:center;gap:4px;font-size:.72rem;color:var(--mut);white-space:nowrap}
+.rb-add-prefs{width:100%;margin-top:6px;background:var(--bg);border:var(--bw) solid var(--ln);border-radius:var(--r-sm);padding:6px 8px;font:inherit;font-size:.82rem;outline:0}
+.rb-add-prefs:focus,.rb-add-row input:focus{border-color:var(--mut)}
+.rb-modal .sec{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:10px 0 4px}
 .rb-tag{font-size:.62rem;border:1px solid var(--warn);color:var(--warn);border-radius:20px;padding:0 5px;white-space:nowrap}
 .rb-del{border:0;background:transparent;color:var(--mut);cursor:pointer;font-size:1rem;line-height:1;padding:0 2px}
 .rb-del:hover{color:#ff6b6b}
@@ -1605,7 +1610,7 @@ const RB = (function(){
     auto:false, lastAuto:0, changed:false, newSignups:0,
     notify:true, notified:{}, deaths:{}, deathsAt:0,
     changes:[], changesLocal:[], changesAt:0, changesOff:false,
-    manual:{}
+    manual:{}, guild:[], guildAt:0, guildErr:'', addQuery:''
   };
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1824,20 +1829,110 @@ const RB = (function(){
     return manualFor().some(m => String(m.name || '').toLowerCase() === n);
   }
 
+  /** Öffnet die Auswahl: Gildenmitglied anklicken oder externen Namen eintippen. */
   function showAddPlayer(){
-    const box = byId('rb-add');
-    if (!box) return;
     if (!S.token) { flash('Bitte zuerst ein Event verbinden'); return; }
-    box.hidden = false;
-    const name = byId('rb-add-name'), prefs = byId('rb-add-prefs'), tent = byId('rb-add-tent');
-    if (name) { name.value = ''; name.focus(); }
-    if (prefs) prefs.value = '';
-    if (tent) tent.checked = false;
+    const md = byId('rb-modal'), ov = byId('rb-overlay');
+    if (!md || !ov) return;
+    S.addQuery = '';
+
+    md.innerHTML = `<h3>Spieler hinzufügen</h3>
+      <p class="mut" style="font-size:.8rem;margin:0 0 10px">Gildenmitglied anklicken – oder unten einen Namen eintippen, der nicht in der Gilde ist.</p>
+      <input id="rb-add-q" class="rb-add-q" placeholder="Gilde durchsuchen…" autocomplete="off">
+      <div class="rb-add-list" id="rb-add-list"><p class="rb-msg">Gildenliste wird geladen…</p></div>
+      <div class="sec">Nicht in der Gilde</div>
+      <div class="rb-add-row">
+        <input id="rb-add-name" placeholder="Name eintippen" maxlength="40">
+        <label><input type="checkbox" id="rb-add-tent"> tentative</label>
+        <button class="b small" onclick="RB.confirmAddPlayer()">Eintragen</button>
+      </div>
+      <input id="rb-add-prefs" class="rb-add-prefs" placeholder="Wunschrollen, optional (Komma)">
+      <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="b" onclick="RB.closeAddPlayer()">Schließen</button></div>`;
+    ov.classList.add('open');
+
+    const q = byId('rb-add-q');
+    if (q) { q.addEventListener('input', () => { S.addQuery = q.value; renderAddList(); }); q.focus(); }
+    const name = byId('rb-add-name');
+    if (name) name.addEventListener('keydown', e => { if (e.key === 'Enter') confirmAddPlayer(); });
+    const prefs = byId('rb-add-prefs');
+    if (prefs) prefs.addEventListener('keydown', e => { if (e.key === 'Enter') confirmAddPlayer(); });
+
+    renderAddList();
+    loadGuildMembers();
   }
 
-  function cancelAddPlayer(){
-    const box = byId('rb-add');
-    if (box) box.hidden = true;
+  function closeAddPlayer(){
+    const ov = byId('rb-overlay');
+    if (ov) ov.classList.remove('open');
+    const md = byId('rb-modal');
+    if (md) md.innerHTML = '';
+  }
+
+  /** Gildenliste über den Worker holen (10 Min im Speicher). */
+  async function loadGuildMembers(force){
+    if (!force && S.guildAt && Date.now() - S.guildAt < 10 * 60 * 1000) return;
+    const key = sessionStorage.getItem('feedbackModKey');
+    if (!key) { S.guildErr = 'Nicht als Moderator angemeldet.'; renderAddList(); return; }
+    S.guildAt = Date.now();
+    try{
+      const res = await fetch(ROSTER_GUILD_ENDPOINT
+        + '?guild=' + encodeURIComponent(RB_GUILD_ID)
+        + '&key=' + encodeURIComponent(key), { cache:'no-store' });
+      if (!res.ok) {
+        S.guildAt = 0;
+        S.guildErr = res.status === 401 ? 'Mod-Key ungültig – neu anmelden.' : 'Gildenliste nicht abrufbar (HTTP ' + res.status + ')';
+        renderAddList();
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      S.guild = Array.isArray(data.members) ? data.members.filter(m => m && m.name) : [];
+      S.guildErr = S.guild.length ? '' : 'Gildenliste ist leer.';
+    }catch(e){
+      S.guildAt = 0;
+      S.guildErr = 'Netzwerkfehler bei der Gildenliste';
+    }
+    renderAddList();
+  }
+
+  /** Liste der Gildenmitglieder, ohne bereits eingetragene Spieler. */
+  function renderAddList(){
+    const box = byId('rb-add-list');
+    if (!box) return;
+    if (S.guildErr){
+      box.innerHTML = `<p class="rb-msg">${esc(S.guildErr)}</p>`;
+      return;
+    }
+    if (!S.guild.length){
+      box.innerHTML = '<p class="rb-msg">Gildenliste wird geladen…</p>';
+      return;
+    }
+
+    const have = new Set(S.players.map(p => p.name.toLowerCase()));
+    const q = String(S.addQuery || '').trim().toLowerCase();
+    const members = S.guild
+      .filter(m => !have.has(String(m.name).toLowerCase()))
+      .filter(m => !q || String(m.name).toLowerCase().includes(q));
+
+    let h = '';
+    if (!members.length){
+      h += '<p class="rb-msg">' + (q ? 'Kein Treffer in der Gilde.' : 'Alle Gildenmitglieder stehen schon in der Liste.') + '</p>';
+    } else {
+      h += members.slice(0, 80).map(m => `<div class="rb-pick" data-guild="${esc(m.name)}">
+        <span><b>${esc(m.name)}</b></span><span class="sc">hinzufügen</span></div>`).join('');
+      if (members.length > 80) h += `<p class="rb-msg">${members.length - 80} weitere – Suche eingrenzen.</p>`;
+    }
+    box.innerHTML = h;
+    box.querySelectorAll('.rb-pick[data-guild]').forEach(el => {
+      el.addEventListener('click', () => addGuildPlayer(el.dataset.guild));
+    });
+  }
+
+  /** Ein Klick auf ein Gildenmitglied trägt ihn direkt ein. */
+  function addGuildPlayer(name){
+    if (addPlayerEntry(name, [], false)){
+      renderAddList();                 // Eintrag verschwindet aus der Auswahl
+      flash(name + ' aus der Gilde eingetragen');
+    }
   }
 
   function parsePrefs(raw){
@@ -1849,25 +1944,32 @@ const RB = (function(){
       .map(canon);
   }
 
-  /** Trägt einen Spieler ein, der sich nicht bei AlbionZvZ angemeldet hat. */
-  function confirmAddPlayer(){
-    if (!S.token) { flash('Bitte zuerst ein Event verbinden'); return; }
-    const name = String((byId('rb-add-name') || {}).value || '').trim().slice(0, 40);
-    if (!name) { flash('Name fehlt'); return; }
-    if (S.players.some(p => p.name.toLowerCase() === name.toLowerCase())) {
-      flash(name + ' steht schon in der Liste');
-      return;
+  /** Gemeinsamer Eintrag: Gilde oder extern. true = eingetragen. */
+  function addPlayerEntry(name, prefs, tentative){
+    if (!S.token) { flash('Bitte zuerst ein Event verbinden'); return false; }
+    const n = String(name || '').trim().slice(0, 40);
+    if (!n) { flash('Name fehlt'); return false; }
+    if (S.players.some(p => p.name.toLowerCase() === n.toLowerCase())){
+      flash(n + ' steht schon in der Liste');
+      return false;
     }
+    const list = (prefs || []).slice(0, 6).map(canon);
+    setManualFor(manualFor().concat([{ name:n, prefs:list, tentative:!!tentative }]));
+    S.players.push({ name:n, prefs:list, tentative:!!tentative, manual:true });
+    maybeAuto('change');               // Auto an: sofort einplanen
+    render();
+    return true;
+  }
 
+  /** Externen Namen aus den Eingabefeldern eintragen. */
+  function confirmAddPlayer(){
+    const name = (byId('rb-add-name') || {}).value || '';
     const prefs = parsePrefs((byId('rb-add-prefs') || {}).value);
     const tentative = !!((byId('rb-add-tent') || {}).checked);
-
-    setManualFor(manualFor().concat([{ name, prefs, tentative }]));
-    S.players.push({ name, prefs, tentative, manual:true });
-    cancelAddPlayer();
-    maybeAuto('change');       // Auto an: sofort einplanen
-    render();
-    flash(name + ' manuell eingetragen');
+    if (addPlayerEntry(name, prefs, tentative)){
+      closeAddPlayer();
+      flash(String(name).trim() + ' manuell eingetragen');
+    }
   }
 
   /** Entfernt einen manuell eingetragenen Spieler wieder. */
@@ -2555,15 +2657,8 @@ const RB = (function(){
       <div class="rb-grid">
         <section class="rb-panel">
           <h3>Angemeldet <span class="rb-count" id="rb-cnt-players">0</span>
-            <button class="b small" onclick="RB.showAddPlayer()" title="Spieler ohne AlbionZvZ-Anmeldung eintragen">+ Spieler</button>
+            <button class="b small" onclick="RB.showAddPlayer()" title="Gildenmitglied auswählen oder externen Spieler eintragen">+ Spieler</button>
           </h3>
-          <div class="rb-add" id="rb-add" hidden>
-            <input id="rb-add-name" placeholder="Name" maxlength="40" onkeydown="if(event.key==='Enter')RB.confirmAddPlayer()">
-            <input id="rb-add-prefs" placeholder="Wunschrollen, mit Komma" onkeydown="if(event.key==='Enter')RB.confirmAddPlayer()">
-            <label><input type="checkbox" id="rb-add-tent"> tentative</label>
-            <button class="b small" onclick="RB.confirmAddPlayer()">Hinzufügen</button>
-            <button class="b small" onclick="RB.cancelAddPlayer()" title="Abbrechen">×</button>
-          </div>
           <div class="rb-body" id="rb-players"><p class="rb-msg">Noch kein Event verbunden.</p></div>
         </section>
         <section class="rb-panel">
@@ -2888,7 +2983,7 @@ const RB = (function(){
   }
 
   return { page, init, connect, build, copy, bump, toggleLive, toggleAuto, toggleNotify, testDiscord, flushQueued, pinLink, reloadComp, closePick,
-    reloadChanges: () => loadChanges(true), showAddPlayer, cancelAddPlayer, confirmAddPlayer, removeManualPlayer };
+    reloadChanges: () => loadChanges(true), showAddPlayer, closeAddPlayer, confirmAddPlayer, removeManualPlayer };
 })();
 
 P['admin-roster'] = () => RB.page();

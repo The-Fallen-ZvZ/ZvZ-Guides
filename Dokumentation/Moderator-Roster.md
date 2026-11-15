@@ -74,11 +74,11 @@ Manuell anpassen: https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster
 
 ## Spieler manuell eintragen
 
-Wer sich nicht bei AlbionZvZ angemeldet hat (Nachrücker, Vertretung, Gast), lässt sich direkt im Roster ergänzen:
+Wer sich nicht bei AlbionZvZ angemeldet hat (Nachrücker, Vertretung, Gast), lässt sich direkt im Roster ergänzen. Der Knopf **+ Spieler** im Panel **Angemeldet** öffnet die Auswahl:
 
-1. Im Panel **Angemeldet** auf **+ Spieler** klicken.
-2. Name eintragen, optional Wunschrollen (mit Komma getrennt, max. 6) und **tentative** setzen.
-3. **Hinzufügen** – der Spieler erscheint sofort in der Liste, ist ziehbar wie jeder andere und wird bei aktivem Auto direkt eingeplant.
+- **Aus der Gilde:** Liste aller Gildenmitglieder (über `/guild`, 10 Minuten zwischengespeichert), Suchfeld darüber. Ein Klick auf einen Namen trägt ihn sofort ein – der Dialog bleibt offen, damit mehrere nacheinander gehen
+- **Nicht in der Gilde:** unten den Namen eintippen, optional Wunschrollen (Komma, max. 6) und **tentative**, dann **Eintragen**
+- Bereits eingetragene Spieler (angemeldet oder manuell) fehlen in der Gildenliste; ein Duplikat wird abgelehnt
 
 | Verhalten | Details |
 | --- | --- |
@@ -87,6 +87,7 @@ Wer sich nicht bei AlbionZvZ angemeldet hat (Nachrücker, Vertretung, Gast), lä
 | Discord | Manuelle Einträge lösen **keine** Anmeldungs-Nachricht aus und fehlen deshalb im Änderungs-Spiegel – sie sind keine Albion-Anmeldung |
 | Später offiziell angemeldet | Sobald der Name in den AlbionZvZ-Daten auftaucht, übernimmt die Seite die offiziellen Wunschrollen; der manuelle Merker fällt weg |
 | Speicherung | pro Event-Token im Browser (`tf-rb-manual`) – nicht geräteübergreifend, andere Moderatoren sehen den Eintrag nicht |
+| Ohne Mod-Key | Der Dialog meldet „Nicht als Moderator angemeldet." – die Gildenliste kommt nur mit gültigem Key |
 
 ## Änderungs-Spiegel auf der Seite
 

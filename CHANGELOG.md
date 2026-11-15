@@ -12,6 +12,15 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-15 – Spieler-Auswahl: Gilde anklicken oder extern eintippen
+
+- **+ Spieler** öffnet jetzt einen Dialog statt des Inline-Formulars: oben Suchfeld und Gildenliste, unten Feld für Namen außerhalb der Gilde
+- Gildenliste kommt über den bestehenden Endpunkt `/guild` (10 Minuten im Speicher); ein Klick auf ein Mitglied trägt es sofort ein, der Dialog bleibt für weitere Klicks offen
+- Bereits eingetragene Spieler fehlen in der Liste, Duplikate werden abgelehnt; externe Namen behalten Wunschrollen (Komma, max. 6) und **tentative**
+- Fehlerfälle im Dialog: kein Mod-Key, HTTP-Fehler der Gildenliste, leere Antwort
+- Keine Worker-Änderung nötig – `handleGuild` liefert die Mitglieder bereits
+- Getestet per Node-Simulation: Dialoginhalt, Klick auf Gildenmitglied, Duplikat, Filterung (bereits Eingetragene raus), externer Eintrag; Seite syntaktisch geprüft
+
 ### 2026-11-15 – Roster: Spieler ohne AlbionZvZ-Anmeldung eintragen
 
 - Neuer Knopf **+ Spieler** im Panel „Angemeldet": Name, optional Wunschrollen (Komma, max. 6) und **tentative**; Enter im Namensfeld fügt direkt hinzu
