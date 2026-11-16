@@ -68,20 +68,26 @@ Alle Meldungen gehen in den Kanal aus `DISCORD_CHANNEL_ID` (Feedback, Comp, Tode
 **THE-FALLEN · ZVZ Test Event**
 Stand 16.11., 14:32 · 18 angemeldet
 ```
-Party 1                                 │ Party 2
-Caller      1H Mace          DerJoker   │ Tank        Dreadstorm
-Tank        HeavyMace        Pinsel     │ Healer      Exalted (Plate)
-Healer      Exalted          Boerse     │ Healer      Tank Hallowfall
-Healer      1H Holy                     │ Support     Grovekeeper
-Support     Locus            Relgok     │ Support DPS Carving
-Clap DD     Spiked Gauntlets Amayana
-Clap DD     Permafrost
+Party 1                        │ Party 2
+Call 1H Mace          DerJoker │ Tank Dreadstorm
+Tank HeavyMace        Pinsel   │ Tank Stillgaze
+Tank Earthrune                 │ Heal Exalted
+Heal Exalted          Boerse   │ Heal Tank Hallowfall
+Heal 1H Holy                   │ Supp Grovekeeper
+Heal 1H Nature                 │ DPS  Carving
+Supp Locus            Relgok   │ DPS  Damnation
+Supp Rootbound                 │ DPS  Shadowcaller
+Supp Oathkeepers               │ DPS  Demonfang
+DPS  Spiked Gauntlets Amayana  │ DPS  Galatine Pair
+DPS  Permafrost                │ DPS  Riftglaive
+DPS  Longbow                   │ Tank Heron
+DPS  Dawnsong
 ```
 
 **Alternativen**
 ```
-Healer      Exalted          Gast1
-Clap DD     Longbow          Bank1
+Heal Exalted          Gast1
+DPS  Longbow          Bank1
 ```
 
 Besetzt: Heiler 4 · Tanks 4 · Support 3 · DPS 6 · Caller 1
@@ -89,12 +95,12 @@ Neu: **Boerse**
 ````
 
 - **Beim ersten Mal wird gepostet**, danach ausschließlich dieselbe Nachricht editiert (`PATCH /channels/{id}/messages/{msg}`). Die Nachrichten-ID liegt im KV unter `rb:compmsg:<kanal>:ev-<token>`.
-- **Beim Verbinden eines neuen Events** wird die Nachricht sofort angelegt – auch mit **0 Anmeldungen**. Dann stehen alle Rollen des Plans ohne Namen da, und man sieht beim Auffüllen, welche Rolle noch fehlt.
+- **Beim Verbinden eines neuen Events** wird die Nachricht sofort angelegt – auch mit **0 Anmeldungen**. Dann stehen alle Rollen ohne Namen da, und man sieht beim Auffüllen, welche Rolle noch fehlt.
+- **Komplette Comp:** Es werden **alle Slots** von Party 1 und Party 2 gelistet, belegt oder nicht. Freie Plätze bleiben einfach in der Namensspalte leer (kein „offen", kein Platzhalter).
 - **Kein Spam:** Die Seite schickt nur, wenn sich der Text geändert hat; zwischen zwei Edits liegen mindestens 20 s (`COMP_MIN_GAP_MS`). Wird die Nachricht im Discord gelöscht, legt der Worker sie beim nächsten Aufruf neu an.
-- **Aufbau:** Party 1 und Party 2 stehen **nebeneinander** in einem Code-Block (dadurch feste Spalten). Links Rolle und Waffe, rechts der Name – die Spaltenbreite richtet sich nach dem längsten Eintrag, Namen starten also immer an derselben Stelle.
-- **Freie Plätze bleiben leer** – kein „offen", kein Platzhalter. Nur Rollen außerhalb des Rollen-Ziels werden ganz ausgeblendet.
+- **Schmal gehalten:** Party 1 und Party 2 stehen in einem Code-Block nebeneinander (feste Spalten, keine Breite zum Scrollen). Rollen kurz (`Call`, `Tank`, `Heal`, `Supp`, `DPS`, `BM`), Waffen ohne Klammerzusatz (`Galatine Pair` statt `Galatine Pair (Offtimer)`), lange Namen werden auf 18 Zeichen gekürzt. Gesamtbreite rund 60–65 Zeichen.
 - **Alternativen** (Reserve-Parties und nicht eingeplante Spieler) stehen darunter, gleiche Spalten. Bei den nicht eingeplanten Spielern steht die 1. Wunschrolle; ohne Wunsch `Bank`.
-- **Kein `Ziel`-Block mehr** (seit 2026-11-16 entfernt) – die Vorgabe steckt in der Anzahl der gelisteten Plätze. `Besetzt` zeigt weiter den Ist-Stand je Rolle.
+- **Kein `Ziel`-Block** – die Vorgabe steckt in der Anzahl der Rollen-Slots. `Besetzt` zeigt den Ist-Stand je Rolle.
 - **Neu-Zeile** erscheint nur, wenn seit dem letzten Edit jemand dazugekommen ist; die Änderungen werden zusätzlich im Panel **Änderungen** gespiegelt (`/changes`).
 - **Takt (seit 2026-11-16):** Die Seite fragt **1x pro Stunde** ab (24 Abfragen am Tag); der Knopf **Aktualisieren** holt jederzeit sofort neu. Der Cron prüft ebenfalls höchstens 1x pro Stunde (`CRON_MIN_GAP_MS`), auch wenn der Trigger im Dashboard noch auf 5 Minuten steht.
 - **Entfernt am 2026-11-16:** `type:"flush"`, `type:"reset"`, `?demo=1` bei `/alerts`, `?send=1` bei `/health`, der Discord-Test-Knopf, der Knopf „Wartende senden" und die separate „Neue Anmeldung"-Nachricht.

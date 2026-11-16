@@ -2626,6 +2626,24 @@ const RB = (function(){
   const COMP_MIN_GAP_MS = 20 * 1000;          // Discord keine Edit-Flut schicken
   let compTimer = null, compPending = false, compLastAt = 0;
 
+  /* Kurzformen nur für die Discord-Nachricht – halten die Tabelle schmal. */
+  const ROLE_SHORT = {
+    'Tank':'Tank', 'Healer':'Heal', 'Support':'Supp',
+    'Support DPS':'DPS', 'Clap DD':'DPS', 'Brawl DD':'DPS',
+    'Battlemount':'BM', 'Unbekannt':'?'
+  };
+  function shortRole(slot, weapon){
+    if (slot && slot.caller) return 'Call';
+    const r = roleOf(weapon);
+    return ROLE_SHORT[r] || r;
+  }
+  function shortWeapon(w){
+    const s = String(w || '').replace(/\s*\([^)]*\)\s*$/, '').trim();   // "(Offtimer)" u. ä. weg
+    if (s.length <= 18) return s;
+    const first = s.split(' ')[0];
+    return first.length >= 5 ? first : s.slice(0, 17) + '…';
+  }
+
   /** Text der einen Nachricht: Party 1 + Party 2 mit Rollen und Spielern. */
   function compMessageText(){
     const main = S.parties.filter(pt => pt.tier === 'main').slice(0, 2);
@@ -2641,41 +2659,43 @@ const RB = (function(){
       return t.length > n ? t.slice(0, Math.max(0, n - 1)) + '…' : t + ' '.repeat(n - t.length);
     };
 
-    /* Zeilen einer Party: Rolle, Waffe, Name. Ohne Namen bleibt die Spalte leer. */
+    /* Zeilen einer Party: Rolle, Waffe, Name. Auch leere Slots werden gezeigt. */
     const rowsOf = pt => {
       const rows = [];
       if (!pt) return rows;
       pt.slots.forEach(sl => {
         if (!sl.weapons.length) return;
-        if (sl.inQuota === false && !sl.player) return;   // außerhalb des Rollen-Ziels
         const w = sl.pick || sl.weapons[0];
-        rows.push({ role: sl.caller ? 'Caller' : roleOf(w), weapon: w, name: sl.player || '' });
+        rows.push({ role: shortRole(sl, w), weapon: shortWeapon(w), name: sl.player || '' });
       });
       return rows;
     };
 
     const rows1 = rowsOf(main[0]);
     const rows2 = rowsOf(main[1]);
-    const allRows = rows1.concat(rows2);
 
-    const wRole = Math.max(4, ...allRows.map(r => r.role.length));
-    const wWeapon = Math.max(6, ...allRows.map(r => r.weapon.length));
-    const wName = Math.min(16, Math.max(10, ...rows1.map(r => r.name.length)));   // Namensspalte
+    /* Spaltenbreiten getrennt je Party: Party 2 ist die letzte Spalte und
+       braucht nur so breit zu sein wie ihre eigenen Einträge. */
+    const wRole1 = Math.max(4, ...rows1.map(r => r.role.length));
+    const wRole2 = Math.max(4, ...rows2.map(r => r.role.length));
+    const wW1 = Math.max(6, ...rows1.map(r => r.weapon.length));
+    const wW2 = Math.max(6, ...rows2.map(r => r.weapon.length));
+    const wName = Math.min(14, Math.max(8, ...rows1.map(r => r.name.length)));
     const sep = ' │ ';
-    const width = wRole + wWeapon + wName + 2;
+    const width1 = wRole1 + wW1 + wName + 2;
 
-    const cell = (r, last) => pad(r.role, wRole) + ' ' + pad(r.weapon, wWeapon) + ' '
-      + (last ? r.name : pad(r.name, wName));
-    const blank = ' '.repeat(width);
+    const cell1 = r => pad(r.role, wRole1) + ' ' + pad(r.weapon, wW1) + ' ' + pad(r.name, wName);
+    const cell2 = r => pad(r.role, wRole2) + ' ' + pad(r.weapon, wW2) + ' ' + r.name;
+    const blank = ' '.repeat(width1);
 
     /* Party 1 und Party 2 nebeneinander (Code-Block = feste Spalten) */
-    if (allRows.length){
+    if (rows1.length || rows2.length){
       out.push('```');
-      out.push(pad(main[0].name, width) + sep + (main[1] ? main[1].name : ''));
+      out.push(pad(main[0].name, width1) + sep + (main[1] ? main[1].name : ''));
       const lines = Math.max(rows1.length, rows2.length);
       for (let i = 0; i < lines; i++){
-        const a = rows1[i] ? cell(rows1[i], false) : blank;
-        const b = rows2[i] ? cell(rows2[i], true) : '';
+        const a = rows1[i] ? cell1(rows1[i]) : blank;
+        const b = rows2[i] ? cell2(rows2[i]) : '';
         out.push((b ? a + sep + b : a).replace(/[ ]+$/, ''));
       }
       out.push('```');
@@ -2689,18 +2709,18 @@ const RB = (function(){
     S.parties.filter(pt => pt.tier !== 'main').forEach(pt => pt.slots.forEach(sl => {
       if (!sl.player || !sl.weapons.length) return;
       const w = sl.pick || sl.weapons[0];
-      alts.push({ role: sl.caller ? 'Caller' : roleOf(w), weapon: w, name: sl.player });
+      alts.push({ role: shortRole(sl, w), weapon: shortWeapon(w), name: sl.player });
     }));
     S.players.filter(p => !placed.has(p.name)).forEach(p => {
-      const w = (p.prefs || [])[0] || '—';
-      alts.push({ role: w === '—' ? 'Bank' : roleOf(w), weapon: w, name: p.name });
+      const w = (p.prefs || [])[0] || '';
+      alts.push({ role: w ? shortRole({ caller:false }, w) : 'Bank', weapon: w ? shortWeapon(w) : '—', name: p.name });
     });
 
     if (alts.length){
       out.push('');
       out.push('**Alternativen**');
       out.push('```');
-      alts.forEach(r => out.push(cell(r, true)));
+      alts.forEach(r => out.push(pad(r.role, wRole1) + ' ' + pad(r.weapon, wW1) + ' ' + r.name));
       out.push('```');
     }
 

@@ -12,6 +12,13 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-16 – Comp-Nachricht zeigt jetzt die komplette Comp
+
+- **Alle Slots** von Party 1 und Party 2 werden gelistet – belegt oder leer. Der Filter `inQuota` gilt nur noch für die Zuweisung, nicht mehr für die Nachricht.
+- **Schmaler:** Rollen-Kurzformen (`Call`, `Tank`, `Heal`, `Supp`, `DPS`, `BM`), Waffen ohne Klammerzusatz (`Galatine Pair` statt `Galatine Pair (Offtimer)`), Spaltenbreiten getrennt je Partie, Namensspalte max. 14 Zeichen. Zeilenbreite jetzt ca. 60–65 Zeichen statt ~100, kein horizontales Scrollen im Code-Block.
+- Leere Plätze bleiben in der Namensspalte leer (kein Platzhalter).
+- Tests per Node-Simulation (0 und 3 Anmeldungen): vollständige Comp sichtbar, Ausrichtung korrekt.
+
 ### 2026-11-16 – Discord-Nachricht: Spaltenlayout, Party 1 + 2 nebeneinander
 
 - `Ziel:`-Zeile entfernt; die Vorgabe steckt jetzt in der Anzahl der gelisteten Plätze.
