@@ -12,6 +12,16 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-16 – Neue Events: Comp-Nachricht sofort, auch ohne Anmeldungen
+
+- Beim **Verbinden eines neuen Events** wird die Comp-Nachricht jetzt sofort angelegt/aktualisiert – auch mit 0 Anmeldungen. Alle Rollen des Plans stehen dann auf `_offen_`, beim Auffüllen wandert die Nachricht mit.
+- `build()` baut auch ohne Anmeldungen (Ziel + offene Slots statt leerer Ansicht); `maybeAuto` blockiert nicht mehr bei 0 Spielern.
+- `slotPlan()` ausgelagert: bestimmt die aktiven Slots nach Rollen-Ziel, markiert sie am Slot (`inQuota`) und wird von Build **und** Nachricht genutzt – dadurch zeigen Anzeige und Discord dasselbe.
+- `quotaFor()` kürzt nicht mehr auf die Kopfzahl: die Tabelle ist der Plan (bei 12 Angemeldeten 14 Plätze, 2 offen). Bei 0 Anmeldungen der volle 10–15er-Plan inkl. Caller-Slot.
+- `notifyChanges()` erkennt die erste Anmeldung jetzt auch nach einer leeren Erstbelegung (Merker über Existenz des Token-Eintrags statt Anzahl der Spieler).
+- Leere Parteien werden in der Nachricht nicht mehr als leerer Block angezeigt.
+- `Stand`-Zeile in der Nachricht enthält Datum + Uhrzeit; Tests per Node-Simulation (0/3/14/20 Spieler) und Syntaxprüfung OK.
+
 ### 2026-11-16 – Eine Comp-Nachricht pro Event + Rollen-Ziele
 
 **Discord: eine Nachricht, die aktualisiert wird**

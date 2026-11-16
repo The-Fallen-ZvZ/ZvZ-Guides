@@ -1623,23 +1623,18 @@ const RB = (function(){
   ];
 
   /** Zielverteilung für n Angemeldete – bei kleinen Gruppen anteilig gekürzt. */
+  /**
+   * Zielverteilung für n Angemeldete.
+   * Die Tabelle IST der Plan – nicht auf die Kopfzahl gekürzt. Bei 12
+   * Angemeldeten stehen also 14 Plätze im Plan und zwei bleiben offen:
+   * genau daran sieht man, welche Rollen noch fehlen.
+   */
   function quotaFor(n, hasCaller){
     const row = QUOTA_TABLE.find(r => n <= r.upTo) || QUOTA_TABLE[QUOTA_TABLE.length - 1];
-    const q = { Healer:row.Healer, Tank:row.Tank, Support:row.Support, DPS:row.DPS, Caller: hasCaller ? 1 : 0 };
-    const sum = () => q.Healer + q.Tank + q.Support + q.DPS + q.Caller;
-
-    const want = sum();
-    if (n < want){
-      const k = n / want;
-      ['Healer','Tank','Support','DPS'].forEach(r => { q[r] = Math.max(1, Math.round(q[r] * k)); });
-    }
-    ['DPS','Support','Tank','Healer'].forEach(r => {
-      while (sum() > n && q[r] > 1) q[r]--;
-    });
-    /* Bleibt ein Platz übrig (Rundung), geht er an die DPS – so sitzt niemand
-       unnötig auf der Bank, solange ein DPS-Slot frei ist. */
-    while (sum() < n) q.DPS++;
-    return q;
+    return {
+      Healer: row.Healer, Tank: row.Tank, Support: row.Support, DPS: row.DPS,
+      Caller: (hasCaller || !n) ? 1 : 0     // leere Comp zeigt den Caller-Slot
+    };
   }
 
   function quotaGroup(slot){
@@ -1685,6 +1680,27 @@ const RB = (function(){
   function quotaText(q){
     return 'Heiler ' + q.Healer + ' · Tanks ' + q.Tank + ' · Support ' + q.Support
       + ' · DPS ' + q.DPS + (q.Caller ? ' · Caller 1' : '');
+  }
+
+  /**
+   * Aktive Slots nach Rollen-Ziel bestimmen und an den Slots vermerken
+   * (`inQuota`), damit Discord-Nachricht und Anzeige dasselbe Bild haben.
+   * Funktioniert auch ohne Anmeldungen – dann ist eben alles offen.
+   */
+  function slotPlan(){
+    const n = S.players.length;
+    const hasCaller = !n || S.players.some(p => p.name === (S.event || {}).shotCaller);
+    const quota = quotaFor(n, hasCaller);
+
+    const flat = [];
+    S.parties.forEach((pt, pi) => pt.slots.forEach((sl, si) => {
+      if (sl.weapons.length) flat.push({ pi, si, tier: pt.tier, weapons: sl.weapons, caller: sl.caller, ref: sl });
+    }));
+
+    const active = capSlotsByQuota(flat, quota);
+    const keep = new Set(active);
+    flat.forEach(s => { s.ref.inQuota = keep.has(s); });
+    return { quota, active, flat };
   }
 
   const S = {
@@ -2118,7 +2134,9 @@ const RB = (function(){
       S.stamp = 'Stand ' + new Date().toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
       setStatus(S.stamp);
       maybeAuto(first ? 'first' : (S.changed ? 'change' : 'poll'));
+      if (first && !S.builtAt && S.parties.length) build(true);   // leere Comp trotzdem aufbauen
       notifyChanges();          // An-/Abmeldungen auch ohne Build erkennen
+      if (first) scheduleCompSync(900);   // Comp-Nachricht beim Verbinden anlegen/aktualisieren
       loadChanges();            // gleiche Änderungen auch auf der Seite zeigen
       if (S.changed) S.deathsAt = 0;
       loadDeaths();
@@ -2241,8 +2259,8 @@ const RB = (function(){
   /* ---------------- Bauen ---------------- */
 
   function build(auto){
-    if (!S.players.length) { if (auto) return; flash('Keine Anmeldungen geladen'); return; }
     if (!S.parties.length) { if (auto) return; flash('Noch keine Comp geladen'); return; }
+    if (!S.players.length && !auto) { flash('Noch keine Anmeldungen – Comp bleibt leer'); }
     const players = S.players.map(p => ({
       name: p.name,
       caller: p.name === S.event.shotCaller,
@@ -2252,25 +2270,15 @@ const RB = (function(){
       deaths: S.deaths[p.name]
     }));
 
-    const flat = [];
-    S.parties.forEach((pt, pi) => pt.slots.forEach((sl, si) => flat.push({
-      pi, si, tier: pt.tier, weapons: sl.weapons, caller: sl.caller, ref: sl
-    })));
-    const all = flat.filter(s => s.weapons.length);
-
     /* Rollen-Ziele: pro Rolle nur so viele Haupt-Slots, wie die Vorgabe sagt.
        Alles darüber bleibt offen – dadurch rutschen Leute auf 2./3. Wahl. */
-    const quota = quotaFor(players.length, players.some(p => p.caller));
-    const active = capSlotsByQuota(all, quota);
+    const plan = slotPlan();
+    const quota = plan.quota;
+    const active = plan.active;
     const res = solveAssignment(players, active.map(s => ({ weapons:s.weapons, caller:s.caller, tier:s.tier })));
 
     S.parties.forEach(pt => pt.slots.forEach(sl => { sl.player = null; sl.pick = null; }));
     res.forEach((r, i) => { if (r) { active[i].ref.player = r.player.name; active[i].ref.pick = r.pick; } });
-
-    /* Slots außerhalb des Rollen-Ziels merken – sie erscheinen nicht in der
-       Discord-Nachricht, solange sie leer sind. */
-    const activeSet = new Set(active);
-    all.forEach(s => { s.ref.inQuota = activeSet.has(s); });
 
     const assigned = {};
     res.forEach((r, i) => { if (r) assigned[r.player.name] = { slot: active[i], score: r.score, pick: r.pick }; });
@@ -2345,7 +2353,7 @@ const RB = (function(){
     const reserve = players.filter(p => assigned[p.name] && assigned[p.name].slot.tier === 'reserve');
     if (reserve.length) notes.push('Auf Reserve-Slots: ' + reserve.map(p => esc(p.name)).join(', ') + '.');
     notes.unshift('Ziel bei ' + players.length + ' Angemeldeten: ' + esc(quotaText(quota)) + '.');
-    if (all.length > active.length) notes.push((all.length - active.length) + ' Slot(s) bleiben wegen der Rollen-Ziele offen.');
+    if (plan.flat.length > active.length) notes.push((plan.flat.length - active.length) + ' Slot(s) bleiben wegen der Rollen-Ziele offen.');
 
     const main = active.filter(s => s.tier === 'main');
     const resv = active.filter(s => s.tier === 'reserve');
@@ -2359,7 +2367,7 @@ const RB = (function(){
     S.builtAt = Date.now();
     render();
     scheduleCompSync(1200);      // Comp-Nachricht im Discord aktualisieren
-    flash(auto ? 'Automatisch zugewiesen' : 'Gruppe gebaut');
+    if (players.length) flash(auto ? 'Automatisch zugewiesen' : 'Gruppe gebaut');
     if (auto) setAutoBtn();
   }
 
@@ -2395,7 +2403,7 @@ const RB = (function(){
   /** Weist automatisch zu: sofort bei Änderungen, sonst höchstens einmal pro Stunde. */
   function maybeAuto(reason){
     if (!S.auto) return;
-    if (!S.players.length || !S.parties.length) return;
+    if (!S.parties.length) return;
     const now = Date.now();
     if (reason === 'poll' && now - S.lastAuto < AUTO_MS) return;
     S.lastAuto = now;
@@ -2458,8 +2466,11 @@ const RB = (function(){
    */
   function notifyChanges(){
     if (!S.notify || !S.token) return;
-    const store = S.notified[S.token] || (S.notified[S.token] = {});
-    const known = Object.keys(store).length > 0;
+    /* "known" = für dieses Event wurde schon einmal ein Stand gemerkt.
+       Bewusst nicht "hat Einträge": eine leere Comp (0 Anmeldungen) muss
+       ebenfalls als Ausgangsstand gelten, sonst geht die erste Anmeldung verloren. */
+    const known = Object.prototype.hasOwnProperty.call(S.notified, S.token);
+    const store = known ? S.notified[S.token] : (S.notified[S.token] = {});
     const roleMap = currentRoleMap();
 
     /* Erstbelegung nur merken, nicht melden (sonst 20 Zeilen beim ersten Login) */
@@ -2620,37 +2631,38 @@ const RB = (function(){
     const main = S.parties.filter(pt => pt.tier === 'main').slice(0, 2);
     if (!main.length) return '';
 
+    const plan = slotPlan();          // setzt inQuota an den Slots – vor dem Rendern
     const title = (S.event || {}).title || 'ZvZ-Event';
     const stamp = new Date().toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
     const out = ['**THE-FALLEN · ' + title + '**', 'Stand ' + stamp + ' · ' + S.players.length + ' angemeldet'];
 
     main.forEach(pt => {
-      out.push('');
-      out.push('**' + pt.name + '**');
+      const block = [];
       pt.slots.forEach(sl => {
         if (!sl.weapons.length) return;
         if (sl.inQuota === false && !sl.player) return;   // außerhalb des Rollen-Ziels
         const w = sl.pick || sl.weapons[0];
         const role = sl.caller ? 'Caller' : roleOf(w);
-        out.push(role + ' · ' + w + ' — ' + (sl.player ? '**' + sl.player + '**' : '_offen_'));
+        block.push(role + ' · ' + w + ' — ' + (sl.player ? '**' + sl.player + '**' : '_offen_'));
       });
+      if (!block.length) return;                          // leere Party nicht anzeigen
+      out.push('');
+      out.push('**' + pt.name + '**');
+      block.forEach(l => out.push(l));
     });
 
     /* Ziel und Ist je Rolle – zeigt sofort, wo noch jemand fehlt */
-    if (S.builtAt){
-      const q = quotaFor(S.players.length, S.players.some(p => p.name === (S.event || {}).shotCaller));
-      const filled = { Healer:0, Tank:0, Support:0, DPS:0, Caller:0 };
-      main.forEach(pt => pt.slots.forEach(sl => {
-        if (!sl.player || !sl.weapons.length) return;
-        const g = quotaGroup(sl);
-        if (filled[g] != null) filled[g]++;
-      }));
-      out.push('');
-      out.push('Ziel: ' + quotaText(q));
-      out.push('Besetzt: Heiler ' + filled.Healer + ' · Tanks ' + filled.Tank
-        + ' · Support ' + filled.Support + ' · DPS ' + filled.DPS
-        + (q.Caller ? ' · Caller ' + filled.Caller : ''));
-    }
+    const filled = { Healer:0, Tank:0, Support:0, DPS:0, Caller:0 };
+    main.forEach(pt => pt.slots.forEach(sl => {
+      if (!sl.player || !sl.weapons.length) return;
+      const g = quotaGroup(sl);
+      if (filled[g] != null) filled[g]++;
+    }));
+    out.push('');
+    out.push('Ziel: ' + quotaText(plan.quota));
+    out.push('Besetzt: Heiler ' + filled.Healer + ' · Tanks ' + filled.Tank
+      + ' · Support ' + filled.Support + ' · DPS ' + filled.DPS
+      + (plan.quota.Caller ? ' · Caller ' + filled.Caller : ''));
 
     const fresh = (S.pendingChanges || []).filter(c => c.role !== '—');
     if (fresh.length) out.push('Neu: ' + fresh.map(c => '**' + c.name + '**').join(', '));

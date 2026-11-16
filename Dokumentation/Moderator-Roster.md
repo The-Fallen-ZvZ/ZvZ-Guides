@@ -49,7 +49,7 @@ Der Build setzt **pro Rolle nur so viele Slots**, wie die Vorgabe für die aktue
 | 20–25 | 6 | 6 | 5 | 7 | 1 | 25 |
 | 25–30 | 7 | 7 | 6 | 9 | 1 | 30 |
 
-- **Kleinere Gruppen:** Liegt die Summe über der Zahl der Angemeldeten, wird die Vorgabe anteilig gekürzt (jede Rolle behält mindestens 1). Ein übrig gebliebener Platz geht an die DPS.
+- **Kleinere Gruppen:** Die Tabelle **ist** der Plan – nicht auf die Kopfzahl gekürzt. Bei 12 Angemeldeten stehen 14 Plätze drin, zwei bleiben offen; genau daran sieht man, welche Rollen noch fehlen. Bei 0 Anmeldungen zeigt die Nachricht den vollen 10–15er-Plan.
 - **Rollen-Gruppen:** `Healer` → Heiler, `Tank` → Tank, `Support` → Support, `Support DPS` / `Clap DD` / `Brawl DD` / `Battlemount` → DPS, der Caller-Slot der Party 1 zählt separat.
 - **Gleichmäßig auf beide Parteien:** Die Slots werden reihum aus Party 1 und Party 2 genommen (Heiler #1 aus P1, Heiler #1 aus P2, Heiler #2 aus P1 …), damit keine Partei alles aufsaugt.
 - **Wünsche:** Exakter Wunsch ⇒ 105/84/66/50/36/24 Punkte (1.–6. Wahl). Gleiche Rollen-Familie (z. B. `Spiked Gauntlets` auf einem `Longbow`-Slot) ⇒ 48/38/28/20/14. Gleiche Rollen-Gruppe (z. B. `Spiked Gauntlets` auf `Carving`, beides DPS) ⇒ 40/30/22/16/12. Danach zählen Historie und Todesdaten.
@@ -86,6 +86,7 @@ Neu: **Boerse**
 ```
 
 - **Beim ersten Mal wird gepostet**, danach ausschließlich dieselbe Nachricht editiert (`PATCH /channels/{id}/messages/{msg}`). Die Nachrichten-ID liegt im KV unter `rb:compmsg:<kanal>:ev-<token>`.
+- **Beim Verbinden eines neuen Events** wird die Nachricht sofort angelegt – auch mit **0 Anmeldungen**. Dann stehen alle Rollen des Plans auf `_offen_`, und man sieht beim Auffüllen, welche Rolle noch fehlt.
 - **Kein Spam:** Die Seite schickt nur, wenn sich der Text geändert hat; zwischen zwei Edits liegen mindestens 20 s (`COMP_MIN_GAP_MS`). Wird die Nachricht im Discord gelöscht, legt der Worker sie beim nächsten Aufruf neu an.
 - **Nur Party 1 + Party 2** (die Haupt-Parties). Slots außerhalb des Rollen-Ziels erscheinen nicht, solange sie leer sind.
 - **Ziele und Besetzung** stehen unter der Comp: `Ziel` = Vorgabe aus der Rollen-Formel, `Besetzt` = Ist-Stand.
