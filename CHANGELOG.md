@@ -12,6 +12,23 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-16 – Eine Comp-Nachricht pro Event + Rollen-Ziele
+
+**Discord: eine Nachricht, die aktualisiert wird**
+- Neuer Endpunkt `POST /comp { key, event, eventKey, content, changes }`: postet die Comp beim ersten Aufruf und editiert danach ausschließlich dieselbe Nachricht (`PATCH /channels/{id}/messages/{msg}`). Die Nachrichten-ID liegt im KV unter `rb:compmsg:<kanal>:ev-<token>`; ist die Nachricht im Discord gelöscht (404), wird sie neu angelegt.
+- Inhalt: **Party 1 + Party 2** mit Rolle · Waffe — Spieler, darunter `Ziel:` (Vorgabe) und `Besetzt:` (Ist) je Rolle sowie eine `Neu:`-Zeile für die letzten Anmeldungen. Leere Slots außerhalb des Rollen-Ziels werden ausgeblendet.
+- Client: `compMessageText()` + `syncComp()` ersetzen `postNotify()`; `COMP_MIN_GAP_MS` = 20 s gegen Edit-Fluten, Entprellung über `setTimeout`. Die separate „Neue Anmeldung"-Nachricht entfällt, `handleNotify` bedient nur noch `type:'pin'`.
+- Änderungen landen weiterhin im Panel **Änderungen** (`/changes`, neues Label `aktualisiert`).
+
+**Rollen-Ziele (statt „jeder auf seine 1. Wahl")**
+- `QUOTA_TABLE` + `quotaFor(n)`: 10–15 → H4/T3/S2/D4/C1 · 15–20 → H5/T4/S4/D6/C1 · 20–25 → H6/T6/S5/D7/C1 · 25–30 → H7/T7/S6/D9/C1. Bei kleineren Gruppen anteilig gekürzt, jede Rolle mindestens 1, Restplätze an DPS.
+- `capSlotsByQuota()` begrenzt die Haupt-Slots je Rolle und nimmt sie reihum aus Party 1 und 2 (keine Partei saugt alles auf). Reserve-Parties bleiben unbegrenzt.
+- `scoreWeapon()`: neue Stufe für die gleiche Rollen-Gruppe (DPS ↔ DPS) mit 40/30/22/16/12 Punkten, damit 2./3. Wahl tatsächlich genutzt wird (`ROLE_GROUP`).
+- Brain-Panel zeigt das Ziel und wie viele Slots wegen der Vorgabe offen bleiben.
+- Getestet per Node-Simulation (14/20 Spieler, 2 Parteien): Quoten summierten sich korrekt, Heiler/Support/DPS wurden voll besetzt, 2. und 3. Wahlen kamen zum Einsatz; Seite und Worker syntaktisch geprüft.
+
+**Worker-Version:** `2026-11-16-2`
+
 ### 2026-11-16 – Doppelte Discord-Meldungen behoben, Takt auf 1x pro Stunde
 
 **Ursache:** `notifyChanges()` hat jede Abweichung gemeldet – auch Rollenwechsel. Da der Auto-Build bei jedem Poll neu zuwies, entstand für dieselben Spieler immer wieder eine neue „Neue Anmeldung". Zusätzlich hat der Worker bei der 5-Minuten-Sperre den Text in eine Warteschlange gelegt und der Client einen Retry-Timer gestartet – beide Wege haben denselben Text noch einmal geschickt.

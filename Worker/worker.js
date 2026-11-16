@@ -7,7 +7,7 @@
      - Live-Editor (/content GET/POST/DELETE)
      - Roster-Brain:
          GET  /roster?event=<64-hex>&key=<mod-key>
-         POST /notify   { key, event, changes:[{name,role}], link }
+         POST /comp     { key, eventKey, content, changes } -> Comp-Nachricht anlegen/aktualisieren
          POST /notify   { key, type:'pin', link }
          GET  /changes?event=<64-hex>&limit=40&key=<mod-key>   (Spiegel der Discord-Meldungen)
          GET  /deaths?guild=<id>&names=A,B,C&days=30&key=<mod-key>
@@ -387,7 +387,7 @@ async function handleRoster(request, env, url) {
 
 const DISCORD_API = 'https://discord.com/api/v10';
 let LAST_DISCORD = null;                     // letzter Discord-Fehler (nur Diagnose)
-const WORKER_VERSION = '2026-11-16-1';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
+const WORKER_VERSION = '2026-11-16-2';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
 const SEND_CLAIM_TTL = 10 * 60;              // Anspruch auf einen Text (Sekunden)
 const SEND_CLAIM_WAIT_MS = 300;              // so lange warten, bis parallele Aufrufe den Anspruch sehen
 const SEND_LEDGER_TTL = 30 * 60;             // derselbe Text geht 30 Min nur einmal raus (Sekunden)
@@ -564,52 +564,102 @@ async function handleNotify(request, env) {
     return rosterJson({ ok: true, pinned: true });
   }
 
-  /* Änderungen in den Kanal */
-  const changes = Array.isArray(body.changes) ? body.changes.slice(0, 25) : [];
-  if (!changes.length) return rosterJson({ error: 'no_changes' }, 400);
+  return rosterJson({ error: 'unknown_type', hint: "type:'pin' oder POST /comp" }, 400);
+}
 
-  const eventTitle = String(body.event || '').slice(0, 80);
-  const lines = changes.map(c => {
-    const name = String(c.name || '').slice(0, 40);
-    const role = String(c.role || '').slice(0, 60);
-    return (role === '-' || role === '—' || role === '–')
-      ? '**' + name + '** hat den Slot verlassen'
-      : 'Anmeldung von: **' + name + '** -> ' + role;
+/* ---------- Comp-Nachricht: einmal posten, danach editieren --------------- */
+
+/** Scope des Events (Token, sonst Titel) – gleiche Logik wie in handleChanges. */
+function eventScope(body){
+  const raw = String((body && body.eventKey) || '').toLowerCase();
+  if (/^[0-9a-f]{64}$/.test(raw)) return 'ev-' + raw.slice(0, 24);
+  const title = String((body && body.event) || 'default').toLowerCase();
+  return title.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'default';
+}
+
+function compMsgKey(env, scope){
+  return 'rb:compmsg:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':' + scope;
+}
+
+/** Legt die Comp-Nachricht an oder aktualisiert sie (PATCH) – eine Nachricht pro Event. */
+async function upsertCompMessage(env, scope, content){
+  const channel = env.DISCORD_CHANNEL_ID;
+  if (!env.DISCORD_TOKEN || !channel) return { error: 'no_channel' };
+
+  const key = compMsgKey(env, scope);
+  const prev = await kvGet(env, key);
+  const body = JSON.stringify({ content: content.slice(0, 1990), allowed_mentions: { parse: [] } });
+
+  if (prev && prev.id) {
+    const res = await fetch(DISCORD_API + '/channels/' + channel + '/messages/' + prev.id, {
+      method: 'PATCH', headers: discordAuth(env), body
+    });
+    if (res.ok) {
+      await kvPut(env, key, { id: prev.id, at: Date.now() }, 30 * 86400);
+      return { ok: true, updated: true, id: prev.id };
+    }
+    const detail = (await res.text()).slice(0, 300);
+    if (res.status !== 404) {
+      LAST_DISCORD = { at: new Date().toISOString(), status: res.status, body: detail, channel };
+      return { error: 'edit_failed', detail };
+    }
+    await kvDelete(env, key);      /* Nachricht wurde im Discord geloescht -> neu posten */
+  }
+
+  const send = await fetch(DISCORD_API + '/channels/' + channel + '/messages', {
+    method: 'POST', headers: discordAuth(env), body
   });
-
-  let content = '**Neue Anmeldung**' + (eventTitle ? ' - ' + eventTitle : '') + '\n'
-    + lines.join('\n')
-    + '\n\nManuell anpassen: ' + link;
-  if (content.length > 1900) content = content.slice(0, 1870) + '\n... (gekuerzt)';
-
-  /* Sperre/Doppel-Erkennung pro Event-Token, sonst pro Titel (Fallback) */
-  const eventKey = String(body.eventKey || '').toLowerCase();
-  const scope = /^[0-9a-f]{64}$/.test(eventKey)
-    ? 'ev-' + eventKey.slice(0, 24)
-    : ((eventTitle || 'default').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'default');
-
-  /* Fuer den Aenderungs-Spiegel auf der Seite: dieselben Zeilen wie im Discord */
-  const logChanges = changes.map(c => ({
-    name: String(c.name || '').slice(0, 40),
-    role: String(c.role || '').slice(0, 60)
-  }));
-  const logBase = { event: eventTitle, changes: logChanges, count: logChanges.length };
-
-  /* Meldung genau einmal senden. Doppelte Texte blockt der Ledger (30 Min),
-     parallele Aufrufe (zwei Tabs) regelt claimSend(). Keine Warteschlange. */
-  const out = await sendOnce(env, content);
-
-  if (out.duplicate) {
-    await logNotify(env, scope, Object.assign({}, logBase, { result: 'duplicate' }));
-    return rosterJson({ ok: true, sent: 0, duplicate: true });
+  if (!send.ok) {
+    LAST_DISCORD = { at: new Date().toISOString(), status: send.status, body: (await send.text()).slice(0, 300), channel };
+    return { error: 'send_failed' };
   }
-  if (!out.sent) {
-    await logNotify(env, scope, Object.assign({}, logBase, { result: 'failed' }));
-    return rosterJson({ error: 'notify_failed', hint: 'DISCORD_CHANNEL_ID (Kanal) oder DISCORD_USER_ID (DM) pruefen' }, 502);
+  const msg = await send.json();
+  if (!msg || !msg.id) return { error: 'no_message_id' };
+  await kvPut(env, key, { id: msg.id, at: Date.now() }, 30 * 86400);
+  return { ok: true, created: true, id: msg.id };
+}
+
+/**
+ * POST /comp { key, event, eventKey, content, changes? }
+ * content = fertige Comp (Party 1 + Party 2). Beim ersten Aufruf wird gepostet,
+ * danach ausschliesslich dieselbe Nachricht aktualisiert.
+ */
+async function handleComp(request, env){
+  if (request.method !== 'POST') return rosterJson({ error: 'method_not_allowed' }, 405);
+
+  let body;
+  try { body = await request.json(); }
+  catch (e) { return rosterJson({ error: 'bad_json' }, 400); }
+
+  if (!env.MOD_KEY || body.key !== env.MOD_KEY) return rosterJson({ error: 'unauthorized' }, 401);
+
+  const content = String(body.content || '').trim();
+  if (!content) return rosterJson({ error: 'no_content' }, 400);
+
+  const scope = eventScope(body);
+  const out = await upsertCompMessage(env, scope, content);
+  if (out.error === 'no_channel') {
+    return rosterJson({ error: 'no_channel', hint: 'DISCORD_CHANNEL_ID fehlt (Variable im Worker anlegen)' }, 400);
+  }
+  if (out.error) {
+    return rosterJson({ error: out.error, detail: out.detail || null, hint: 'Bot braucht SEND_MESSAGES und MANAGE_MESSAGES (fuer Edits)' }, 502);
   }
 
-  await logNotify(env, scope, Object.assign({}, logBase, { result: 'sent', sent: out.sent }));
-  return rosterJson({ ok: true, sent: out.sent });
+  const changes = Array.isArray(body.changes)
+    ? body.changes.slice(0, 25).map(c => ({
+        name: String(c.name || '').slice(0, 40),
+        role: String(c.role || '').slice(0, 60)
+      }))
+    : [];
+  if (changes.length) {
+    await logNotify(env, scope, {
+      event: String(body.event || '').slice(0, 80),
+      changes, count: changes.length,
+      result: out.updated ? 'updated' : 'sent'
+    });
+  }
+
+  return rosterJson({ ok: true, updated: !!out.updated, created: !!out.created, id: out.id });
 }
 
 /**
@@ -1323,6 +1373,11 @@ export default {
     if (url.pathname === '/notify') {
       try { return await handleNotify(request, env); }
       catch (e) { return rosterJson({ error: 'notify_failed', detail: String(e && e.message || e) }, 500); }
+    }
+
+    if (url.pathname === '/comp') {
+      try { return await handleComp(request, env); }
+      catch (e) { return rosterJson({ error: 'comp_failed', detail: String(e && e.message || e) }, 500); }
     }
 
     if (url.pathname === '/changes') {

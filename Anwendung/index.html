@@ -316,6 +316,7 @@ const FEEDBACK_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev';
 const CUSTOM_CONTENT_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/content';
 const ROSTER_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/roster';
 const ROSTER_NOTIFY_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/notify';
+const ROSTER_COMP_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/comp';
 const ROSTER_DEATHS_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/deaths';
 const ROSTER_GUILD_STATS_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/guildstats';
 const ROSTER_GUILD_RECENT_ENDPOINT = 'https://cool-morning-ff55.lukashamann4.workers.dev/guildrecent';
@@ -1604,11 +1605,94 @@ const RB = (function(){
   const PREF_W = [105,84,66,50,36,24];
   const THRESHOLD = { main:18, reserve:60 };
 
+  /* ---- Rollen-Ziele (Melee-Clap-Battleboard, 10-30 Angemeldete) ----
+     Die Zahlen sind Vorgaben, keine Wünsche: pro Rolle werden nur so viele
+     Slots besetzt. Wer auf seiner 1. Wahl keinen Platz mehr findet, rutscht
+     auf die 2./3. Wahl einer anderen Rolle – so hat die Party immer genug
+     Heiler, Tanks und Support, auch wenn sie noch nicht voll ist. */
+  const ROLE_GROUP = {
+    'Tank':'Tank', 'Healer':'Healer', 'Support':'Support',
+    'Support DPS':'DPS', 'Clap DD':'DPS', 'Brawl DD':'DPS',
+    'Battlemount':'DPS', 'Unbekannt':'DPS'
+  };
+  const QUOTA_TABLE = [
+    { upTo:15, Healer:4, Tank:3, Support:2, DPS:4, Caller:1 },
+    { upTo:20, Healer:5, Tank:4, Support:4, DPS:6, Caller:1 },
+    { upTo:25, Healer:6, Tank:6, Support:5, DPS:7, Caller:1 },
+    { upTo:99, Healer:7, Tank:7, Support:6, DPS:9, Caller:1 }
+  ];
+
+  /** Zielverteilung für n Angemeldete – bei kleinen Gruppen anteilig gekürzt. */
+  function quotaFor(n, hasCaller){
+    const row = QUOTA_TABLE.find(r => n <= r.upTo) || QUOTA_TABLE[QUOTA_TABLE.length - 1];
+    const q = { Healer:row.Healer, Tank:row.Tank, Support:row.Support, DPS:row.DPS, Caller: hasCaller ? 1 : 0 };
+    const sum = () => q.Healer + q.Tank + q.Support + q.DPS + q.Caller;
+
+    const want = sum();
+    if (n < want){
+      const k = n / want;
+      ['Healer','Tank','Support','DPS'].forEach(r => { q[r] = Math.max(1, Math.round(q[r] * k)); });
+    }
+    ['DPS','Support','Tank','Healer'].forEach(r => {
+      while (sum() > n && q[r] > 1) q[r]--;
+    });
+    /* Bleibt ein Platz übrig (Rundung), geht er an die DPS – so sitzt niemand
+       unnötig auf der Bank, solange ein DPS-Slot frei ist. */
+    while (sum() < n) q.DPS++;
+    return q;
+  }
+
+  function quotaGroup(slot){
+    if (!slot.weapons.length) return '';
+    if (slot.caller) return 'Caller';
+    return ROLE_GROUP[roleOf(slot.weapons[0])] || 'DPS';
+  }
+
+  /**
+   * Nur so viele Haupt-Slots je Rolle behalten, wie das Ziel vorgibt.
+   * Die Auswahl läuft reihum über Party 1 und Party 2, damit beide Parteien
+   * gleichmäßig besetzt werden (und nicht Party 1 alles aufsaugt).
+   */
+  function capSlotsByQuota(slots, quota){
+    const used = { Healer:0, Tank:0, Support:0, DPS:0, Caller:0 };
+    const rank = new Map();
+    const perGroup = {};
+
+    slots.forEach(s => {
+      if (s.tier !== 'main') return;
+      const g = quotaGroup(s) || 'DPS';
+      const k = (s.pi || 0) + '|' + g;
+      perGroup[k] = (perGroup[k] || 0) + 1;
+      rank.set(s, perGroup[k]);
+    });
+
+    const ordered = slots.filter(s => s.tier === 'main')
+      .sort((a, b) => (rank.get(a) || 0) - (rank.get(b) || 0)
+        || (a.pi || 0) - (b.pi || 0)
+        || (a.si || 0) - (b.si || 0));
+
+    const keep = new Set();
+    ordered.forEach(s => {
+      const g = quotaGroup(s) || 'DPS';
+      if (used[g] >= (quota[g] || 0)) return;      // Ziel erreicht -> Slot bleibt offen
+      used[g]++;
+      keep.add(s);
+    });
+
+    return slots.filter(s => s.tier !== 'main' || keep.has(s));   // Reihenfolge der Comp bleibt
+  }
+
+  function quotaText(q){
+    return 'Heiler ' + q.Healer + ' · Tanks ' + q.Tank + ' · Support ' + q.Support
+      + ' · DPS ' + q.DPS + (q.Caller ? ' · Caller 1' : '');
+  }
+
   const S = {
     token:'', event:null, parties:[], players:[], playstyles:{}, hist:{},
     builtAt:null, log:null, live:null, last:null, status:'',
     auto:false, lastAuto:0, changed:false, newSignups:0,
     notify:true, notified:{}, deaths:{}, deathsAt:0, lastFetchAt:0,
+    compText:'', pendingChanges:[],
     changes:[], changesLocal:[], changesAt:0, changesOff:false,
     manual:{}, guild:[], guildAt:0, guildErr:'', addQuery:''
   };
@@ -1645,6 +1729,14 @@ const RB = (function(){
       (p.prefs || []).forEach((pw, i) => {
         if (roleOf(pw) === r) base = Math.max(base, [48,38,28,20,14][Math.min(i,4)]);
       });
+      /* Gleiche Rollengruppe (z. B. alle DPS-Slots) zählt als 2./3. Wahl,
+         damit die Rollen-Ziele auch mit den hinteren Wünschen erfüllt werden. */
+      if (!base){
+        const g = ROLE_GROUP[r] || r;
+        (p.prefs || []).forEach((pw, i) => {
+          if ((ROLE_GROUP[roleOf(pw)] || roleOf(pw)) === g) base = Math.max(base, [40,30,22,16,12][Math.min(i,4)]);
+        });
+      }
     }
 
     const hw = hist[canon(w)] || 0;
@@ -2006,6 +2098,7 @@ const RB = (function(){
     S.token = tok;
     S.parties = []; S.players = []; S.log = null; S.builtAt = null;
     S.changes = []; S.changesAt = 0; S.changesOff = false;
+    S.compText = ''; S.pendingChanges = [];
     localStorage.setItem(LS_TOKEN, tok);
     fetchData(true);
   }
@@ -2163,11 +2256,21 @@ const RB = (function(){
     S.parties.forEach((pt, pi) => pt.slots.forEach((sl, si) => flat.push({
       pi, si, tier: pt.tier, weapons: sl.weapons, caller: sl.caller, ref: sl
     })));
-    const active = flat.filter(s => s.weapons.length);
+    const all = flat.filter(s => s.weapons.length);
+
+    /* Rollen-Ziele: pro Rolle nur so viele Haupt-Slots, wie die Vorgabe sagt.
+       Alles darüber bleibt offen – dadurch rutschen Leute auf 2./3. Wahl. */
+    const quota = quotaFor(players.length, players.some(p => p.caller));
+    const active = capSlotsByQuota(all, quota);
     const res = solveAssignment(players, active.map(s => ({ weapons:s.weapons, caller:s.caller, tier:s.tier })));
 
     S.parties.forEach(pt => pt.slots.forEach(sl => { sl.player = null; sl.pick = null; }));
     res.forEach((r, i) => { if (r) { active[i].ref.player = r.player.name; active[i].ref.pick = r.pick; } });
+
+    /* Slots außerhalb des Rollen-Ziels merken – sie erscheinen nicht in der
+       Discord-Nachricht, solange sie leer sind. */
+    const activeSet = new Set(active);
+    all.forEach(s => { s.ref.inQuota = activeSet.has(s); });
 
     const assigned = {};
     res.forEach((r, i) => { if (r) assigned[r.player.name] = { slot: active[i], score: r.score, pick: r.pick }; });
@@ -2241,6 +2344,8 @@ const RB = (function(){
     if (tent.length) notes.push('Tentative eingeplant: ' + tent.map(p => esc(p.name)).join(', ') + '.');
     const reserve = players.filter(p => assigned[p.name] && assigned[p.name].slot.tier === 'reserve');
     if (reserve.length) notes.push('Auf Reserve-Slots: ' + reserve.map(p => esc(p.name)).join(', ') + '.');
+    notes.unshift('Ziel bei ' + players.length + ' Angemeldeten: ' + esc(quotaText(quota)) + '.');
+    if (all.length > active.length) notes.push((all.length - active.length) + ' Slot(s) bleiben wegen der Rollen-Ziele offen.');
 
     const main = active.filter(s => s.tier === 'main');
     const resv = active.filter(s => s.tier === 'reserve');
@@ -2252,8 +2357,8 @@ const RB = (function(){
       conflicts, notes
     };
     S.builtAt = Date.now();
-    notifyChanges();
     render();
+    scheduleCompSync(1200);      // Comp-Nachricht im Discord aktualisieren
     flash(auto ? 'Automatisch zugewiesen' : 'Gruppe gebaut');
     if (auto) setAutoBtn();
   }
@@ -2378,16 +2483,16 @@ const RB = (function(){
       if (!(name in roleMap)) { changes.push({ name, role: '—' }); delete next[name]; }
     });
 
-    if (!changes.length) { S.notified[S.token] = next; saveNotified(); return; }
-
-    /* Nur ein Request gleichzeitig: sonst feuert der zweite Aufruf (Build + Poll)
-       denselben Stand erneut, weil der Merker erst nach der Antwort geschrieben wird. */
-    if (notifyPending) return;
-    notifyPending = true;
-    postNotify(changes, next);
+    /* Stand in beiden Faellen uebernehmen; bei echten An-/Abmeldungen die
+       Comp-Nachricht sofort aktualisieren (kein neuer Post). */
+    S.notified[S.token] = next;
+    saveNotified();
+    if (changes.length){
+      S.pendingChanges = (S.pendingChanges || []).concat(changes).slice(-20);
+      scheduleCompSync(0);
+    }
   }
 
-  let notifyPending = false;
   const LS_NLOG = 'tf-rb-notify-log';
 
   function saveNotifyLog(result){
@@ -2406,11 +2511,11 @@ const RB = (function(){
 
   const CHANGE_LABEL = {
     sent:'gesendet', flushed:'nachgesendet', queued:'gemerkt', duplicate:'schon gemeldet',
-    cooldown:'Sperre', failed:'fehlgeschlagen', claimed:'parallel'
+    cooldown:'Sperre', failed:'fehlgeschlagen', claimed:'parallel', updated:'aktualisiert'
   };
   const CHANGE_CLASS = {
     sent:'ok', flushed:'ok', queued:'warn', cooldown:'warn',
-    duplicate:'info', claimed:'info', failed:'bad'
+    duplicate:'info', claimed:'info', failed:'bad', updated:'ok'
   };
 
   function loadLocalChanges(){
@@ -2498,57 +2603,118 @@ const RB = (function(){
         : '<div class="mut">' + (Number(e.count) || 0) + ' Änderungen (älterer Eintrag)</div>';
       h += '<div class="item ' + (CHANGE_CLASS[res] || 'info') + '">'
         + '<div class="h"><span class="when">' + changeTime(e.at) + '</span>'
-        + '<b>Neue Anmeldung</b>' + (e.event ? ' <span class="mut">· ' + esc(e.event) + '</span>' : '')
+        + '<b>' + (res === 'updated' ? 'Comp aktualisiert' : 'Neue Anmeldung') + '</b>' + (e.event ? ' <span class="mut">· ' + esc(e.event) + '</span>' : '')
         + '<span class="tagline">' + esc(CHANGE_LABEL[res] || res) + '</span></div>'
         + body + '</div>';
     });
     el.innerHTML = h;
   }
 
-  async function postNotify(changes, next){
+  /* ---------------- Comp-Nachricht im Discord (eine pro Event) ---------------- */
+
+  const COMP_MIN_GAP_MS = 20 * 1000;          // Discord keine Edit-Flut schicken
+  let compTimer = null, compPending = false, compLastAt = 0;
+
+  /** Text der einen Nachricht: Party 1 + Party 2 mit Rollen und Spielern. */
+  function compMessageText(){
+    const main = S.parties.filter(pt => pt.tier === 'main').slice(0, 2);
+    if (!main.length) return '';
+
+    const title = (S.event || {}).title || 'ZvZ-Event';
+    const stamp = new Date().toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+    const out = ['**THE-FALLEN · ' + title + '**', 'Stand ' + stamp + ' · ' + S.players.length + ' angemeldet'];
+
+    main.forEach(pt => {
+      out.push('');
+      out.push('**' + pt.name + '**');
+      pt.slots.forEach(sl => {
+        if (!sl.weapons.length) return;
+        if (sl.inQuota === false && !sl.player) return;   // außerhalb des Rollen-Ziels
+        const w = sl.pick || sl.weapons[0];
+        const role = sl.caller ? 'Caller' : roleOf(w);
+        out.push(role + ' · ' + w + ' — ' + (sl.player ? '**' + sl.player + '**' : '_offen_'));
+      });
+    });
+
+    /* Ziel und Ist je Rolle – zeigt sofort, wo noch jemand fehlt */
+    if (S.builtAt){
+      const q = quotaFor(S.players.length, S.players.some(p => p.name === (S.event || {}).shotCaller));
+      const filled = { Healer:0, Tank:0, Support:0, DPS:0, Caller:0 };
+      main.forEach(pt => pt.slots.forEach(sl => {
+        if (!sl.player || !sl.weapons.length) return;
+        const g = quotaGroup(sl);
+        if (filled[g] != null) filled[g]++;
+      }));
+      out.push('');
+      out.push('Ziel: ' + quotaText(q));
+      out.push('Besetzt: Heiler ' + filled.Healer + ' · Tanks ' + filled.Tank
+        + ' · Support ' + filled.Support + ' · DPS ' + filled.DPS
+        + (q.Caller ? ' · Caller ' + filled.Caller : ''));
+    }
+
+    const fresh = (S.pendingChanges || []).filter(c => c.role !== '—');
+    if (fresh.length) out.push('Neu: ' + fresh.map(c => '**' + c.name + '**').join(', '));
+
+    let text = out.join('\n');
+    if (text.length > 1950) text = text.slice(0, 1900) + '\n… (gekürzt)';
+    return text;
+  }
+
+  /** Sammelt Änderungen und schickt die Comp kurz danach (entprellt). */
+  function scheduleCompSync(delay){
+    if (!S.notify || !S.token) return;
+    if (compTimer) clearTimeout(compTimer);
+    compTimer = setTimeout(() => { compTimer = null; syncComp(); }, Math.max(0, delay || 0));
+  }
+
+  /** Erster Aufruf postet, alle weiteren aktualisieren dieselbe Nachricht. */
+  async function syncComp(){
+    if (!S.notify || !S.token) return;
+    if (compPending){ scheduleCompSync(3000); return; }
+
+    const key = sessionStorage.getItem('feedbackModKey');
+    if (!key) return;
+
+    const text = compMessageText();
+    if (!text) return;
+
+    const changes = (S.pendingChanges || []).slice(-20);
+    if (text === S.compText && !changes.length) return;     // nichts geändert
+
+    const wait = COMP_MIN_GAP_MS - (Date.now() - compLastAt);
+    if (wait > 0){ scheduleCompSync(wait); return; }
+
+    compPending = true;
     try{
-      const key = sessionStorage.getItem('feedbackModKey');
-      if (!key) { flash('Discord: nicht angemeldet'); return; }
-      const list = changes.slice(0, 20);
-      const res = await fetch(ROSTER_NOTIFY_ENDPOINT, {
+      const res = await fetch(ROSTER_COMP_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           key,
           event: (S.event || {}).title || '',
           eventKey: S.token,
-          changes: list,
-          link: rosterLink()
+          content: text,
+          changes
         })
       });
       const data = await res.json().catch(() => ({}));
-      const result = data.duplicate ? 'duplicate' : res.ok ? 'sent' : 'failed';
-      rememberChanges(list, result);
-
-      /* Stand IMMER uebernehmen - auch bei Fehler. Sonst schickt der naechste
-         Poll dieselben Zeilen noch einmal; genau so entstanden die doppelten
-         "Neue Anmeldung"-Meldungen im Discord. */
-      if (next) {
-        S.notified[S.token] = next;
-      } else {
-        const store = S.notified[S.token] || (S.notified[S.token] = {});
-        list.forEach(c => { if (c.role === '—') delete store[c.name]; else store[c.name] = c.role; });
-      }
-      saveNotified();
-
-      if (!res.ok) {
+      if (res.status === 401){ flash('Discord: Mod-Key ungültig – neu anmelden'); return; }
+      if (!res.ok){
         saveNotifyLog('Fehler ' + res.status);
-        flash('Discord: ' + (data.hint || data.error || 'Versand fehlgeschlagen'));
+        flash('Discord: ' + (data.hint || data.error || 'Aktualisierung fehlgeschlagen'));
         return;
       }
-      S.newSignups = 0;
-      saveNotifyLog(data.duplicate ? 'unverändert' : 'gesendet');
-      flash(data.duplicate
-        ? 'Discord: unverändert, nicht erneut gesendet'
-        : (list.length === 1 ? 'Discord: 1 Änderung gemeldet' : 'Discord: ' + list.length + ' Änderungen gemeldet'));
-      loadChanges(true);   // gesendete Meldung sofort im Spiegel zeigen
-    }catch(e){ /* beim naechsten Poll erneut versuchen */ }
-    finally{ notifyPending = false; }
+      compLastAt = Date.now();
+      S.compText = text;
+      if (changes.length){
+        rememberChanges(changes, data.updated ? 'updated' : 'sent');
+        S.pendingChanges = [];
+      }
+      saveNotifyLog(data.updated ? 'aktualisiert' : 'gesendet');
+      flash(data.updated ? 'Discord: Comp aktualisiert' : 'Discord: Comp gepostet');
+      loadChanges(true);
+    }catch(e){ /* beim nächsten Build erneut */ }
+    finally{ compPending = false; }
   }
 
   async function pinLink(){
@@ -2611,7 +2777,7 @@ const RB = (function(){
             <button class="b" id="rb-auto" onclick="RB.toggleAuto()" title="Weist bei neuen Anmeldungen und hoechstens einmal pro Stunde automatisch zu">Auto: aus</button>
             <button class="b" onclick="RB.copy()">Kopieren</button>
             <button class="b" onclick="RB.bump()" title="Aktuelle Zuweisung als einen gespielten Einsatz zählen">Historie +1</button>
-            <button class="b" id="rb-notify" onclick="RB.toggleNotify()" title="Discord-Meldung bei jeder neuen An- oder Abmeldung">Discord: an</button>
+            <button class="b" id="rb-notify" onclick="RB.toggleNotify()" title="Hält die eine Comp-Nachricht im Discord aktuell (Party 1 + 2)">Discord: an</button>
           </div>
           <div id="rb-stats" class="mut" style="padding:6px 10px;font-size:.73rem;border-bottom:var(--bw) solid var(--ln)"></div>
           <div class="rb-parties" id="rb-parties"><p class="rb-msg">Noch keine Comp geladen.</p></div>

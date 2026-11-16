@@ -10,7 +10,7 @@ Stand: 13.11.2026 · **in `Anwendung/index.html` eingebaut** · Worker-Erweiteru
 | Gilde-Tab `#admin-guild` | eingebaut: alle Mitglieder, Klick zeigt die letzten Tode |
 | AlbionZvZ | **bleibt verbindlich** – das Brain liefert nur den Vorschlag und eine Kopiervorlage |
 | Worker-Route `/roster` | Code fertig (`Worker/roster.js`), muss noch deployt werden |
-| Discord | Kanal-Nachricht bei jeder Änderung, Todes-Erinnerung per Cron, optional angepinnter Roster-Link |
+| Discord | eine Comp-Nachricht (Party 1 + 2), die bei jeder Änderung aktualisiert wird, Todes-Erinnerung per Cron, optional angepinnter Roster-Link |
 | Historie | lokal im Browser (später optional KV) |
 | Live-Aktualisierung | Polling jede Stunde (24/Tag), startet beim Öffnen automatisch; Knopf **Aktualisieren** jederzeit |
 | Auto-Zuweisung | standardmäßig an: bei Änderungen sofort, sonst höchstens einmal pro Stunde |
@@ -38,30 +38,60 @@ Der Schalter **Auto** sitzt neben „Build the Group" und merkt sich seinen Zust
 
 Damit ist der Ablauf: Moderatoren-Login → Seite öffnen (Live + Auto laufen) → Ergebnis in AlbionZvZ übertragen. Ohne offene Seite wird nichts zugewiesen – es gibt keinen Server-Job, der im Hintergrund arbeitet.
 
+## Rollen-Ziele (Party-Aufbau)
+
+Der Build setzt **pro Rolle nur so viele Slots**, wie die Vorgabe für die aktuelle Anmeldezahl sagt. Alles darüber bleibt offen – dadurch rutschen Spieler auf ihre **2. oder 3. Wunschrolle**, statt dass alle auf ihrer 1. Wahl sitzen und Heiler/Tanks fehlen.
+
+| Angemeldet | Heiler | Tanks | Support | DPS | Caller | Summe |
+| --- | --- | --- | --- | --- | --- | --- |
+| 10–15 | 4 | 3 | 2 | 4 | 1 | 14 |
+| 15–20 | 5 | 4 | 4 | 6 | 1 | 20 |
+| 20–25 | 6 | 6 | 5 | 7 | 1 | 25 |
+| 25–30 | 7 | 7 | 6 | 9 | 1 | 30 |
+
+- **Kleinere Gruppen:** Liegt die Summe über der Zahl der Angemeldeten, wird die Vorgabe anteilig gekürzt (jede Rolle behält mindestens 1). Ein übrig gebliebener Platz geht an die DPS.
+- **Rollen-Gruppen:** `Healer` → Heiler, `Tank` → Tank, `Support` → Support, `Support DPS` / `Clap DD` / `Brawl DD` / `Battlemount` → DPS, der Caller-Slot der Party 1 zählt separat.
+- **Gleichmäßig auf beide Parteien:** Die Slots werden reihum aus Party 1 und Party 2 genommen (Heiler #1 aus P1, Heiler #1 aus P2, Heiler #2 aus P1 …), damit keine Partei alles aufsaugt.
+- **Wünsche:** Exakter Wunsch ⇒ 105/84/66/50/36/24 Punkte (1.–6. Wahl). Gleiche Rollen-Familie (z. B. `Spiked Gauntlets` auf einem `Longbow`-Slot) ⇒ 48/38/28/20/14. Gleiche Rollen-Gruppe (z. B. `Spiked Gauntlets` auf `Carving`, beides DPS) ⇒ 40/30/22/16/12. Danach zählen Historie und Todesdaten.
+- **Reserve-Parties** (ab Party 3) bleiben unbegrenzt; dort landet nur, wer die Rolle ausdrücklich will.
+- **Anpassen:** Tabelle `QUOTA_TABLE` und Zuordnung `ROLE_GROUP` im Roster-Modul (`Anwendung/index.html`). Die Werte gelten als Obergrenze – manuell ziehen kann man weiterhin alles.
+
 ## Discord-Benachrichtigungen
 
-Der Schalter **Discord** (neben „Historie +1") steuert, ob Meldungen rausgehen; Standard ist an.
+Der Schalter **Discord** (neben „Historie +1") steuert, ob die Comp-Nachricht gepflegt wird; Standard ist an.
 
-Alle Meldungen gehen in den Kanal aus `DISCORD_CHANNEL_ID` (Feedback, Anmeldungen, Todes-Erinnerung). Ist keine Kanal-ID gesetzt, fällt der Worker auf DMs an `DISCORD_USER_ID` zurück.
+Alle Meldungen gehen in den Kanal aus `DISCORD_CHANNEL_ID` (Feedback, Comp, Todes-Erinnerung). Ist keine Kanal-ID gesetzt, fällt der Worker auf DMs an `DISCORD_USER_ID` zurück.
 
-Ablauf: Nach jedem Datenabruf (60 s) und nach jedem Build vergleicht die Seite die **Anmeldungen samt aktueller Rolle** mit dem zuletzt gemeldeten Stand (`tf-rb-notified`, pro Event-Token). Nur echte Änderungen erzeugen eine Nachricht:
+**Eine Nachricht pro Event, die aktualisiert wird** (seit 2026-11-16):
 
 ```
-**📋 Neue Anmeldung** · ZVZ-Builds ZVZ Test Event
-Anmeldung von: **Pinsel** → Locus
-Anmeldung von: **Boerse** → Tank Hallowfall
+**THE-FALLEN · ZVZ Test Event**
+Stand 16.11. 14:32 · 18 angemeldet
 
-Manuell anpassen: https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster
+**Party 1**
+Caller · 1H Mace — **DerJoker**
+Tank · HeavyMace — **Pinsel**
+Healer · Exalted — **Boerse**
+Healer · 1H Holy — _offen_
+Support · Locus — **Relgok**
+DPS · Spiked Gauntlets — **Amayana**
+…
+
+**Party 2**
+…
+
+Ziel: Heiler 5 · Tanks 4 · Support 4 · DPS 6 · Caller 1
+Besetzt: Heiler 4 · Tanks 4 · Support 3 · DPS 6 · Caller 1
+Neu: **Boerse**
 ```
 
-- **Ein Spieler = eine Zeile**, mehrere Änderungen gebündelt in einer Nachricht (max. 20, Rest gekürzt).
-- **Gemeldet werden nur echte An- und Abmeldungen.** Ein Rollenwechsel (neuer Build, Auto-Zuweisung) wird still nachgetragen und **nicht** gemeldet – vorher löste jede automatische Zuweisung eine neue „Neue Anmeldung"-Nachricht für dieselben Spieler aus.
-- **Beim ersten Öffnen keine Meldung** – die Erstbelegung wird nur gemerkt.
-- **Wer den Slot verlässt**, wird als „hat den Slot verlassen" gemeldet.
-- **Keine Sperre und keine Warteschlange mehr:** Eine Meldung geht sofort raus. Der Versand-Merker (`rb:sent:<kanal>:<text-hash>`, 30 Min) verhindert, dass derselbe Text zweimal im Kanal landet – auch wenn zwei Tabs oder zwei Geräte gleichzeitig senden.
-- **Ein Abruf ohne Änderung schickt nichts.**
+- **Beim ersten Mal wird gepostet**, danach ausschließlich dieselbe Nachricht editiert (`PATCH /channels/{id}/messages/{msg}`). Die Nachrichten-ID liegt im KV unter `rb:compmsg:<kanal>:ev-<token>`.
+- **Kein Spam:** Die Seite schickt nur, wenn sich der Text geändert hat; zwischen zwei Edits liegen mindestens 20 s (`COMP_MIN_GAP_MS`). Wird die Nachricht im Discord gelöscht, legt der Worker sie beim nächsten Aufruf neu an.
+- **Nur Party 1 + Party 2** (die Haupt-Parties). Slots außerhalb des Rollen-Ziels erscheinen nicht, solange sie leer sind.
+- **Ziele und Besetzung** stehen unter der Comp: `Ziel` = Vorgabe aus der Rollen-Formel, `Besetzt` = Ist-Stand.
+- **Neu-Zeile** erscheint nur, wenn seit dem letzten Edit jemand dazugekommen ist; die Änderungen werden zusätzlich im Panel **Änderungen** gespiegelt (`/changes`).
 - **Takt (seit 2026-11-16):** Die Seite fragt **1x pro Stunde** ab (24 Abfragen am Tag); der Knopf **Aktualisieren** holt jederzeit sofort neu. Der Cron prüft ebenfalls höchstens 1x pro Stunde (`CRON_MIN_GAP_MS`), auch wenn der Trigger im Dashboard noch auf 5 Minuten steht.
-- **Entfernt am 2026-11-16:** `type:"flush"`, `type:"reset"`, `?demo=1` bei `/alerts`, `?send=1` bei `/health`, der Discord-Test-Knopf und der Knopf „Wartende senden" – reine Testpfade, die zusätzliche Abfragen und Nachrichten ausgelöst haben.
+- **Entfernt am 2026-11-16:** `type:"flush"`, `type:"reset"`, `?demo=1` bei `/alerts`, `?send=1` bei `/health`, der Discord-Test-Knopf, der Knopf „Wartende senden" und die separate „Neue Anmeldung"-Nachricht.
 
 **Link anpinnen:** Der Button „Link anpinnen" postet den Roster-Link in `DISCORD_CHANNEL_ID` und pinnt die Nachricht. Dafür braucht der Bot `MANAGE_MESSAGES` im Kanal. Ohne die Variable meldet die Seite „DISCORD_CHANNEL_ID fehlt".
 
