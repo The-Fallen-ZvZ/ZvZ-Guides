@@ -12,6 +12,15 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-16 – Discord-Nachricht: Spaltenlayout, Party 1 + 2 nebeneinander
+
+- `Ziel:`-Zeile entfernt; die Vorgabe steckt jetzt in der Anzahl der gelisteten Plätze.
+- **Freie Slots ohne Namen** (kein `_offen_` mehr) – die Rollen bleiben sichtbar, die Namensspalte ist leer.
+- **Party 1 und Party 2 nebeneinander** in einem Code-Block: links Rolle · Waffe, rechts Name. Spaltenbreiten werden aus den Daten berechnet (`wRole`, `wWeapon`, `wName`), Namen beginnen dadurch immer an derselben Stelle.
+- Neue Sektion **Alternativen** darunter: besetzte Reserve-Slots sowie alle nicht eingeplanten Spieler mit ihrer 1. Wunschrolle (ohne Wunsch `Bank`), gleiche Spalten.
+- `Besetzt:` bleibt als Ist-Stand je Rolle; `Neu:` unverändert.
+- Tests per Node-Simulation (0 und 3 Anmeldungen) – Ausgabe geprüft, Seite syntaktisch OK.
+
 ### 2026-11-16 – Neue Events: Comp-Nachricht sofort, auch ohne Anmeldungen
 
 - Beim **Verbinden eines neuen Events** wird die Comp-Nachricht jetzt sofort angelegt/aktualisiert – auch mit 0 Anmeldungen. Alle Rollen des Plans stehen dann auf `_offen_`, beim Auffüllen wandert die Nachricht mit.
