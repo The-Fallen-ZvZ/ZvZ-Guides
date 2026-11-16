@@ -16,7 +16,7 @@
          GET  /guildrecent?guild=<id>&force=1&key=<mod-key>
          GET  /alerts?guild=<id>&notify=0|1&force=1&key=<mod-key>
          GET  /deaths/detail?guild=<id>&name=<name>&key=<mod-key>
-       - Cron (scheduled): prüft alle 5 Minuten die letzten 3 Battles auf Mehrfach-Tode
+       - Cron (scheduled): prüft die letzten 3 Battles auf Mehrfach-Tode, höchstens 1x pro Stunde
 
    Bindings:
      MOD_KEY            (Pflicht, Moderatoren-Key)
@@ -357,8 +357,7 @@ async function handleRoster(request, env, url) {
     return rosterJson({ error: 'bad_event', hint: 'Token = die 64 Zeichen aus /e/...' }, 400);
   }
 
-  /* Nebenbei wartende Anmeldungen nachholen (die Seite fragt ohnehin alle 5 Min ab) */
-  try { await flushNotifyQueue(env); } catch (e) { /* naechster Lauf */ }
+  /* Kein Queue-Flush mehr: Meldungen gehen sofort raus, Doppelungen blockt der Ledger. */
 
   let meta, roster;
   try { meta = await loadEventMeta(token); }
@@ -388,13 +387,11 @@ async function handleRoster(request, env, url) {
 
 const DISCORD_API = 'https://discord.com/api/v10';
 let LAST_DISCORD = null;                     // letzter Discord-Fehler (nur Diagnose)
-const WORKER_VERSION = '2026-11-15-2';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
-const NOTIFY_COOLDOWN_MS = 5 * 60 * 1000;    // min. 5 Min zwischen zwei Anmeldungs-Nachrichten
-const NOTIFY_DUPLICATE_MS = 10 * 60 * 1000;  // identische Nachricht 10 Min nicht wiederholen
-const NOTIFY_QUEUE_TTL = 24 * 60 * 60;       // gemerkte Anmeldung max. 1 Tag aufheben
+const WORKER_VERSION = '2026-11-16-1';       // erscheint in /health – zeigt, ob der Deploy aktuell ist
 const SEND_CLAIM_TTL = 10 * 60;              // Anspruch auf einen Text (Sekunden)
 const SEND_CLAIM_WAIT_MS = 300;              // so lange warten, bis parallele Aufrufe den Anspruch sehen
 const SEND_LEDGER_TTL = 30 * 60;             // derselbe Text geht 30 Min nur einmal raus (Sekunden)
+const CRON_MIN_GAP_MS = 55 * 60 * 1000;      // Cron arbeitet hoechstens 1x pro Stunde (24 Laeufe/Tag)
 
 function hashText(text) {
   let h = 2166136261;
@@ -508,59 +505,7 @@ async function sendOnce(env, content) {
   return { sent, duplicate: false, state: sent > 0 ? 'sent' : 'failed', at: Date.now() };
 }
 
-/**
- * Anmeldungen mit 5-Minuten-Sperre und Doppel-Erkennung.
- * So kann weder ein zweiter Tab noch ein Reload dieselbe Meldung spammen.
- * Innerhalb der Sperre wird der Text gemerkt und spaeter automatisch gesendet.
- */
-async function sendWithCooldown(env, content, scope, force) {
-  const key = 'rb:notifylast:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':' + scope;
-  const last = await kvGet(env, key);
-  const now = Date.now();
-  const hash = hashText(content);
-
-  /* Testnachricht (force): bewusst ohne Sperre und ohne Doppel-Erkennung */
-  if (force) {
-    const sent = await notifyMods(env, content);
-    return { sent, duplicate: false, throttled: false, queued: false, retryInMs: 0 };
-  }
-
-  /* Gleicher Text wurde bereits gesendet oder wird gerade gesendet -> fertig */
-  const ledger = await kvGet(env, sentKey(env, hash));
-  if (ledger) {
-    /* Nur bei "sent" ist der Wartende Eintrag wirklich erledigt; bei "claim"
-       bleibt er liegen, falls der andere Aufruf am Versand scheitert. */
-    if (ledger.state === 'sent') await kvDelete(env, queueKey(env, scope));
-    return { sent: 0, duplicate: true, throttled: true, queued: false, retryInMs: 0 };
-  }
-
-  if (last && last.at) {
-    if (last.hash === hash && now - last.at < NOTIFY_DUPLICATE_MS) {
-      return { sent: 0, duplicate: true, throttled: true, queued: false, retryInMs: 0 };
-    }
-    if (now - last.at < NOTIFY_COOLDOWN_MS) {
-      const retryInMs = NOTIFY_COOLDOWN_MS - (now - last.at);
-      await kvPut(env, queueKey(env, scope), { at: now, content }, NOTIFY_QUEUE_TTL);
-      return { sent: 0, duplicate: false, throttled: true, queued: true, retryInMs };
-    }
-  }
-
-  const out = await sendOnce(env, content);
-  if (out.sent > 0) {
-    await kvPut(env, key, { at: now, hash }, 3600);
-    await kvDelete(env, queueKey(env, scope));
-    return { sent: out.sent, duplicate: false, throttled: false, queued: false, retryInMs: 0 };
-  }
-  if (out.duplicate) {
-    /* Ein anderer Aufruf sendet denselben Text bereits */
-    return { sent: 0, duplicate: true, throttled: true, queued: false, retryInMs: 0 };
-  }
-  return { sent: 0, duplicate: false, throttled: false, queued: false, retryInMs: 0 };
-}
-
-function queueKey(env, scope) {
-  return 'rb:notifyq:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':' + scope;
-}
+/* ---------- Log und Meldungen --------------------------------------------- */
 
 /** Letzte Entscheidungen pro Event mitschreiben (fuer /changes und /health). */
 async function logNotify(env, scope, entry) {
@@ -573,60 +518,7 @@ async function logNotify(env, scope, entry) {
   } catch (e) { /* Log ist optional */ }
 }
 
-/** Sendet gemerkte Anmeldungen, sobald ihre Sperre abgelaufen ist (force = sofort). */
-async function flushNotifyQueue(env, force) {
-  const prefix = 'rb:notifyq:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':';
-  let sent = 0;
-
-  let list;
-  try { list = await env.FEEDBACK_TF.list({ prefix }); }
-  catch (e) { return 0; }
-
-  for (const k of list.keys) {
-    const q = await kvGet(env, k.name);
-    if (!q || !q.content) { await kvDelete(env, k.name); continue; }
-
-    const scope = k.name.slice(prefix.length);
-    const lockKey = 'rb:notifylast:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':' + scope;
-    const last = await kvGet(env, lockKey);
-    const hash = hashText(q.content);
-
-    /* Text ist bereits raus (oder wird gerade gesendet) -> Wartenden Eintrag verwerfen */
-    const ledger = await kvGet(env, sentKey(env, hash));
-    if (ledger && ledger.state === 'sent') {
-      await kvDelete(env, k.name);
-      await logNotify(env, scope, { result: 'flush-duplicate' });
-      continue;
-    }
-    /* Fremder Anspruch: dieser Aufruf wartet, bis der andere fertig ist */
-    if (ledger) continue;
-
-    /* Wartet noch derselbe Text wie der zuletzt gesendete, nicht erneut posten */
-    if (last && last.hash === hash && Date.now() - last.at < NOTIFY_DUPLICATE_MS) {
-      await kvDelete(env, k.name);
-      await logNotify(env, scope, { result: 'flush-duplicate' });
-      continue;
-    }
-
-    if (!force && last && last.at && Date.now() - last.at < NOTIFY_COOLDOWN_MS) continue;
-
-    const out = await sendOnce(env, q.content);
-    if (out.sent > 0) {
-      await kvPut(env, lockKey, { at: Date.now(), hash }, 3600);
-      await kvDelete(env, k.name);
-      await logNotify(env, scope, { result: 'flushed', sent: out.sent });
-      sent += out.sent;
-    } else if (out.duplicate) {
-      /* Ein paralleler Aufruf hat den Text uebernommen; nur bei Erfolg verwerfen */
-      if (out.state === 'sent') await kvDelete(env, k.name);
-      await logNotify(env, scope, { result: 'flush-claimed' });
-    } else {
-      await logNotify(env, scope, { result: 'flush-failed', discord: LAST_DISCORD });
-    }
-  }
-
-  return sent;
-}
+/* ---------- Anmeldungen melden -------------------------------------------- */
 
 async function handleNotify(request, env) {
   if (request.method !== 'POST') return rosterJson({ error: 'method_not_allowed' }, 405);
@@ -644,26 +536,6 @@ async function handleNotify(request, env) {
     : 'https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster';
 
   const auth = discordAuth(env);
-
-  /* Manuell: wartende Anmeldungen sofort senden: { key, type:'flush' } */
-  if (body.type === 'flush') {
-    const sent = await flushNotifyQueue(env, true);
-    await logNotify(env, 'flush', { result: sent ? 'flushed-manual' : 'flush-empty', sent });
-    return rosterJson({ ok: true, sent, flushed: sent > 0 });
-  }
-
-  /* Sperre manuell loeschen (zum Testen): { key, type:'reset' } */
-  if (body.type === 'reset') {
-    const prefix = 'rb:notifylast:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':';
-    const list = await env.FEEDBACK_TF.list({ prefix });
-    for (const k of list.keys) await env.FEEDBACK_TF.delete(k.name);
-
-    const qPrefix = 'rb:notifyq:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':';
-    const qList = await env.FEEDBACK_TF.list({ prefix: qPrefix });
-    for (const k of qList.keys) await env.FEEDBACK_TF.delete(k.name);
-
-    return rosterJson({ ok: true, reset: list.keys.length, queued: qList.keys.length });
-  }
 
   /* Link in einen Kanal posten und anpinnen */
   if (body.type === 'pin') {
@@ -723,33 +595,20 @@ async function handleNotify(request, env) {
   }));
   const logBase = { event: eventTitle, changes: logChanges, count: logChanges.length };
 
-  /* Neue Anmeldung zuerst behandeln, danach andere wartende Events nachholen. */
-  const out = await sendWithCooldown(env, content, scope, body.force === true);
-  try { await flushNotifyQueue(env); } catch (e) { /* naechster Lauf */ }
+  /* Meldung genau einmal senden. Doppelte Texte blockt der Ledger (30 Min),
+     parallele Aufrufe (zwei Tabs) regelt claimSend(). Keine Warteschlange. */
+  const out = await sendOnce(env, content);
 
   if (out.duplicate) {
     await logNotify(env, scope, Object.assign({}, logBase, { result: 'duplicate' }));
     return rosterJson({ ok: true, sent: 0, duplicate: true });
-  }
-  if (out.queued) {
-    await logNotify(env, scope, Object.assign({}, logBase, { result: 'queued', retryInMs: Math.round(out.retryInMs) }));
-    return rosterJson({ ok: true, sent: 0, queued: true, retryInMs: out.retryInMs });
-  }
-  if (out.throttled) {
-    await logNotify(env, scope, Object.assign({}, logBase, { result: 'cooldown' }));
-    return rosterJson({
-      error: 'cooldown',
-      throttled: true,
-      retryInMs: out.retryInMs,
-      hint: 'Naechste Meldung fruehestens in ' + Math.ceil(out.retryInMs / 1000) + ' s'
-    }, 429);
   }
   if (!out.sent) {
     await logNotify(env, scope, Object.assign({}, logBase, { result: 'failed' }));
     return rosterJson({ error: 'notify_failed', hint: 'DISCORD_CHANNEL_ID (Kanal) oder DISCORD_USER_ID (DM) pruefen' }, 502);
   }
 
-  await logNotify(env, scope, Object.assign({}, logBase, { result: 'sent', sent: out.sent, force: body.force === true }));
+  await logNotify(env, scope, Object.assign({}, logBase, { result: 'sent', sent: out.sent }));
   return rosterJson({ ok: true, sent: out.sent });
 }
 
@@ -1025,24 +884,6 @@ async function handleAlerts(request, env, url) {
 
   const name = (url.searchParams.get('name') || '').trim();
 
-  /* Testnachricht: zeigt das Format, ohne echte Daten anzufassen */
-  if (url.searchParams.get('demo') === '1') {
-    const who = (name || 'Takumoto04').slice(0, 40);
-    const deaths = Math.max(2, Math.min(20, parseInt(url.searchParams.get('deaths') || '5', 10)));
-    const content = '**3-ZvZs-Todes-Warnungen** (Testnachricht)\n'
-      + 'In den letzten 3-ZvZs gestorben:\n'
-      + '- **' + who + '**: ' + deaths + ' Tode, 1 Kill\n'
-      + '\nSo sieht die echte Warnung aus. Kein echter Treffer, nichts gespeichert.';
-    const sent = await notifyMods(env, content);
-    return rosterJson({
-      demo: true,
-      sent,
-      channel: !!env.DISCORD_CHANNEL_ID,
-      name: who,
-      deaths
-    });
-  }
-
   const guild = (url.searchParams.get('guild') || '').trim();
   if (!/^[A-Za-z0-9_-]{10,30}$/.test(guild)) {
     return rosterJson({ error: 'bad_guild' }, 400);
@@ -1082,24 +923,7 @@ async function handleAlerts(request, env, url) {
 
 /* ---------- Diagnose ------------------------------------------------------ */
 
-/** Postet eine Testnachricht und gibt Discords Antwort im Klartext zurueck. */
-async function diagnoseDiscord(env) {
-  if (!env.DISCORD_TOKEN) return { ok: false, error: 'DISCORD_TOKEN fehlt' };
-  if (!env.DISCORD_CHANNEL_ID) return { ok: false, error: 'DISCORD_CHANNEL_ID fehlt' };
-  try {
-    const res = await fetch(DISCORD_API + '/channels/' + env.DISCORD_CHANNEL_ID + '/messages', {
-      method: 'POST',
-      headers: discordAuth(env),
-      body: JSON.stringify({ content: '**Diagnose** ' + new Date().toISOString() })
-    });
-    const text = await res.text();
-    return { ok: res.ok, status: res.status, body: text.slice(0, 400) };
-  } catch (e) {
-    return { ok: false, error: String(e && e.message || e) };
-  }
-}
-
-/** GET /health?key=…[&send=1] – Version, Bindings, Sperren und Discord-Test. */
+/** GET /health?key=… – Version, Bindings, Sperren und letzter Cron-Lauf (nur lesend). */
 async function handleHealth(request, env, url) {
   if (request.method !== 'GET') return rosterJson({ error: 'method_not_allowed' }, 405);
   if (!env.MOD_KEY || url.searchParams.get('key') !== env.MOD_KEY) {
@@ -1112,7 +936,6 @@ async function handleHealth(request, env, url) {
     token: !!env.DISCORD_TOKEN,
     alertGuild: env.ALERT_GUILD || 'p9uAFij9ReO0BhIhHlVa8g',
     locks: [],
-    discord: null,
     now: new Date().toISOString()
   };
 
@@ -1138,20 +961,6 @@ async function handleHealth(request, env, url) {
       const v = await kvGet(env, k.name);
       if (Array.isArray(v)) out.logs.push({ key: k.name, entries: v.slice(0, 5) });
     }
-    const qList = await env.FEEDBACK_TF.list({ prefix: 'rb:notifyq:' });
-    out.queue = qList.keys.map(k => k.name);
-    out.queueDetails = [];
-    for (const name of out.queue) {
-      const q = await kvGet(env, name);
-      const scope = name.slice(('rb:notifyq:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':').length);
-      const lock = await kvGet(env, 'rb:notifylast:' + (env.DISCORD_CHANNEL_ID || 'dm') + ':' + scope);
-      out.queueDetails.push({
-        scope,
-        queuedAgeSec: q && q.at ? Math.round((Date.now() - q.at) / 1000) : null,
-        lockAgeSec: lock && lock.at ? Math.round((Date.now() - lock.at) / 1000) : null,
-        preview: q && q.content ? q.content.slice(0, 140) : null
-      });
-    }
   } catch (e) {
     out.logsError = String(e && e.message || e);
   }
@@ -1166,11 +975,6 @@ async function handleHealth(request, env, url) {
       ? { at: new Date(c.at).toISOString(), when: c.when || null, ageSec: Math.round((Date.now() - c.at) / 1000) }
       : null;
   } catch (e) { out.cron = null; out.cronRaw = 'error: ' + String(e && e.message || e); }
-
-  try { out.flushedNow = await flushNotifyQueue(env); }
-  catch (e) { out.flushedNow = 0; }
-
-  if (url.searchParams.get('send') === '1') out.discord = await diagnoseDiscord(env);
 
   return rosterJson(out);
 }
@@ -1677,24 +1481,21 @@ export default {
     return new Response('Methode nicht erlaubt', { status: 405, headers: corsHeaders });
   },
 
-  /* Cron-Trigger (z. B. alle 5 Minuten): Todes-Erinnerungen und Anmelde-Warteschlange */
+  /* Cron (in Cloudflare auf 0 * * * *) :
+     - Sperre im Code: arbeitet hoechstens einmal pro Stunde, egal wie oft der
+       Trigger feuert (CRON_MIN_GAP_MS). Das sind max. 24 Laeufe pro Tag.
+     - Aufgabe: letzte 3 ZvZ-Battles auf Mehrfach-Tode pruefen.
+     - Keine Warteschlange mehr, keine Testnachrichten. */
   async scheduled(event, env, ctx) {
     const guild = env.ALERT_GUILD || 'p9uAFij9ReO0BhIhHlVa8g';
+    const now = Date.now();
 
-    /* Herzschlag zuerst und awaited, damit er auch bei knapper Laufzeit ankommt */
-    try { await kvPut(env, 'rb:cron', { at: Date.now(), when: new Date().toISOString() }, 172800); }
+    const last = await kvGet(env, 'rb:cron');
+    if (last && last.at && now - last.at < CRON_MIN_GAP_MS) return;   // leiser Abbruch
+
+    try { await kvPut(env, 'rb:cron', { at: now, when: new Date(now).toISOString() }, 172800); }
     catch (e) { /* egal */ }
-    console.log('[cron] tick ' + new Date().toISOString());
-
-    ctx.waitUntil((async () => {
-      const flushed = await flushNotifyQueue(env).catch(() => 0);
-      let waiting = 0;
-      try {
-        const q = await env.FEEDBACK_TF.list({ prefix: 'rb:notifyq:' });
-        waiting = q.keys.length;
-      } catch (e) { /* egal */ }
-      await logNotify(env, 'cron', { result: 'cron', flushed, waiting });
-    })());
+    console.log('[cron] ' + new Date(now).toISOString());
 
     ctx.waitUntil(checkDeathAlerts(env, guild).catch(() => {}));
   }

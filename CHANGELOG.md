@@ -12,6 +12,30 @@ Der vollständige, detaillierte Changelog bleibt in der Anwendung selbst (Tab �
 
 ## Einträge
 
+### 2026-11-16 – Doppelte Discord-Meldungen behoben, Takt auf 1x pro Stunde
+
+**Ursache:** `notifyChanges()` hat jede Abweichung gemeldet – auch Rollenwechsel. Da der Auto-Build bei jedem Poll neu zuwies, entstand für dieselben Spieler immer wieder eine neue „Neue Anmeldung". Zusätzlich hat der Worker bei der 5-Minuten-Sperre den Text in eine Warteschlange gelegt und der Client einen Retry-Timer gestartet – beide Wege haben denselben Text noch einmal geschickt.
+
+**Worker (`Worker/worker.js`, Version `2026-11-16-1`):**
+- `sendWithCooldown()`, `queueKey()` und `flushNotifyQueue()` entfernt; `/notify` ruft direkt `sendOnce()` auf (Anspruch + 30-Minuten-Ledger gegen doppelte Texte)
+- Kein Flush mehr bei `/roster`, `/notify` und `/health` – dadurch deutlich weniger KV-Listen/Reads pro Aufruf
+- Testpfade entfernt: `?demo=1` bei `/alerts`, `?send=1` (Diagnose-Post) bei `/health`, `type:"flush"` und `type:"reset"` bei `/notify`, `force`-Testnachricht
+- Cron: Sperre `CRON_MIN_GAP_MS` (55 Min) – der Cron arbeitet höchstens 1x pro Stunde, auch wenn der Trigger in Cloudflare noch auf 5 Minuten steht. Kein Queue-Flush, kein zusätzliches KV-Schreiben alle 5 Minuten
+- `/health` listet keine Warteschlange mehr
+
+**Anwendung (`Anwendung/index.html`):**
+- `LIVE_MS` 60 s → 60 Min, `AUTO_MS` 5 Min → 60 Min (24 automatische Abfragen pro Tag)
+- Neuer Knopf **Aktualisieren** für manuelle Abfragen; Tab-Wechsel fragt erst nach 10 Minuten neu ab
+- `notifyChanges()` meldet nur noch neue Anmeldungen und Austritte; Rollenwechsel werden still nachgetragen
+- `postNotify()` übernimmt den Stand immer – auch bei Fehler – und hat keinen Retry-Timer mehr (kein Doppelversand)
+- Tode-Abfrage 15 Min → 60 Min, `/changes` 30 s → 5 Min
+- Knöpfe **Discord-Test** und **Wartende senden** samt Funktionen entfernt
+- `node --check` auf dem Inline-Script: OK
+
+**Dokumentation:** `Dokumentation/Moderator-Roster.md` auf den neuen Takt, die entfernten Endpunkte und das neue Meldeverhalten angepasst.
+
+**Cloudflare-Dashboard (manuell):** Cron-Trigger auf `0 * * * *` ändern (Triggers → Cron Triggers).
+
 ### 2026-11-15 – Spieler-Auswahl: Gilde anklicken oder extern eintippen
 
 - **+ Spieler** öffnet jetzt einen Dialog statt des Inline-Formulars: oben Suchfeld und Gildenliste, unten Feld für Namen außerhalb der Gilde

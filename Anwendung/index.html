@@ -1565,8 +1565,8 @@ const RB = (function(){
   const LS_NOTIFIED = 'tf-rb-notified';
   const LS_CHANGES = 'tf-rb-changes';   // lokaler Spiegel, falls /changes (noch) fehlt
   const LS_MANUAL = 'tf-rb-manual';     // manuell eingetragene Spieler (pro Event-Token)
-  const AUTO_MS  = 5 * 60 * 1000;        // Auto-Zuweisung mindestens alle 5 Minuten
-  const LIVE_MS  = 60 * 1000;            // Anmeldungen jede Minute abfragen (früher 5 Min)
+  const AUTO_MS  = 60 * 60 * 1000;       // Auto-Zuweisung hoechstens 1x pro Stunde
+  const LIVE_MS  = 60 * 60 * 1000;       // Anmeldungen 1x pro Stunde abfragen (24/Tag)
   const TIER_RESERVE_FROM = 2;          // Party 1+2 = Haupt, ab Party 3 Reserve
 
   const ALIAS = {
@@ -1608,7 +1608,7 @@ const RB = (function(){
     token:'', event:null, parties:[], players:[], playstyles:{}, hist:{},
     builtAt:null, log:null, live:null, last:null, status:'',
     auto:false, lastAuto:0, changed:false, newSignups:0,
-    notify:true, notified:{}, deaths:{}, deathsAt:0,
+    notify:true, notified:{}, deaths:{}, deathsAt:0, lastFetchAt:0,
     changes:[], changesLocal:[], changesAt:0, changesOff:false,
     manual:{}, guild:[], guildAt:0, guildErr:'', addQuery:''
   };
@@ -2013,6 +2013,7 @@ const RB = (function(){
   async function fetchData(first){
     const key = sessionStorage.getItem('feedbackModKey');
     if (!key) { flash('Bitte neu als Moderator anmelden.'); return; }
+    S.lastFetchAt = Date.now();
     setStatus('Lade Event…');
     try{
       const res = await fetch(ROSTER_ENDPOINT + '?event=' + S.token + '&key=' + encodeURIComponent(key), { cache:'no-store' });
@@ -2032,10 +2033,18 @@ const RB = (function(){
     render();
   }
 
+  /** Manuell aktualisieren (Knopf "Aktualisieren") – jederzeit, kostet eine Abfrage. */
+  async function refresh(){
+    if (!S.token){ flash('Erst Event verbinden'); return; }
+    flash('Aktualisiere…');
+    await fetchData(false);
+    flash('Aktualisiert');
+  }
+
   /** Tode/Aktivität aus der offiziellen Albion-API (über den Worker, 12 h gecacht). */
   async function loadDeaths(){
     if (!S.players.length) return;
-    if (Date.now() - S.deathsAt < 15 * 60 * 1000) return;
+    if (Date.now() - S.deathsAt < 60 * 60 * 1000) return;
     const key = sessionStorage.getItem('feedbackModKey');
     if (!key) return;
     S.deathsAt = Date.now();
@@ -2257,7 +2266,7 @@ const RB = (function(){
     b.textContent = S.auto ? 'Auto: an' : 'Auto: aus';
     b.classList.toggle('on', S.auto);
     b.title = S.auto
-      ? 'Weist bei neuen Anmeldungen und alle 5 Minuten automatisch zu. Manuelles Eingreifen schaltet Auto aus.'
+      ? 'Weist bei neuen Anmeldungen und hoechstens einmal pro Stunde automatisch zu. Manuelles Eingreifen schaltet Auto aus.'
       : 'Auto-Zuweisung ist aus – du baust selbst.';
   }
 
@@ -2278,7 +2287,7 @@ const RB = (function(){
     }
   }
 
-  /** Weist automatisch zu: sofort bei Änderungen, sonst höchstens alle 5 Minuten. */
+  /** Weist automatisch zu: sofort bei Änderungen, sonst höchstens einmal pro Stunde. */
   function maybeAuto(reason){
     if (!S.auto) return;
     if (!S.players.length || !S.parties.length) return;
@@ -2336,7 +2345,12 @@ const RB = (function(){
     return map;
   }
 
-  /** Vergleicht die Anmeldungen mit dem zuletzt gemeldeten Stand (pro Event-Token). */
+  /**
+   * Meldet nur echte An- und Abmeldungen an Discord.
+   * Rollenwechsel (durch einen neuen Build oder die Auto-Zuweisung) werden
+   * still nachgetragen und NICHT gemeldet - sonst entsteht bei jeder
+   * automatischen Zuweisung eine neue "Neue Anmeldung"-Meldung.
+   */
   function notifyChanges(){
     if (!S.notify || !S.token) return;
     const store = S.notified[S.token] || (S.notified[S.token] = {});
@@ -2354,16 +2368,10 @@ const RB = (function(){
     const changes = [];
 
     Object.entries(roleMap).forEach(([name, role]) => {
-      const prev = store[name];
-      if (prev === undefined) {
-        changes.push({ name, role: role || 'noch offen' });
-        next[name] = role;
-      } else if (!prev && role) {
-        next[name] = role;              // Rolle war noch unbekannt -> still nachtragen
-      } else if (prev !== role) {
-        changes.push({ name, role: role || '—' });
-        next[name] = role;
+      if (store[name] === undefined) {
+        changes.push({ name, role: role || 'noch offen' });   // neue Anmeldung
       }
+      next[name] = role;                                       // Rolle immer nachtragen
     });
 
     Object.keys(store).forEach(name => {
@@ -2380,7 +2388,6 @@ const RB = (function(){
   }
 
   let notifyPending = false;
-  let notifyRetryTimer = null;
   const LS_NLOG = 'tf-rb-notify-log';
 
   function saveNotifyLog(result){
@@ -2433,7 +2440,7 @@ const RB = (function(){
   /** Holt die zuletzt gemeldeten Änderungen aus dem Worker (alle Geräte). */
   async function loadChanges(force){
     if (!S.token) return;
-    if (!force && Date.now() - S.changesAt < 30 * 1000) return;
+    if (!force && Date.now() - S.changesAt < 5 * 60 * 1000) return;
     const key = sessionStorage.getItem('feedbackModKey');
     if (!key) return;
     S.changesAt = Date.now();
@@ -2515,31 +2522,12 @@ const RB = (function(){
         })
       });
       const data = await res.json().catch(() => ({}));
-      const result = res.status === 429 ? 'cooldown'
-        : data.queued ? 'queued'
-        : data.duplicate ? 'duplicate'
-        : res.ok ? 'sent' : 'failed';
+      const result = data.duplicate ? 'duplicate' : res.ok ? 'sent' : 'failed';
       rememberChanges(list, result);
-      if (res.status === 429) {
-        saveNotifyLog('Sperre');
-        const secs = Math.ceil((data.retryInMs || 0) / 1000);
-        flash('Discord: 5-Minuten-Sperre aktiv' + (secs ? ' – nächste Meldung in ' + secs + ' s' : ''));
-        /* Der Worker hat den Text gemerkt – Stand sofort uebernehmen, sonst
-           erzeugt der naechste Poll denselben Request noch einmal. */
-        if (next) { S.notified[S.token] = next; saveNotified(); }
-        if (notifyRetryTimer) clearTimeout(notifyRetryTimer);
-        notifyRetryTimer = setTimeout(() => {
-          notifyRetryTimer = null;
-          notifyPending = true;
-          postNotify(changes, next);
-        }, Math.max(2000, (data.retryInMs || 5000) + 1500));
-        return;
-      }
-      if (!res.ok) {
-        saveNotifyLog('Fehler ' + res.status);
-        flash('Discord: ' + (data.hint || data.error || 'Versand fehlgeschlagen'));
-        return;
-      }
+
+      /* Stand IMMER uebernehmen - auch bei Fehler. Sonst schickt der naechste
+         Poll dieselben Zeilen noch einmal; genau so entstanden die doppelten
+         "Neue Anmeldung"-Meldungen im Discord. */
       if (next) {
         S.notified[S.token] = next;
       } else {
@@ -2547,66 +2535,20 @@ const RB = (function(){
         list.forEach(c => { if (c.role === '—') delete store[c.name]; else store[c.name] = c.role; });
       }
       saveNotified();
-      S.newSignups = 0;
-      if (data.queued) {
-        saveNotifyLog('gemerkt');
-        const mins = Math.max(1, Math.ceil((data.retryInMs || 0) / 60000));
-        flash('Discord: Sperre aktiv – wird in ca. ' + mins + ' Min automatisch gesendet');
-      } else {
-        saveNotifyLog(data.duplicate ? 'unverändert' : 'gesendet');
-        flash(data.duplicate
-          ? 'Discord: unverändert, nicht erneut gesendet'
-          : (list.length === 1 ? 'Discord: 1 Änderung gemeldet' : 'Discord: ' + list.length + ' Änderungen gemeldet'));
+
+      if (!res.ok) {
+        saveNotifyLog('Fehler ' + res.status);
+        flash('Discord: ' + (data.hint || data.error || 'Versand fehlgeschlagen'));
+        return;
       }
+      S.newSignups = 0;
+      saveNotifyLog(data.duplicate ? 'unverändert' : 'gesendet');
+      flash(data.duplicate
+        ? 'Discord: unverändert, nicht erneut gesendet'
+        : (list.length === 1 ? 'Discord: 1 Änderung gemeldet' : 'Discord: ' + list.length + ' Änderungen gemeldet'));
       loadChanges(true);   // gesendete Meldung sofort im Spiegel zeigen
     }catch(e){ /* beim naechsten Poll erneut versuchen */ }
     finally{ notifyPending = false; }
-  }
-
-  /** Sendet die waehrend der Sperre gemerkten Meldungen sofort. */
-  async function flushQueued(){
-    const key = sessionStorage.getItem('feedbackModKey');
-    if (!key) { flash('Discord: nicht angemeldet – bitte neu einloggen'); return; }
-    flash('Discord: sende Wartende…');
-    try{
-      const res = await fetch(ROSTER_NOTIFY_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, type: 'flush' })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { flash('Discord: ' + (data.hint || data.error || ('HTTP ' + res.status))); return; }
-      if (data.sent) {
-        saveNotifyLog('gesendet (manuell)');
-        flash('Discord: ' + data.sent + ' wartende Meldung' + (data.sent === 1 ? '' : 'en') + ' gesendet');
-      } else {
-        saveNotifyLog('nichts offen');
-        flash('Discord: nichts offen (keine gemerkte Meldung)');
-      }
-    }catch(e){ flash('Discord: Netzwerkfehler'); }
-  }
-
-  /** Testnachricht, umgeht Sperre und Doppel-Erkennung bewusst. */
-  async function testDiscord(){
-    const key = sessionStorage.getItem('feedbackModKey');
-    if (!key) { flash('Discord: nicht angemeldet – bitte neu einloggen'); return; }
-    flash('Discord: Test läuft…');
-    try{
-      const res = await fetch(ROSTER_NOTIFY_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          key,
-          event: (S.event || {}).title || '',
-          changes: [{ name: 'Testspieler', role: 'Testrolle' }],
-          link: rosterLink(),
-          force: true
-        })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) flash('Discord: Testnachricht gesendet');
-      else flash('Discord: ' + (data.hint || data.error || ('HTTP ' + res.status)));
-    }catch(e){ flash('Discord: Netzwerkfehler'); }
   }
 
   async function pinLink(){
@@ -2649,6 +2591,7 @@ const RB = (function(){
       <div class="rb-bar">
         <input id="rb-token" placeholder="Event-Token oder kompletter Link (/e/…)">
         <button class="b" onclick="RB.connect()">Verbinden</button>
+        <button class="b" onclick="RB.refresh()" title="Jetzt neu vom Worker holen (sonst jede Stunde automatisch)">Aktualisieren</button>
         <button class="b" id="rb-live" onclick="RB.toggleLive()">Live: aus</button>
         <button class="b" onclick="RB.reloadComp()">Comp neu laden</button>
         <button class="b" onclick="RB.pinLink()" title="Postet den Roster-Link in den Discord-Kanal und pinnt ihn">Link anpinnen</button>
@@ -2665,12 +2608,10 @@ const RB = (function(){
           <h3>Comp <span class="rb-count" id="rb-cnt-slots">0</span></h3>
           <div class="rb-bar" style="padding:8px 10px;margin:0;border-bottom:var(--bw) solid var(--ln)">
             <button class="b" onclick="RB.build()">Build the Group</button>
-            <button class="b" id="rb-auto" onclick="RB.toggleAuto()" title="Weist bei neuen Anmeldungen und alle 5 Minuten automatisch zu">Auto: aus</button>
+            <button class="b" id="rb-auto" onclick="RB.toggleAuto()" title="Weist bei neuen Anmeldungen und hoechstens einmal pro Stunde automatisch zu">Auto: aus</button>
             <button class="b" onclick="RB.copy()">Kopieren</button>
             <button class="b" onclick="RB.bump()" title="Aktuelle Zuweisung als einen gespielten Einsatz zählen">Historie +1</button>
-            <button class="b" id="rb-notify" onclick="RB.toggleNotify()" title="Discord-Meldung bei jeder neuen Zuweisung">Discord: an</button>
-            <button class="b" onclick="RB.testDiscord()" title="Schickt sofort eine Testnachricht in den Kanal (umgeht die 5-Minuten-Sperre)">Discord-Test</button>
-            <button class="b" onclick="RB.flushQueued()" title="Sendet die während der Sperre gemerkten An- und Abmeldungen sofort">Wartende senden</button>
+            <button class="b" id="rb-notify" onclick="RB.toggleNotify()" title="Discord-Meldung bei jeder neuen An- oder Abmeldung">Discord: an</button>
           </div>
           <div id="rb-stats" class="mut" style="padding:6px 10px;font-size:.73rem;border-bottom:var(--bw) solid var(--ln)"></div>
           <div class="rb-parties" id="rb-parties"><p class="rb-msg">Noch keine Comp geladen.</p></div>
@@ -2941,12 +2882,12 @@ const RB = (function(){
     if (!S.token){ flash('Erst Event verbinden'); return; }
     startLive();
     fetchData(false);
-    flash('Live – Abfrage alle 5 Min');
+    flash('Live – Abfrage jede Stunde');
   }
 
   function startLive(){
     if (S.live || !S.token) return;
-    S.live = setInterval(() => fetchData(false), LIVE_MS);   // jede Minute
+    S.live = setInterval(() => fetchData(false), LIVE_MS);   // 1x pro Stunde = 24/Tag
     setLiveBtn();
   }
   function stopLive(){
@@ -2954,9 +2895,11 @@ const RB = (function(){
     setLiveBtn();
   }
 
-  /* Beim Zurückkehren in den Tab sofort aktualisieren (Browser drosseln Intervalle im Hintergrund) */
+  /* Beim Zurückkehren in den Tab aktualisieren - aber fruehestens nach 10 Minuten,
+     damit Tab-Wechsel keine zusaetzlichen Abfragen ausloesen. */
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && S.live && S.token) fetchData(false);
+    if (document.visibilityState === 'visible' && S.live && S.token
+        && Date.now() - (S.lastFetchAt || 0) > 10 * 60 * 1000) fetchData(false);
   });
 
   function init(){
@@ -2982,7 +2925,7 @@ const RB = (function(){
     }
   }
 
-  return { page, init, connect, build, copy, bump, toggleLive, toggleAuto, toggleNotify, testDiscord, flushQueued, pinLink, reloadComp, closePick,
+  return { page, init, connect, refresh, build, copy, bump, toggleLive, toggleAuto, toggleNotify, pinLink, reloadComp, closePick,
     reloadChanges: () => loadChanges(true), showAddPlayer, closeAddPlayer, confirmAddPlayer, removeManualPlayer };
 })();
 

@@ -12,15 +12,15 @@ Stand: 13.11.2026 · **in `Anwendung/index.html` eingebaut** · Worker-Erweiteru
 | Worker-Route `/roster` | Code fertig (`Worker/roster.js`), muss noch deployt werden |
 | Discord | Kanal-Nachricht bei jeder Änderung, Todes-Erinnerung per Cron, optional angepinnter Roster-Link |
 | Historie | lokal im Browser (später optional KV) |
-| Live-Aktualisierung | Polling jede Minute, startet beim Öffnen automatisch |
-| Auto-Zuweisung | standardmäßig an: bei Änderungen sofort, sonst alle 5 Minuten |
+| Live-Aktualisierung | Polling jede Stunde (24/Tag), startet beim Öffnen automatisch; Knopf **Aktualisieren** jederzeit |
+| Auto-Zuweisung | standardmäßig an: bei Änderungen sofort, sonst höchstens einmal pro Stunde |
 
 ## Ablauf im Betrieb
 
 1. Moderatoren-Login → **Roster-Brain** in der Seitenleiste.
 2. Event-Token aus dem AlbionZvZ-Link einfügen (`/e/…`) → **Verbinden**.
-3. **Live** startet automatisch – neue Anmeldungen erscheinen ohne Reload (Abfrage alle 5 Minuten). Beim Zurückwechseln in den Tab wird sofort aktualisiert.
-4. **Auto** ist standardmäßig an: Das Gehirn weist bei jeder Änderung sofort und sonst alle 5 Minuten selbst zu. Wer selbst bauen will, schaltet Auto aus – oder greift einfach manuell ein, dann schaltet es sich ab.
+3. **Live** startet automatisch – neue Anmeldungen erscheinen ohne Reload (Abfrage **jede Stunde**; der Knopf **Aktualisieren** holt sofort neu). Beim Zurückwechseln in den Tab wird nach frühestens 10 Minuten aktualisiert.
+4. **Auto** ist standardmäßig an: Das Gehirn weist bei jeder Änderung sofort und sonst höchstens einmal pro Stunde selbst zu. Wer selbst bauen will, schaltet Auto aus – oder greift einfach manuell ein, dann schaltet es sich ab.
 5. **Build the Group** – einmaliger Vorschlag mit Begründung, Konflikten, Bank und offenen Slots.
 5. Manuell korrigieren: Spieler auf einen Slot ziehen, freien Slot anklicken (nach Passung sortierte Liste), × zum Entfernen.
 6. **Kopieren** und das Ergebnis in AlbionZvZ übertragen – dort bleibt die verbindliche Zuweisung.
@@ -32,7 +32,7 @@ Der Schalter **Auto** sitzt neben „Build the Group" und merkt sich seinen Zust
 
 | Zustand | Verhalten |
 | --- | --- |
-| **Auto: an** | Weist bei jeder erkannten Änderung sofort zu (neuer/abgemeldeter Spieler, geänderte Wünsche) und sonst spätestens alle 5 Minuten. Beim Öffnen der Seite wird sofort gebaut. |
+| **Auto: an** | Weist bei jeder erkannten Änderung sofort zu (neuer/abgemeldeter Spieler, geänderte Wünsche) und sonst höchstens einmal pro Stunde. Beim Öffnen der Seite wird sofort gebaut. |
 | **Auto: aus** | Nichts wird automatisch verändert. „Build the Group" bleibt als einmaliger Vorschlag verfügbar. |
 | **Manueller Eingriff** | Ziehen, × oder Picker setzt Auto automatisch auf aus und meldet „Auto aus – manuelle Zuweisung". So wird eine korrigierte Gruppe nicht beim nächsten Poll überschrieben. |
 
@@ -55,20 +55,13 @@ Manuell anpassen: https://the-fallen-zvz.github.io/ZvZ-Guides/#admin-roster
 ```
 
 - **Ein Spieler = eine Zeile**, mehrere Änderungen gebündelt in einer Nachricht (max. 20, Rest gekürzt).
-- **Gemeldet wird jede Abweichung** gegenüber dem zuletzt gemeldeten Stand: neue Anmeldung, Rollenwechsel, Austritt. Die Erstbelegung beim ersten Login (oder nach gelöschtem Browser-Speicher) wird nur gemerkt, nicht gesendet.
-- **Beim ersten Öffnen keine Meldung** – die Erstbelegung ist keine neue Anmeldung.
+- **Gemeldet werden nur echte An- und Abmeldungen.** Ein Rollenwechsel (neuer Build, Auto-Zuweisung) wird still nachgetragen und **nicht** gemeldet – vorher löste jede automatische Zuweisung eine neue „Neue Anmeldung"-Nachricht für dieselben Spieler aus.
+- **Beim ersten Öffnen keine Meldung** – die Erstbelegung wird nur gemerkt.
 - **Wer den Slot verlässt**, wird als „hat den Slot verlassen" gemeldet.
-- **Kein Doppelversand:** gleicher Spieler + gleiche Rolle wird nicht erneut geschickt; erst eine neue Rolle löst wieder aus.
-- **Pro Event-Token:** Sperre und Doppel-Erkennung im Worker laufen über `eventKey` (Token). Zwei Events mit gleichem Titel teilen sich keine Sperre mehr. Ohne Token greift der Titel als Ersatzschlüssel.
-- **Wer noch keinen Slot hat** (z. B. Auto aus, vor dem ersten Build), wird beim Nachtragen der Rolle nicht erneut gemeldet – die Erstmeldung lautet dann „noch offen".
-- **Nur bei geänderten Daten** – ein Poll ohne Änderung schickt nichts.
-- **5-Minuten-Sperre mit Warteschlange:** Zwischen zwei Anmeldungs-Nachrichten desselben Events liegen mindestens 5 Minuten. Kommt innerhalb der Sperre etwas Neues, wird der Text in `rb:notifyq:<kanal>:<event>` gemerkt und **automatisch** gesendet, sobald die Sperre abgelaufen ist – durch den Cron (alle 5 Min) oder beim nächsten Aufruf, auch ohne offene Seite.
-- **Doppel-Erkennung:** Ist der Text identisch mit der letzten Nachricht, wird er 10 Minuten lang nicht wiederholt – das verhindert doppelte Meldungen aus zwei Tabs oder nach einem Reload. Zusätzlich hält der Worker seit `2026-11-15` einen Versand-Merker (`rb:sent:<kanal>:<text-hash>`, 30 Min): erst Anspruch schreiben, 300 ms warten, gegenlesen – nur ein Aufruf sendet, auch wenn mehrere Geräte im selben Moment posten.
-- **Sichtbar in der App:** Bei Sperre zeigt die Seite „Sperre aktiv – wird in ca. X Min automatisch gesendet", bei unverändertem Text „unverändert, nicht erneut gesendet".
-- **Sperre zurücksetzen:** `POST /notify` mit `{ "key": "…", "type": "reset" }` löscht Sperren und Warteschlange (zum Testen).
-- **Wartende sofort senden:** Der Button „Wartende senden" im Roster schickt alle während der Sperre gemerkten An-/Abmeldungen sofort (`POST /notify` mit `{ "key": "…", "type": "flush" }`). Der Discord-Test-Knopf bleibt separat und schickt nur eine Beispielnachricht.
-- **Automatisch nachholen** passiert an drei Stellen: Cron (`*/5 * * * *`), jeder `/notify`-Aufruf und jeder `/roster`-Abruf (die Seite fragt alle 5 Minuten). `/health` zeigt unter `cron.ageSec`, wann der Cron zuletzt lief – `"cron":null` heißt: kein Cron-Trigger eingerichtet.
-- **Fehler werden nicht als gesendet markiert**, der nächste Build versucht es erneut.
+- **Keine Sperre und keine Warteschlange mehr:** Eine Meldung geht sofort raus. Der Versand-Merker (`rb:sent:<kanal>:<text-hash>`, 30 Min) verhindert, dass derselbe Text zweimal im Kanal landet – auch wenn zwei Tabs oder zwei Geräte gleichzeitig senden.
+- **Ein Abruf ohne Änderung schickt nichts.**
+- **Takt (seit 2026-11-16):** Die Seite fragt **1x pro Stunde** ab (24 Abfragen am Tag); der Knopf **Aktualisieren** holt jederzeit sofort neu. Der Cron prüft ebenfalls höchstens 1x pro Stunde (`CRON_MIN_GAP_MS`), auch wenn der Trigger im Dashboard noch auf 5 Minuten steht.
+- **Entfernt am 2026-11-16:** `type:"flush"`, `type:"reset"`, `?demo=1` bei `/alerts`, `?send=1` bei `/health`, der Discord-Test-Knopf und der Knopf „Wartende senden" – reine Testpfade, die zusätzliche Abfragen und Nachrichten ausgelöst haben.
 
 **Link anpinnen:** Der Button „Link anpinnen" postet den Roster-Link in `DISCORD_CHANNEL_ID` und pinnt die Nachricht. Dafür braucht der Bot `MANAGE_MESSAGES` im Kanal. Ohne die Variable meldet die Seite „DISCORD_CHANNEL_ID fehlt".
 
@@ -108,7 +101,7 @@ Unter der Comp sitzt das Panel **Änderungen** (volle Breite). Es zeigt dieselbe
 
 ## Todes-Erinnerung im Kanal
 
-Der Cron-Trigger (`*/5 * * * *`) prüft die **letzten 3 ZvZ-Battles**. Wer in einem dieser Battles **mindestens 2 Tode** hat, löst eine Nachricht aus:
+Der Cron-Trigger (`0 * * * *`) prüft die **letzten 3 ZvZ-Battles**. Wer in einem dieser Battles **mindestens 2 Tode** hat, löst eine Nachricht aus:
 
 ```
 **☠️ Todes-Erinnerung · ZvZ**
@@ -122,19 +115,18 @@ Battle 13.11., 21:34 · Masse 21
 - Battle-Daten werden erst 2 Stunden nach dem Battle-Ende aus dem 30-Tage-Cache bedient; während des Fights gespeicherte Zwischenstände können so nicht dauerhaft falsche Tode zeigen.
 - Gilden-ID für den Cron: `ALERT_GUILD`, Standard `p9uAFij9ReO0BhIhHlVa8g` (The-Fallen).
 
-**Testen:**
+**Prüfen:**
 
 ```
-# 1. Format prüfen (Beispielnachricht, keine echten Daten, kein Merker)
-GET /alerts?demo=1&name=Takumoto04&deaths=5&key=<mod-key>
-
-# 2. Trockenlauf: was würde gemeldet, ohne zu senden
+# Trockenlauf: was würde gemeldet, ohne zu senden
 GET /alerts?guild=<id>&key=<mod-key>&notify=0&force=1
 #    Antwort: details[] mit name, deaths, kills, battleId, time, mass
 
-# 3. Echter Test: Merker eines Spielers löschen und sofort neu melden
+# Merker eines Spielers löschen, damit die nächste Prüfung wieder meldet
 GET /alerts?guild=<id>&key=<mod-key>&reset=1&name=<Spieler>
 ```
+
+`?demo=1` (Beispielnachricht) wurde am 2026-11-16 entfernt.
 
 Die `details` stammen aus denselben `playerStats` wie die Battle-Ansicht auf AlbionZvZ – ein Abgleich der Todeszahlen dort ist der Beleg, dass das Tracking stimmt.
 
@@ -265,7 +257,7 @@ export default {
 
 </details>
 
-**Bindings:** `MOD_KEY`, `DISCORD_TOKEN` und `FEEDBACK_TF` sind vorhanden. `DISCORD_CHANNEL_ID` muss auf den Zielkanal gesetzt sein (Feedback, Anmeldungen, Todes-Erinnerung und Pin). `DISCORD_USER_ID` bleibt optional als DM-Fallback. `ALERT_GUILD` ist optional. Zusätzlich im Dashboard unter **Triggers** einen Cron-Trigger `*/5 * * * *` anlegen, damit die Todes-Erinnerung ohne offene Seite läuft.
+**Bindings:** `MOD_KEY`, `DISCORD_TOKEN` und `FEEDBACK_TF` sind vorhanden. `DISCORD_CHANNEL_ID` muss auf den Zielkanal gesetzt sein (Feedback, Anmeldungen, Todes-Erinnerung und Pin). `DISCORD_USER_ID` bleibt optional als DM-Fallback. `ALERT_GUILD` ist optional. Zusätzlich im Dashboard unter **Triggers** einen Cron-Trigger `0 * * * *` anlegen (stündlich), damit die Todes-Erinnerung ohne offene Seite läuft. Der Worker selbst bremst zusätzlich auf einen Lauf pro Stunde (`CRON_MIN_GAP_MS`), ein versehentlicher 5-Minuten-Trigger ist damit unschädlich.
 
 **CORS:** Der Worker antwortet mit `Access-Control-Allow-Origin: *` wie der bisherige Code; der Mod-Key bleibt der Riegel. Dadurch funktioniert die Seite auch von `file://` und localhost.
 
@@ -273,8 +265,8 @@ export default {
 
 - AlbionZvZ liefert öffentlich `GET /api/events/public/<token>/roster` (~4 KB) und `…/assignments/ops?sinceSeq=` (~400 B Delta).
 - Es gibt **keinen** CORS-Header und keinen WebSocket/SSE-Kanal – der Browser darf nicht direkt, und Push ist nicht verfügbar.
-- Deshalb: Worker holt die Daten, die Seite fragt den Worker alle 5 Minuten. Das ist derselbe Weg, den AlbionZvZ selbst nutzt.
-- Der Worker cacht die Event-Seite (Rollen + Comp) 5 Minuten, damit nicht bei jedem Poll 800 KB HTML geladen werden.
+- Deshalb: Worker holt die Daten, die Seite fragt den Worker jede Stunde (24 Abfragen/Tag). Das ist derselbe Weg, den AlbionZvZ selbst nutzt.
+- Der Worker cacht die Event-Seite (Rollen + Comp) 5 Minuten, damit nicht bei jedem Abruf 800 KB HTML geladen werden.
 
 ## Zahlen neben den Rollen
 
@@ -342,7 +334,7 @@ Die Engine arbeitet zweistufig (erst Party 1 + 2, dann Reserve), setzt den Calle
 2. **Kein Multi-Moderator-Sync** – die Live-Abfrage liest AlbionZvZ, nicht die Änderungen eines zweiten Callers.
 3. **Kein Zurückschreiben** nach AlbionZvZ: Das ginge nur mit deiner Login-Session und ist bewusst nicht eingebaut. Übertragung per Kopiervorlage.
 4. **Token manuell** – kein Event-Picker; der Link wird eingefügt.
-5. **Polling-Intervall 60 s** (`LIVE_MS` im Modul) – Auto-Build bleibt bei 5 Minuten. Ein Verlassen **und** Wiederkommen innerhalb eines Intervalls ist nicht erkennbar.
+5. **Polling-Intervall 1 Stunde** (`LIVE_MS` im Modul) – Auto-Build höchstens 1x pro Stunde. Ein Verlassen **und** Wiederkommen innerhalb eines Intervalls ist nicht erkennbar; der Tab-Wechsel fragt erst nach 10 Minuten neu ab.
 
 ## Testprotokoll
 
